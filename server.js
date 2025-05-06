@@ -234,52 +234,37 @@ app.get('/api/financial-analysis', async (req, res) => {
       });
     }
     
-    // DB에서 해당 재무제표 데이터 조회
-    let financialStatements = await financialService.getFinancialStatements(
-      db, corp_code, bsns_year, reprt_code
-    );
+    let financialStatements = [];
     
-    console.log(`재무분석 API - ${corp_code} 회사의 ${bsns_year}년 재무제표 데이터 조회 결과: ${financialStatements.length}개`);
-    
-    // DB에 데이터가 없는 경우 DART API에서 가져와서 저장
-    if (financialStatements.length === 0) {
-      console.log(`재무분석 API - ${corp_code} 회사의 ${bsns_year}년 재무제표 데이터가 없어 DART API에서 가져오는 중...`);
+    // Vercel 환경에서는 항상 DART API에서 데이터를 가져옵니다.
+    console.log(`재무분석 API - ${corp_code} 회사의 ${bsns_year}년 재무제표 데이터를 DART API에서 가져오는 중...`);
+    try {
+      const newData = await financialService.fetchFinancialStatements(
+        corp_code, bsns_year, reprt_code
+      );
       
-      try {
-        const newData = await financialService.fetchFinancialStatements(
-          corp_code, bsns_year, reprt_code
-        );
-        
-        if (newData && newData.length > 0) {
-          await financialService.saveFinancialStatementsToDB(
-            db, corp_code, bsns_year, reprt_code, newData
-          );
-          
-          // 저장 후 다시 조회
-          financialStatements = await financialService.getFinancialStatements(
-            db, corp_code, bsns_year, reprt_code
-          );
-          
-          console.log(`재무분석 API - ${corp_code} 회사의 ${bsns_year}년 재무제표 데이터 DART API에서 가져와 저장 완료: ${financialStatements.length}개`);
-        } else {
-          console.warn(`재무분석 API - ${corp_code} 회사의 ${bsns_year}년 재무제표 데이터를 DART API에서 가져오지 못했습니다.`);
-          return res.status(404).json({
-            status: 'error',
-            message: '해당 회사의 재무제표 데이터를 찾을 수 없습니다.'
-          });
-        }
-      } catch (apiError) {
-        console.error(`재무분석 API - DART API 호출 중 오류 발생:`, apiError);
-        return res.status(500).json({
+      if (newData && newData.length > 0) {
+        financialStatements = newData;
+        console.log(`재무분석 API - ${corp_code} 회사의 ${bsns_year}년 재무제표 데이터 DART API에서 가져오기 완료: ${financialStatements.length}개`);
+      } else {
+        console.warn(`재무분석 API - ${corp_code} 회사의 ${bsns_year}년 재무제표 데이터를 DART API에서 가져오지 못했습니다.`);
+        // DB 저장 로직이 없으므로, 여기서 바로 404 반환
+        return res.status(404).json({
           status: 'error',
-          message: `DART API 데이터 조회 중 오류가 발생했습니다: ${apiError.message}`
+          message: '해당 회사의 재무제표 데이터를 DART API에서 찾을 수 없습니다.'
         });
       }
+    } catch (apiError) {
+      console.error(`재무분석 API - DART API 호출 중 오류 발생:`, apiError);
+      return res.status(500).json({
+        status: 'error',
+        message: `DART API 데이터 조회 중 오류가 발생했습니다: ${apiError.message}`
+      });
     }
     
-    // 데이터가 없는 경우
+    // 데이터가 없는 경우 (API에서도 못 가져온 경우)
     if (financialStatements.length === 0) {
-      console.warn(`재무분석 API - ${corp_code} 회사의 ${bsns_year}년 재무제표 데이터가 없습니다.`);
+      console.warn(`재무분석 API - ${corp_code} 회사의 ${bsns_year}년 재무제표 데이터가 없습니다. (최종 확인)`);
       return res.status(404).json({
         status: 'error',
         message: '해당 회사의 재무제표 데이터를 찾을 수 없습니다.'
@@ -288,9 +273,9 @@ app.get('/api/financial-analysis', async (req, res) => {
     
     // 전체 재무제표에서 주요 항목 추출
     const analysis = {
-      balanceSheet: {}, // 재무상태표 주요 항목
-      incomeStatement: {}, // 손익계산서 주요 항목
-      ratio: {} // 주요 재무 비율
+      balanceSheet: {}, 
+      incomeStatement: {}, 
+      ratio: {} 
     };
     
     // 재무상태표 데이터 추출

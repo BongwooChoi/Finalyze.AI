@@ -303,13 +303,11 @@ function connectDB() {
 }
 
 module.exports = {
+  connectDB,
+  fetchFinancialStatements,
+  getSpecificAccount,
   searchCompanyByName,
   searchCompanyByStockCode,
-  fetchFinancialStatements,
-  saveFinancialStatementsToDB,
-  getFinancialStatements,
-  getSpecificAccount,
-  connectDB,
   REPORT_CODE,
   FS_DIV
 }; 

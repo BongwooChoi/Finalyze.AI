@@ -77,50 +77,36 @@ async function fetchFinancialStatements(corpCode, bsnsYear, reprtCode) {
       timeout: 15000 // 15초 타임아웃 설정
     });
     
-    console.log(`DART API 응답 상태 코드: ${response.status}`);
+    console.log(`DART API 응답 상태 코드: ${response.status}, 응답 데이터 status: ${response.data.status}`);
     
     if (response.data.status === '000') {
       if (response.data.list && response.data.list.length > 0) {
         console.log(`${response.data.list.length}개의 재무제표 항목을 가져왔습니다.`);
         return response.data.list;
       } else {
-        console.warn(`${corpCode} 회사의 ${bsnsYear}년 재무제표 데이터가 없습니다.`);
+        console.warn(`${corpCode} 회사의 ${bsnsYear}년 재무제표 데이터가 없습니다. (응답 list가 비어있음)`);
         return [];
       }
+    } else if (response.data.status === '013') {
+      console.warn(`${corpCode} 회사의 ${bsnsYear}년에 해당하는 데이터가 없습니다. (DART API status: 013)`);
+      return [];
     } else {
-      console.error('재무제표 데이터 가져오기 실패:', response.data);
-      throw new Error(`DART API 오류 (${response.data.status}): ${response.data.message || '알 수 없는 오류'}`);
+      console.error('DART API로부터 오류 응답 수신:', response.data);
+      throw new Error(`DART API 오류 (${response.data.status}): ${response.data.message || '알 수 없는 DART API 오류'}`);
     }
   } catch (error) {
     if (error.response) {
-      // 서버 응답이 있는 경우
-      const responseData = error.response.data || {};
-      const statusCode = error.response.status;
-      const message = responseData.message || '데이터 없음';
-      
-      // API 상태 코드 처리 (OPEN DART API는 HTTP 200으로 응답하고 내부적으로 상태 코드 사용)
-      if (statusCode === 200 && responseData.status === '013') {
-        console.warn(`${corpCode} 회사의 ${bsnsYear}년에 해당하는 데이터가 없습니다. (상태 코드: ${responseData.status})`);
-        return [];
-      } else if (statusCode === 200 && responseData.status === '010') {
-        console.warn(`${corpCode}는 유효하지 않은 회사 고유번호입니다. (상태 코드: ${responseData.status})`);
-        throw new Error('유효하지 않은 회사 고유번호입니다.');
-      } else {
-        console.error('DART API 서버 오류:', statusCode, responseData);
-        throw new Error(`DART API 서버 오류 (${statusCode}): ${message}`);
-      }
+      console.error('DART API 요청 실패 (HTTP 에러 응답):', error.response.status, error.response.data);
+      throw new Error(`DART API 서버 응답 오류 (${error.response.status}): ${error.response.data.message || '내용 없음'}`);
     } else if (error.code === 'ECONNABORTED') {
-      // 타임아웃 오류
       console.error('DART API 요청 타임아웃:', error.message);
       throw new Error('DART API 요청 시간이 초과되었습니다. 나중에 다시 시도해주세요.');
     } else if (error.request) {
-      // 요청은 보냈지만 응답이 없는 경우 (네트워크 오류 등)
-      console.error('DART API 네트워크 오류:', error.message);
+      console.error('DART API 네트워크 오류 (요청은 했으나 응답 없음):', error.message);
       throw new Error(`DART API 네트워크 오류: ${error.message}`);
     } else {
-      // 요청 설정 중에 오류가 발생한 경우
-      console.error('DART API 호출 준비 중 오류 발생:', error.message);
-      throw new Error(`DART API 호출 준비 오류: ${error.message}`);
+      console.error('DART API 호출 중 예기치 않은 오류 발생:', error.message);
+      throw new Error(`재무제표 데이터 조회 준비 중 오류: ${error.message}`);
     }
   }
 }

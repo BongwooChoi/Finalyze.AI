@@ -1,8 +1,8 @@
 // 전역 변수
 let selectedCompany = null;
-let overviewChart = null;
-let assetCompositionChart = null;
-let liabilityEquityChart = null;
+let incomeStatementChart = null;
+// let assetCompositionChart = null;
+// let liabilityEquityChart = null;
 let currentYear = null;
 let previousYear = null;
 
@@ -21,9 +21,10 @@ const analysisCardTitle = document.getElementById('analysisCardTitle');
 const bsTableBody = document.getElementById('bsTableBody');
 const isTableBody = document.getElementById('isTableBody');
 const ratioTableBody = document.getElementById('ratioTableBody');
-const overviewChartCanvas = document.getElementById('overviewChart');
-const assetCompositionChartCanvas = document.getElementById('assetCompositionChart');
-const liabilityEquityChartCanvas = document.getElementById('liabilityEquityChart');
+const incomeStatementChartCanvas = document.getElementById('incomeStatementChart');
+const balanceSheetVisContainer = document.getElementById('balanceSheetVisContainer');
+// const assetCompositionChartCanvas = document.getElementById('assetCompositionChart');
+// const liabilityEquityChartCanvas = document.getElementById('liabilityEquityChart');
 const loadingIndicator = document.getElementById('loadingIndicator');
 const overviewError = document.getElementById('overviewError');
 const aiAnalysisLoading = document.getElementById('aiAnalysisLoading');
@@ -154,18 +155,21 @@ function selectCompany(company) {
   analysisCard.style.display = 'none';
   
   // 차트 초기화
-  if (overviewChart) {
-    overviewChart.destroy();
-    overviewChart = null;
+  if (incomeStatementChart) {
+    incomeStatementChart.destroy();
+    incomeStatementChart = null;
   }
-  if (assetCompositionChart) {
-    assetCompositionChart.destroy();
-    assetCompositionChart = null;
+  if (balanceSheetVisContainer) {
+    balanceSheetVisContainer.innerHTML = '';
   }
-  if (liabilityEquityChart) {
-    liabilityEquityChart.destroy();
-    liabilityEquityChart = null;
-  }
+  // if (assetCompositionChart) {
+  //   assetCompositionChart.destroy();
+  //   assetCompositionChart = null;
+  // }
+  // if (liabilityEquityChart) {
+  //   liabilityEquityChart.destroy();
+  //   liabilityEquityChart = null;
+  // }
   
   // 화면 스크롤
   financialOptionsCard.scrollIntoView({ behavior: 'smooth' });
@@ -197,9 +201,9 @@ async function fetchFinancialAnalysis() {
   // 카드 제목 업데이트
   analysisCardTitle.innerHTML = `${selectedCompany.corp_name} - ${year}년 ${reportName} 분석`;
   
-  // 로딩 표시 및 초기화
+  // 로딩 표시 및 초기화 (여기서 보여주기만 함)
   analysisCard.style.display = 'block';
-  loadingIndicator.style.display = 'block';
+  loadingIndicator.style.display = 'block'; // 보여주기
   overviewError.style.display = 'none';
   document.getElementById('chartRow').style.display = 'none';
   
@@ -225,56 +229,62 @@ async function fetchFinancialAnalysis() {
     console.log('재무분석 API 응답:', data);
     
     if (data.status === 'success') {
-      // 로딩 메시지 숨기기
-      loadingIndicator.style.display = 'none';
-      
-      // 데이터 표시
+      // 데이터 표시 함수 호출
       displayFinancialAnalysis(data.data);
     } else {
-      // 오류 메시지 표시
-      loadingIndicator.style.display = 'none';
+      // 오류 처리 (loadingIndicator 숨기는 로직 제거)
+      loadingIndicator.style.display = 'none'; // 오류 시에는 여기서 바로 숨김
       overviewError.style.display = 'block';
-      overviewError.textContent = data.message || '데이터를 불러오는 중 오류가 발생했습니다';
+      overviewError.textContent = data.message || '데이터를 불러오는 중 오류';
       console.error('재무분석 API 오류:', data.message);
     }
   } catch (error) {
+    // 네트워크/기타 오류 처리 (loadingIndicator 숨김)
     console.error('재무분석 데이터 조회 중 오류 발생:', error);
-    loadingIndicator.style.display = 'none';
+    loadingIndicator.style.display = 'none'; 
     overviewError.style.display = 'block';
-    overviewError.textContent = `데이터를 불러오는 중 오류가 발생했습니다: ${error.message || '알 수 없는 오류'}`;
+    overviewError.textContent = `데이터 조회 오류: ${error.message || '알 수 없는 오류'}`;
   }
 }
 
 // 통합 재무분석 표시 함수
 function displayFinancialAnalysis(analysis) {
+  console.log('--- displayFinancialAnalysis called ---', analysis); 
   try {
-    // 1. 개요 차트 및 AI 분석
-    displayOverviewCharts(analysis);
-    displayCompositionCharts(analysis);
-    fetchAIFinancialAnalysis(analysis);
+    // !!! 여기서 메인 로딩 인디케이터 숨기기 !!!
+    loadingIndicator.style.display = 'none';
     
-    // 2. 재무상태표 탭
+    // 1. 개요 탭 내용 생성
+    console.log('Calling chart/vis display functions...');
+    displayIncomeStatementChart(analysis);
+    displayBalanceSheetVis(analysis);
+    // displayCompositionCharts(analysis);
+    console.log('Calling AI analysis function...');
+    fetchAIFinancialAnalysis(analysis); 
+
+    // 2. 다른 탭 내용 생성
     displayBalanceSheetTable(analysis.balanceSheet || {});
-    
-    // 3. 손익계산서 탭
     displayIncomeStatementTable(analysis.incomeStatement || {});
-    
-    // 4. 재무비율 탭
     displayRatioTable(analysis.ratio || {});
+
+    // 3. 개요 탭 내용 (차트 영역) 표시
+    document.getElementById('chartRow').style.display = 'flex'; 
     
     // 화면 스크롤
     analysisCard.scrollIntoView({ behavior: 'smooth' });
+    
   } catch (error) {
-    console.error('재무분석 표시 중 오류 발생:', error);
-    loadingIndicator.style.display = 'none';
+    console.error('Error in displayFinancialAnalysis:', error);
+    loadingIndicator.style.display = 'none'; // 혹시 모를 오류 시에도 숨김
     overviewError.style.display = 'block';
-    overviewError.textContent = `재무분석 표시 중 오류가 발생했습니다: ${error.message}`;
+    overviewError.textContent = `재무분석 표시 중 오류: ${error.message}`;
     document.getElementById('chartRow').style.display = 'none';
   }
 }
 
 // AI 기반 재무분석 가져오기
 async function fetchAIFinancialAnalysis(analysis) {
+  console.log('--- fetchAIFinancialAnalysis called ---');
   try {
     aiAnalysisLoading.style.display = 'block';
     aiAnalysisError.style.display = 'none';
@@ -303,6 +313,7 @@ async function fetchAIFinancialAnalysis(analysis) {
     }
     
     const data = await response.json();
+    console.log('AI Analysis API Response Data:', data);
     
     if (data.status === 'success') {
       aiAnalysisLoading.style.display = 'none';
@@ -340,275 +351,231 @@ async function fetchAIFinancialAnalysis(analysis) {
       });
       
       aiAnalysisContent.innerHTML = `<div class="ai-analysis">${htmlContent}</div>`;
+      console.log('AI Analysis Content displayed.');
     } else {
       throw new Error(data.message || 'AI 분석 결과를 가져오지 못했습니다.');
     }
   } catch (error) {
-    console.error('AI 재무분석 가져오기 오류:', error);
+    console.error('Error in fetchAIFinancialAnalysis:', error);
     aiAnalysisLoading.style.display = 'none';
     aiAnalysisError.style.display = 'block';
     aiAnalysisError.textContent = `AI 분석을 가져오는 중 오류가 발생했습니다: ${error.message}`;
   }
 }
 
-// 개요 차트 표시 함수
-function displayOverviewCharts(analysis) {
+// 손익계산서 차트 표시 함수
+function displayIncomeStatementChart(analysis) {
+  console.log('--- displayIncomeStatementChart called ---');
   try {
-    // 차트 요소 확인
-    if (!overviewChartCanvas) {
-      console.error('차트 캔버스 요소를 찾을 수 없습니다.');
-      throw new Error('차트를 표시할 수 없습니다. 페이지를 새로고침해주세요.');
-    }
-    
-    // 기존 차트 정리
-    if (overviewChart) {
-      overviewChart.destroy();
-      overviewChart = null;
-    }
-    
-    const overviewCtx = overviewChartCanvas.getContext('2d');
-    
-    // 주요 재무 지표 데이터 준비
-    const labels = [
-      '매출액', '영업이익', '당기순이익', 
-      '자산총계', '부채총계', '자본총계', 
-      '유동자산', '유동부채' // 유동자산, 유동부채 추가
-    ];
-    const currentData = [
-      analysis.incomeStatement?.['매출액']?.current || 0,
-      analysis.incomeStatement?.['영업이익']?.current || 0,
-      analysis.incomeStatement?.['당기순이익']?.current || 0,
-      analysis.balanceSheet?.['자산총계']?.current || 0,
-      analysis.balanceSheet?.['부채총계']?.current || 0,
-      analysis.balanceSheet?.['자본총계']?.current || 0,
-      analysis.balanceSheet?.['유동자산']?.current || 0, // 유동자산 데이터 추가
-      analysis.balanceSheet?.['유동부채']?.current || 0  // 유동부채 데이터 추가
-    ];
-    const previousData = [
-      analysis.incomeStatement?.['매출액']?.previous || 0,
-      analysis.incomeStatement?.['영업이익']?.previous || 0,
-      analysis.incomeStatement?.['당기순이익']?.previous || 0,
-      analysis.balanceSheet?.['자산총계']?.previous || 0,
-      analysis.balanceSheet?.['부채총계']?.previous || 0,
-      analysis.balanceSheet?.['자본총계']?.previous || 0,
-      analysis.balanceSheet?.['유동자산']?.previous || 0, // 유동자산 데이터 추가
-      analysis.balanceSheet?.['유동부채']?.previous || 0  // 유동부채 데이터 추가
-    ];
-    
-    // 데이터에 유효값이 하나도 없는지 확인
-    const hasValidOverviewData = currentData.some(val => val > 0) || previousData.some(val => val > 0);
-    
-    if (!hasValidOverviewData) {
-      console.warn('유효한 재무 지표 데이터가 없습니다.');
-      loadingIndicator.style.display = 'none';
-      overviewError.style.display = 'block';
-      overviewError.textContent = '유효한 재무 지표 데이터가 없습니다.';
-      document.getElementById('chartRow').style.display = 'none';
+    if (!incomeStatementChartCanvas) {
+      console.error('Income statement canvas not found!');
       return;
     }
+    if (incomeStatementChart) incomeStatementChart.destroy();
+
+    const ctx = incomeStatementChartCanvas.getContext('2d');
     
-    // 주요 재무 지표 차트 (막대 그래프)
-    const overviewData = {
-      labels: labels,
-      datasets: [
-        {
-          label: `${currentYear}년`,
-          data: currentData,
-          backgroundColor: 'rgba(54, 162, 235, 0.6)',
-          borderColor: 'rgb(54, 162, 235)',
-          borderWidth: 1
-        },
-        {
-          label: `${previousYear}년`,
-          data: previousData,
-          backgroundColor: 'rgba(255, 159, 64, 0.6)',
-          borderColor: 'rgb(255, 159, 64)',
-          borderWidth: 1
-        }
-      ]
-    };
+    // 데이터 준비
+    const salesCurrent = analysis.incomeStatement?.['매출액']?.current || 0;
+    const opIncomeCurrent = analysis.incomeStatement?.['영업이익']?.current || 0;
+    const netIncomeCurrent = analysis.incomeStatement?.['당기순이익']?.current || 0;
+    const salesPrevious = analysis.incomeStatement?.['매출액']?.previous || 0;
+    const opIncomePrevious = analysis.incomeStatement?.['영업이익']?.previous || 0;
+    const netIncomePrevious = analysis.incomeStatement?.['당기순이익']?.previous || 0;
+
+    // !!! 디버깅 로그 추가 !!!
+    console.log(`Margin Calculation Inputs (${currentYear}): Sales=${salesCurrent}, OpIncome=${opIncomeCurrent}, NetIncome=${netIncomeCurrent}`);
+    console.log(`Margin Calculation Inputs (${previousYear}): Sales=${salesPrevious}, OpIncome=${opIncomePrevious}, NetIncome=${netIncomePrevious}`);
+
+    // 이익률 계산 (%)
+    const opMarginCurrent = salesCurrent !== 0 ? ((opIncomeCurrent / salesCurrent) * 100).toFixed(2) : 0;
+    const netMarginCurrent = salesCurrent !== 0 ? ((netIncomeCurrent / salesCurrent) * 100).toFixed(2) : 0;
+    const opMarginPrevious = salesPrevious !== 0 ? ((opIncomePrevious / salesPrevious) * 100).toFixed(2) : 0;
+    const netMarginPrevious = salesPrevious !== 0 ? ((netIncomePrevious / salesPrevious) * 100).toFixed(2) : 0;
     
-    // 주요 재무 지표 차트 생성
-    overviewChart = new Chart(overviewCtx, {
-      type: 'bar',
-      data: overviewData,
+    // !!! 계산된 이익률 로그 추가 !!!
+    console.log(`Calculated Margins (${currentYear}): OpMargin=${opMarginCurrent}%, NetMargin=${netMarginCurrent}%`);
+    console.log(`Calculated Margins (${previousYear}): OpMargin=${opMarginPrevious}%, NetMargin=${netMarginPrevious}%`);
+
+    const labels = [ `${previousYear}년`, `${currentYear}년`];
+    
+    const chartData = {
+        labels: labels,
+        datasets: [
+          {
+            type: 'bar', // 매출액은 막대
+            label: '매출액',
+            data: [salesPrevious, salesCurrent],
+            backgroundColor: 'rgba(54, 162, 235, 0.6)',
+            borderColor: 'rgb(54, 162, 235)',
+            borderWidth: 1,
+            yAxisID: 'y-axis-amount' // 왼쪽 Y축 사용
+          },
+          {
+            type: 'line', // 영업이익률은 선
+            label: '영업이익률 (%)',
+            data: [opMarginPrevious, opMarginCurrent],
+            borderColor: 'rgb(255, 99, 132)',
+            backgroundColor: 'rgba(255, 99, 132, 0.2)',
+            borderWidth: 2,
+            fill: false,
+            tension: 0.1,
+            yAxisID: 'y-axis-percent' // 오른쪽 Y축 사용
+          },
+          {
+            type: 'line', // 당기순이익률은 선
+            label: '당기순이익률 (%)',
+            data: [netMarginPrevious, netMarginCurrent],
+            borderColor: 'rgb(75, 192, 75)', // 초록색 계열
+            backgroundColor: 'rgba(75, 192, 75, 0.2)',
+            borderWidth: 2,
+            fill: false,
+            tension: 0.1,
+            yAxisID: 'y-axis-percent' // 오른쪽 Y축 사용
+          }
+        ]
+      };
+    // console.log('Income Statement Chart Data:', JSON.stringify(chartData)); // 이전 로그는 주석 처리 또는 유지
+
+    const hasValidData = salesCurrent !== 0 || salesPrevious !== 0; // 매출액 기준으로 유효성 판단
+    if (!hasValidData) {
+        console.warn('No valid sales data to display chart.');
+        incomeStatementChartCanvas.parentElement.innerHTML = '<p class="text-center text-muted small">손익계산서 데이터 없음</p>';
+        return;
+    }
+
+    console.log('Creating Income Statement Chart...');
+    incomeStatementChart = new Chart(ctx, {
+      // type: 'bar', // 타입을 datasets에서 개별 지정
+      data: chartData,
       options: {
         responsive: true,
         maintainAspectRatio: false,
         plugins: {
           title: {
             display: true,
-            text: `${selectedCompany.corp_name} - 주요 재무 지표`,
-            font: {
-              size: 16,
-              weight: 'bold'
-            }
+            text: '매출 및 주요 이익률 추이', // 제목 변경
+            font: { size: 14, weight: 'bold' }
           },
           tooltip: {
             callbacks: {
               label: function(context) {
-                return `${context.dataset.label}: ${formatAmountBetter(context.raw)}`;
+                let label = context.dataset.label || '';
+                if (label) {
+                  label += ': ';
+                }
+                if (context.dataset.yAxisID === 'y-axis-percent') {
+                    label += `${context.formattedValue}%`;
+                } else {
+                    label += formatAmountBetter(context.raw);
+                }
+                return label;
               }
             }
-          }
+          },
+          legend: { display: true, position: 'bottom' }
         },
         scales: {
-          y: {
+          'y-axis-amount': { // 왼쪽 Y축 (금액)
+            type: 'linear',
+            display: true,
+            position: 'left',
             beginAtZero: true,
+            title: {
+                display: true,
+                text: '매출액 (원)'
+            },
             ticks: {
-              callback: function(value) {
-                return formatAmountBetter(value, true);
-              }
+              callback: function(value) { return formatAmountBetter(value, true); }
+            }
+          },
+          'y-axis-percent': { // 오른쪽 Y축 (비율)
+            type: 'linear',
+            display: true,
+            position: 'right',
+            // beginAtZero: true, // 비율은 음수일 수 있으므로 0 시작 강제 안함
+            grid: {
+              drawOnChartArea: false, // 오른쪽 축 그리드 라인 숨김
+            },
+            title: {
+                display: true,
+                text: '이익률 (%)'
+            },
+            ticks: {
+              callback: function(value) { return value + '%'; }
             }
           }
         }
       }
     });
-    
-    // 차트 행 표시
-    document.getElementById('chartRow').style.display = 'flex';
+    console.log('Income Statement Chart CREATED.');
   } catch (error) {
-    console.error('차트 표시 중 오류 발생:', error);
-    loadingIndicator.style.display = 'none';
-    overviewError.style.display = 'block';
-    overviewError.textContent = `차트 표시 중 오류가 발생했습니다: ${error.message}`;
-    document.getElementById('chartRow').style.display = 'none';
+    console.error('Error in displayIncomeStatementChart:', error);
+    if(incomeStatementChartCanvas) incomeStatementChartCanvas.parentElement.innerHTML = '<p class="text-center text-danger small">손익 차트 오류</p>';
   }
 }
 
-// 구성 비율 차트 표시 함수 (신규)
-function displayCompositionCharts(analysis) {
+// 재무상태표 시각화 표시 함수 (수정)
+function displayBalanceSheetVis(analysis) {
+  console.log('--- displayBalanceSheetVis called ---');
   try {
-    // 캔버스 요소 확인
-    if (!assetCompositionChartCanvas || !liabilityEquityChartCanvas) {
-      console.error('구성 비율 차트 캔버스 요소를 찾을 수 없습니다.');
-      return; // 오류 발생 시 함수 종료
+    if (!balanceSheetVisContainer) {
+      console.error('Balance sheet visualization container not found!');
+      return;
+    }
+    balanceSheetVisContainer.innerHTML = ''; // 이전 내용 지우기
+
+    const assets = analysis.balanceSheet?.['자산총계']?.current || 0;
+    const liabilities = analysis.balanceSheet?.['부채총계']?.current || 0;
+    const equity = analysis.balanceSheet?.['자본총계']?.current || 0;
+
+    // 데이터 유효성 검사
+    if (assets <= 0) {
+      console.warn('No valid balance sheet data for visualization.');
+      balanceSheetVisContainer.innerHTML = '<p class="text-center text-muted small">재무상태표 데이터 없음</p>';
+      return;
     }
 
-    // 기존 차트 정리
-    if (assetCompositionChart) assetCompositionChart.destroy();
-    if (liabilityEquityChart) liabilityEquityChart.destroy();
-
-    const assetCtx = assetCompositionChartCanvas.getContext('2d');
-    const liabilityEquityCtx = liabilityEquityChartCanvas.getContext('2d');
-
-    // 데이터 준비
-    const currentAssets = analysis.balanceSheet?.['유동자산']?.current || 0;
-    const nonCurrentAssets = analysis.balanceSheet?.['비유동자산']?.current || 0;
-    const totalLiabilities = analysis.balanceSheet?.['부채총계']?.current || 0;
-    const totalEquity = analysis.balanceSheet?.['자본총계']?.current || 0;
-    const totalAssets = analysis.balanceSheet?.['자산총계']?.current || (currentAssets + nonCurrentAssets);
-    const totalLiabilityEquity = totalLiabilities + totalEquity;
-
-    // 보고서 이름 가져오기 (여기서도 필요)
-    const reportCode = reportTypeSelect.value;
-    const reportCodeMap = {
-      '11011': '사업보고서',
-      '11012': '반기보고서',
-      '11013': '1분기보고서',
-      '11014': '3분기보고서'
-    };
-    const reportName = reportCodeMap[reportCode] || '보고서';
-
-    // 데이터 유효성 검사 (자산)
-    if (totalAssets <= 0) {
-      console.warn('유효한 자산 데이터가 없어 자산 구성 차트를 생성할 수 없습니다.');
-      assetCompositionChartCanvas.parentElement.innerHTML = '<p class="text-center text-muted small">자산 데이터 없음</p>';
-    } else {
-      // 자산 구성 차트 데이터
-      const assetData = {
-        labels: ['유동자산', '비유동자산'],
-        datasets: [{
-          data: [currentAssets, nonCurrentAssets],
-          backgroundColor: ['rgba(54, 162, 235, 0.8)', 'rgba(75, 192, 192, 0.8)'],
-          borderColor: ['#ffffff'],
-          borderWidth: 2
-        }]
-      };
-      // 자산 구성 차트 생성
-      assetCompositionChart = new Chart(assetCtx, {
-        type: 'doughnut',
-        data: assetData,
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: {
-            title: {
-              display: true,
-              text: `${currentYear}년 ${reportName} 자산 구성`,
-              font: { size: 14 }
-            },
-            tooltip: {
-              callbacks: {
-                label: function(context) {
-                  const label = context.label || '';
-                  const value = context.raw || 0;
-                  const percentage = totalAssets > 0 ? ((value / totalAssets) * 100).toFixed(1) : 0;
-                  return `${label}: ${formatAmountBetter(value)} (${percentage}%)`;
-                }
-              }
-            },
-            legend: {
-              position: 'bottom',
-              labels: { boxWidth: 12 }
-            }
-          }
-        }
-      });
+    // 부채 + 자본 ~= 자산 확인
+    if (Math.abs(assets - (liabilities + equity)) / assets > 0.01) { // 1% 이상 차이나면 경고
+      console.warn(`Balance Sheet Equation Check Failed: A(${assets}) != L(${liabilities}) + E(${equity})`);
+      // 간단히 합계로 자산을 대체하거나 오류 표시 가능
     }
 
-    // 데이터 유효성 검사 (부채/자본)
-    if (totalLiabilityEquity <= 0) {
-      console.warn('유효한 부채/자본 데이터가 없어 부채/자본 구성 차트를 생성할 수 없습니다.');
-      liabilityEquityChartCanvas.parentElement.innerHTML = '<p class="text-center text-muted small">부채/자본 데이터 없음</p>';
-    } else {
-      // 부채/자본 구성 차트 데이터
-      const liabilityEquityData = {
-        labels: ['부채총계', '자본총계'],
-        datasets: [{
-          data: [totalLiabilities, totalEquity],
-          backgroundColor: ['rgba(255, 99, 132, 0.8)', 'rgba(255, 206, 86, 0.8)'],
-          borderColor: ['#ffffff'],
-          borderWidth: 2
-        }]
-      };
-      // 부채/자본 구성 차트 생성
-      liabilityEquityChart = new Chart(liabilityEquityCtx, {
-        type: 'doughnut',
-        data: liabilityEquityData,
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: {
-            title: {
-              display: true,
-              text: `${currentYear}년 ${reportName} 부채/자본 구성`,
-              font: { size: 14 }
-            },
-            tooltip: {
-              callbacks: {
-                label: function(context) {
-                  const label = context.label || '';
-                  const value = context.raw || 0;
-                  const percentage = totalLiabilityEquity > 0 ? ((value / totalLiabilityEquity) * 100).toFixed(1) : 0;
-                  return `${label}: ${formatAmountBetter(value)} (${percentage}%)`;
-                }
-              }
-            },
-            legend: {
-              position: 'bottom',
-              labels: { boxWidth: 12 }
-            }
-          }
-        }
-      });
-    }
+    // 비율 계산
+    const liabilityPercent = assets > 0 ? (liabilities / assets) * 100 : 0;
+    const equityPercent = assets > 0 ? (equity / assets) * 100 : 0;
+
+    // HTML 생성
+    const visHTML = `
+      <h6 class="text-center fw-bold mb-2">${currentYear}년 재무상태표 구조</h6>
+      <div class="bs-vis-box d-flex mx-auto">
+        <!-- 자산 (왼쪽) -->
+        <div class="bs-vis-section asset-box d-flex flex-column justify-content-center align-items-center">
+          <span class="bs-vis-label">자산</span>
+          <span class="bs-vis-value">${formatAmountBetter(assets, true)}</span>
+        </div>
+        <!-- 부채 + 자본 (오른쪽) -->
+        <div class="bs-vis-section d-flex flex-column">
+          <div class="liability-box flex-grow-1 d-flex flex-column justify-content-center align-items-center" style="height: ${liabilityPercent}%;">
+            <span class="bs-vis-label">부채</span>
+            <span class="bs-vis-value">${formatAmountBetter(liabilities, true)}</span>
+          </div>
+          <div class="equity-box flex-grow-1 d-flex flex-column justify-content-center align-items-center" style="height: ${equityPercent}%;">
+            <span class="bs-vis-label">자본</span>
+            <span class="bs-vis-value">${formatAmountBetter(equity, true)}</span>
+          </div>
+        </div>
+      </div>
+    `;
+
+    console.log('Creating Balance Sheet Visualization...');
+    balanceSheetVisContainer.innerHTML = visHTML;
+    console.log('Balance Sheet Visualization CREATED.');
 
   } catch (error) {
-    console.error('구성 비율 차트 표시 중 오류 발생:', error);
-    // 오류 발생 시 해당 차트 영역에 메시지 표시
-    if (assetCompositionChartCanvas) assetCompositionChartCanvas.parentElement.innerHTML = '<p class="text-center text-danger small">차트 오류</p>';
-    if (liabilityEquityChartCanvas) liabilityEquityChartCanvas.parentElement.innerHTML = '<p class="text-center text-danger small">차트 오류</p>';
+    console.error('Error in displayBalanceSheetVis:', error);
+    if(balanceSheetVisContainer) balanceSheetVisContainer.innerHTML = '<p class="text-center text-danger small">재무상태표 시각화 오류</p>';
   }
 }
 

@@ -582,5 +582,13 @@ ${JSON.stringify(financialData, null, 2)}
 `;
 }
 
+// Vercel 환경이 아닌 경우 (로컬 개발 환경 등)에만 서버를 직접 실행
+if (process.env.NODE_ENV !== 'production') {
+  app.listen(PORT, () => {
+    console.log(`로컬 서버가 ${PORT} 포트에서 실행 중입니다.`);
+    console.log('(Vercel 배포 시 이 메시지는 보이지 않아야 정상입니다.)');
+  });
+}
+
 // Vercel에서 사용할 수 있도록 Express 앱 인스턴스를 내보냅니다.
 module.exports = app; 

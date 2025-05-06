@@ -209,4 +209,60 @@ body {
 
 .ai-analysis li {
   margin-bottom: 5px;
+}
+
+/* 재무상태표 시각화 스타일 (신규) */
+.balance-sheet-vis-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 200px; /* 최소 높이 설정 */
+}
+
+.bs-vis-box {
+  width: 80%; /* 박스 너비 */
+  max-width: 300px; /* 최대 너비 */
+  height: 200px; /* 박스 높이 */
+  border: 1px solid #ccc;
+  background-color: #f8f9fa;
+}
+
+.bs-vis-section {
+  width: 50%;
+  height: 100%;
+  position: relative; /* 자식 요소의 position 기준 */
+}
+
+.asset-box {
+  background-color: rgba(75, 192, 192, 0.6); /* 자산 색상 */
+  border-right: 1px solid #ccc;
+}
+
+.liability-box {
+  background-color: rgba(255, 99, 132, 0.6); /* 부채 색상 */
+  border-bottom: 1px dashed #ccc; /* 자본과의 구분선 */
+  box-sizing: border-box; /* 테두리 포함 크기 계산 */
+}
+
+.equity-box {
+  background-color: rgba(255, 206, 86, 0.6); /* 자본 색상 */
+}
+
+.bs-vis-label {
+  font-size: 0.85rem;
+  font-weight: bold;
+  color: #333;
+}
+
+.bs-vis-value {
+  font-size: 0.8rem;
+  color: #555;
+  margin-top: 4px;
+}
+
+/* 작은 차트 컨테이너 스타일 */
+.chart-container-small {
+  position: relative;
+  height: 200px; 
+  width: 100%;
 } 

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'financial-app-cache-v2';
+const CACHE_NAME = 'financial-app-cache-v3';
 const urlsToCache = [
   '/',
   '/index.html',
@@ -26,16 +26,21 @@ self.addEventListener('install', event => {
   );
 });
 
-// 요청 처리 (캐시 우선)
+// 요청 처리 (캐시 우선, API 요청은 제외)
 self.addEventListener('fetch', event => {
+  // API 요청은 캐시하지 않고 네트워크로 바로 전달
+  if (event.request.url.includes('/api/')) {
+    event.respondWith(fetch(event.request));
+    return;
+  }
+
+  // 그 외 요청은 캐시 우선 전략 사용
   event.respondWith(
     caches.match(event.request)
       .then(response => {
-        // 캐시에 응답이 있으면 그것을 반환
         if (response) {
           return response;
         }
-        // 캐시에 없으면 네트워크에서 가져옴
         return fetch(event.request);
       })
   );

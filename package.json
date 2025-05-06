@@ -1,0 +1,25 @@
+{
+  "name": "fs-project",
+  "version": "1.0.0",
+  "description": "OPEN DART API를 사용하는 프로젝트",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "download-corp-code": "node downloadCorpCode.js",
+    "parse-corp-code": "node parseCorpCode.js",
+    "parse-corp-code-simple": "node parseCorpCodeSimple.js",
+    "search-corp-name": "node searchCorpCode.js -n",
+    "search-stock-code": "node searchCorpCode.js -c",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "@xmldom/xmldom": "^0.8.10",
+    "adm-zip": "^0.5.10",
+    "axios": "^1.6.0",
+    "chart.js": "^4.4.1",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "sqlite3": "^5.1.6",
+    "xml2js": "^0.6.2"
+  }
+} 

@@ -122,25 +122,16 @@
             <div class="row" id="chartRow" style="display: none;">
               <div class="col-md-6 mb-4">
                 <div class="card h-100">
-                  <div class="card-header">주요 재무 지표</div>
-                  <div class="card-body">
-                    <div class="chart-container mb-3">
-                      <canvas id="overviewChart"></canvas>
+                  <div class="card-header">주요 재무 시각화</div>
+                  <div class="card-body d-flex flex-column">
+                    <!-- 손익계산서 차트 -->
+                    <div class="chart-container mb-4">
+                      <canvas id="incomeStatementChart"></canvas>
                     </div>
-                    <!-- 추가 차트 영역 시작 -->
-                    <div class="row mt-4">
-                      <div class="col-6">
-                        <div class="chart-container-small">
-                          <canvas id="assetCompositionChart"></canvas>
-                        </div>
-                      </div>
-                      <div class="col-6">
-                        <div class="chart-container-small">
-                          <canvas id="liabilityEquityChart"></canvas>
-                        </div>
-                      </div>
+                    <!-- 재무상태표 시각화 컨테이너 -->
+                    <div id="balanceSheetVisContainer" class="balance-sheet-vis-container flex-grow-1 mb-4"> 
+                      <!-- 시각화 내용이 여기에 동적으로 생성됩니다 -->
                     </div>
-                    <!-- 추가 차트 영역 끝 -->
                   </div>
                 </div>
               </div>

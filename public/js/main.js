@@ -224,7 +224,7 @@ async function fetchFinancialAnalysis() {
       if (response.status === 404) {
         loadingIndicator.style.display = 'none';
         overviewError.style.display = 'block';
-        overviewError.textContent = `${year}년 ${reportName}은 아직 업로드되지 않았습니다.`;
+        overviewError.textContent = `${year}년 ${reportName}는 아직 공시되지 않았습니다.`;
         console.warn(`데이터 없음: ${year}년 ${reportName}`); // 콘솔에도 로그 추가
         return; // 함수 종료
       }

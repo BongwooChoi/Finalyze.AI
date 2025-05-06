@@ -256,8 +256,8 @@ function displayFinancialAnalysis(analysis) {
     
     // 1. 개요 탭 내용 생성
     console.log('Calling chart/vis display functions...');
-    displayIncomeStatementChart(analysis);
-    displayBalanceSheetVis(analysis);
+    // displayIncomeStatementChart(analysis); // 주석 처리
+    // displayBalanceSheetVis(analysis); // 주석 처리
     // displayCompositionCharts(analysis);
     console.log('Calling AI analysis function...');
     fetchAIFinancialAnalysis(analysis); 

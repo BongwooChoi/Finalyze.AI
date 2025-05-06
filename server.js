@@ -597,7 +597,5 @@ ${JSON.stringify(financialData, null, 2)}
 `;
 }
 
-// 서버 시작
-app.listen(PORT, () => {
-  console.log(`서버가 ${PORT} 포트에서 실행 중입니다.`);
-}); 
+// Vercel에서 사용할 수 있도록 Express 앱 인스턴스를 내보냅니다.
+module.exports = app; 

@@ -220,6 +220,15 @@ async function fetchFinancialAnalysis() {
     
     // 응답 상태 확인
     if (!response.ok) {
+      // 보고서가 없는 경우 사용자에게 친절한 안내 메시지 표시
+      if (response.status === 404) {
+        loadingIndicator.style.display = 'none';
+        overviewError.style.display = 'block';
+        overviewError.textContent = `${year}년 ${reportName}은 아직 업로드되지 않았습니다.`;
+        console.warn(`데이터 없음: ${year}년 ${reportName}`); // 콘솔에도 로그 추가
+        return; // 함수 종료
+      }
+      // 기타 HTTP 오류 처리
       const errorText = await response.text();
       console.error('HTTP 오류 응답:', response.status, errorText);
       throw new Error(`HTTP 오류 (${response.status}): ${errorText || '응답이 없습니다'}`);

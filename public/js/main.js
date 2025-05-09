@@ -406,7 +406,23 @@ function displayIncomeStatementChart(analysis) {
     console.log(`Calculated Margins (${currentYear}): OpMargin=${opMarginCurrent}%, NetMargin=${netMarginCurrent}%`);
     console.log(`Calculated Margins (${previousYear}): OpMargin=${opMarginPrevious}%, NetMargin=${netMarginPrevious}%`);
 
-    const labels = [ `${previousYear}년`, `${currentYear}년`];
+    // 보고서 유형에 따른 기간 문자열 생성
+    const reportType = reportTypeSelect.value;
+    let currentPeriodString = `${currentYear}년`;
+    let previousPeriodString = `${previousYear}년`;
+
+    if (reportType === '11012') { // 반기보고서
+      currentPeriodString = `${currentYear}년 반기`;
+      previousPeriodString = `${previousYear}년 반기`;
+    } else if (reportType === '11013') { // 1분기보고서
+      currentPeriodString = `${currentYear}년 1분기`;
+      previousPeriodString = `${previousYear}년 1분기`;
+    } else if (reportType === '11014') { // 3분기보고서
+      currentPeriodString = `${currentYear}년 3분기`;
+      previousPeriodString = `${previousYear}년 3분기`;
+    }
+
+    const labels = [previousPeriodString, currentPeriodString];
     
     const chartData = {
         labels: labels,

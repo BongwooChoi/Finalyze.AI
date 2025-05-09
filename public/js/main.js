@@ -534,6 +534,11 @@ function displayBalanceSheetVis(analysis) {
     }
     balanceSheetVisContainer.innerHTML = ''; // 이전 내용 지우기
 
+    // 컨테이너 스타일 설정 (flex column으로 하여 제목과 차트가 수직으로 쌓이도록)
+    balanceSheetVisContainer.style.display = 'flex';
+    balanceSheetVisContainer.style.flexDirection = 'column';
+    balanceSheetVisContainer.style.alignItems = 'stretch'; // 자식 요소들이 컨테이너 너비를 꽉 채우도록
+
     const assets = analysis.balanceSheet?.['자산총계']?.current || 0;
     const liabilities = analysis.balanceSheet?.['부채총계']?.current || 0;
     const equity = analysis.balanceSheet?.['자본총계']?.current || 0;
@@ -556,9 +561,11 @@ function displayBalanceSheetVis(analysis) {
     const equityPercent = assets > 0 ? (equity / assets) * 100 : 0;
 
     // HTML 생성
+    // h6 태그는 align-items: stretch에 의해 자동으로 width: 100%가 되므로 text-center가 잘 동작합니다.
+    // div.bs-vis-box는 width: 100%와 max-width를 설정하여 반응형으로 중앙에 위치하도록 합니다.
     const visHTML = `
       <h6 class="text-center fw-bold mb-2">${currentYear}년 재무상태표 구조</h6>
-      <div class="bs-vis-box d-flex mx-auto">
+      <div class="bs-vis-box d-flex mx-auto" style="width: 100%; max-width: 400px;">
         <!-- 자산 (왼쪽) -->
         <div class="bs-vis-section asset-box d-flex flex-column justify-content-center align-items-center">
           <span class="bs-vis-label">자산</span>
@@ -599,6 +606,22 @@ function displayBalanceSheetTable(balanceSheet) {
     return;
   }
   
+  // 보고서 유형에 따른 기간 문자열 생성
+  const reportType = reportTypeSelect.value;
+  let currentPeriodString = `${currentYear}년`;
+  let previousPeriodString = `${previousYear}년`;
+
+  if (reportType === '11012') { // 반기보고서
+    currentPeriodString = `${currentYear}년 반기`;
+    previousPeriodString = `${previousYear}년 반기`;
+  } else if (reportType === '11013') { // 1분기보고서
+    currentPeriodString = `${currentYear}년 1분기`;
+    previousPeriodString = `${previousYear}년 1분기`;
+  } else if (reportType === '11014') { // 3분기보고서
+    currentPeriodString = `${currentYear}년 3분기`;
+    previousPeriodString = `${previousYear}년 3분기`;
+  }
+  
   items.forEach(item => {
     const current = balanceSheet[item]?.current || 0;
     const previous = balanceSheet[item]?.previous || 0;
@@ -608,8 +631,8 @@ function displayBalanceSheetTable(balanceSheet) {
     const row = document.createElement('tr');
     row.innerHTML = `
       <td>${item}</td>
-      <td class="text-end">${formatAmountBetter(current)} <small class="text-muted">(${currentYear}년)</small></td>
-      <td class="text-end">${formatAmountBetter(previous)} <small class="text-muted">(${previousYear}년)</small></td>
+      <td class="text-end">${formatAmountBetter(current)} <small class="text-muted">(${currentPeriodString})</small></td>
+      <td class="text-end">${formatAmountBetter(previous)} <small class="text-muted">(${previousPeriodString})</small></td>
       <td class="text-end ${diff >= 0 ? 'text-success' : 'text-danger'}">${formatAmountBetter(diff)}</td>
       <td class="text-end ${diff >= 0 ? 'text-success' : 'text-danger'}">${diffRate !== '-' ? diffRate + '%' : '-'}</td>
     `;
@@ -629,6 +652,22 @@ function displayIncomeStatementTable(incomeStatement) {
     return;
   }
   
+  // 보고서 유형에 따른 기간 문자열 생성
+  const reportType = reportTypeSelect.value;
+  let currentPeriodString = `${currentYear}년`;
+  let previousPeriodString = `${previousYear}년`;
+
+  if (reportType === '11012') { // 반기보고서
+    currentPeriodString = `${currentYear}년 반기`;
+    previousPeriodString = `${previousYear}년 반기`;
+  } else if (reportType === '11013') { // 1분기보고서
+    currentPeriodString = `${currentYear}년 1분기`;
+    previousPeriodString = `${previousYear}년 1분기`;
+  } else if (reportType === '11014') { // 3분기보고서
+    currentPeriodString = `${currentYear}년 3분기`;
+    previousPeriodString = `${previousYear}년 3분기`;
+  }
+  
   items.forEach(item => {
     const current = incomeStatement[item]?.current || 0;
     const previous = incomeStatement[item]?.previous || 0;
@@ -638,8 +677,8 @@ function displayIncomeStatementTable(incomeStatement) {
     const row = document.createElement('tr');
     row.innerHTML = `
       <td>${item}</td>
-      <td class="text-end">${formatAmountBetter(current)} <small class="text-muted">(${currentYear}년)</small></td>
-      <td class="text-end">${formatAmountBetter(previous)} <small class="text-muted">(${previousYear}년)</small></td>
+      <td class="text-end">${formatAmountBetter(current)} <small class="text-muted">(${currentPeriodString})</small></td>
+      <td class="text-end">${formatAmountBetter(previous)} <small class="text-muted">(${previousPeriodString})</small></td>
       <td class="text-end ${diff >= 0 ? 'text-success' : 'text-danger'}">${formatAmountBetter(diff)}</td>
       <td class="text-end ${diff >= 0 ? 'text-success' : 'text-danger'}">${diffRate !== '-' ? diffRate + '%' : '-'}</td>
     `;
@@ -663,6 +702,22 @@ function displayRatioTable(ratio) {
     ratioTableBody.innerHTML = '<tr><td colspan="4" class="text-center">재무비율 데이터가 없습니다.</td></tr>';
     return;
   }
+
+  // 보고서 유형에 따른 기간 문자열 생성
+  const reportType = reportTypeSelect.value;
+  let currentPeriodString = `${currentYear}년`;
+  let previousPeriodString = `${previousYear}년`;
+
+  if (reportType === '11012') { // 반기보고서
+    currentPeriodString = `${currentYear}년 반기`;
+    previousPeriodString = `${previousYear}년 반기`;
+  } else if (reportType === '11013') { // 1분기보고서
+    currentPeriodString = `${currentYear}년 1분기`;
+    previousPeriodString = `${previousYear}년 1분기`;
+  } else if (reportType === '11014') { // 3분기보고서
+    currentPeriodString = `${currentYear}년 3분기`;
+    previousPeriodString = `${previousYear}년 3분기`;
+  }
   
   // 실제 존재하는 항목만 표시
   items.forEach(item => {
@@ -674,8 +729,8 @@ function displayRatioTable(ratio) {
       const row = document.createElement('tr');
       row.innerHTML = `
         <td>${item}</td>
-        <td class="text-end">${current}% <small class="text-muted">(${currentYear}년)</small></td>
-        <td class="text-end">${previous}% <small class="text-muted">(${previousYear}년)</small></td>
+        <td class="text-end">${current}% <small class="text-muted">(${currentPeriodString})</small></td>
+        <td class="text-end">${previous}% <small class="text-muted">(${previousPeriodString})</small></td>
         <td class="text-end ${diff >= 0 ? 'text-success' : 'text-danger'}">${diff}%p</td>
       `;
       

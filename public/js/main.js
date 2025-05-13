@@ -332,20 +332,20 @@ async function fetchAIFinancialAnalysis(analysis) {
       let analysisText = data.analysis;
       
       // ```html 및 ``` 제거
-      analysisText = analysisText.replace(/^```html\s*\n?/, '').replace(/\n?```$/, '').trim();
+      analysisText = analysisText.replace(/^```html\\s*\\n?/, '').replace(/\\n?```$/, '').trim();
       
       // 제목 처리 (첫 번째 줄)
-      const lines = analysisText.split('\n');
+      const lines = analysisText.split('\\n');
       let title = '';
       let contentText = analysisText;
       
       if (lines.length > 0) {
         title = lines[0];
-        contentText = lines.slice(1).join('\n');
+        contentText = lines.slice(1).join('\\n');
       }
       
       // 문단 나누기
-      const paragraphs = contentText.split('\n\n').filter(p => p.trim() !== '');
+      const paragraphs = contentText.split('\\n\\n').filter(p => p.trim() !== '');
       
       // 결과 HTML 생성
       let htmlContent = `<h4 class="mb-3">${title}</h4>`;
@@ -382,8 +382,11 @@ function displayIncomeStatementChart(analysis) {
     }
     if (incomeStatementChart) incomeStatementChart.destroy();
 
+    // !!! DataLabels 플러그인 등록 !!!
+    // Chart.register(ChartDataLabels); // Chart.js 3.x 이상에서는 전역 등록이 필요 없음
+
     const ctx = incomeStatementChartCanvas.getContext('2d');
-    
+
     // 데이터 준비
     const salesCurrent = analysis.incomeStatement?.['매출액']?.current || 0;
     const opIncomeCurrent = analysis.incomeStatement?.['영업이익']?.current || 0;
@@ -392,7 +395,6 @@ function displayIncomeStatementChart(analysis) {
     const opIncomePrevious = analysis.incomeStatement?.['영업이익']?.previous || 0;
     const netIncomePrevious = analysis.incomeStatement?.['당기순이익']?.previous || 0;
 
-    // !!! 디버깅 로그 추가 !!!
     console.log(`Margin Calculation Inputs (${currentYear}): Sales=${salesCurrent}, OpIncome=${opIncomeCurrent}, NetIncome=${netIncomeCurrent}`);
     console.log(`Margin Calculation Inputs (${previousYear}): Sales=${salesPrevious}, OpIncome=${opIncomePrevious}, NetIncome=${netIncomePrevious}`);
 
@@ -401,8 +403,7 @@ function displayIncomeStatementChart(analysis) {
     const netMarginCurrent = salesCurrent !== 0 ? ((netIncomeCurrent / salesCurrent) * 100).toFixed(2) : 0;
     const opMarginPrevious = salesPrevious !== 0 ? ((opIncomePrevious / salesPrevious) * 100).toFixed(2) : 0;
     const netMarginPrevious = salesPrevious !== 0 ? ((netIncomePrevious / salesPrevious) * 100).toFixed(2) : 0;
-    
-    // !!! 계산된 이익률 로그 추가 !!!
+
     console.log(`Calculated Margins (${currentYear}): OpMargin=${opMarginCurrent}%, NetMargin=${netMarginCurrent}%`);
     console.log(`Calculated Margins (${previousYear}): OpMargin=${opMarginPrevious}%, NetMargin=${netMarginPrevious}%`);
 
@@ -423,21 +424,44 @@ function displayIncomeStatementChart(analysis) {
     }
 
     const labels = [previousPeriodString, currentPeriodString];
-    
+
     const chartData = {
         labels: labels,
         datasets: [
+          // --- 막대 차트 그룹 ---
           {
-            type: 'bar', // 매출액은 막대
+            type: 'bar',
             label: '매출액',
             data: [salesPrevious, salesCurrent],
             backgroundColor: 'rgba(54, 162, 235, 0.6)',
             borderColor: 'rgb(54, 162, 235)',
             borderWidth: 1,
-            yAxisID: 'y-axis-amount' // 왼쪽 Y축 사용
+            yAxisID: 'y-axis-amount',
+            order: 2 // 막대 차트가 뒤에 오도록 order 설정
           },
           {
-            type: 'line', // 영업이익률은 선
+            type: 'bar',
+            label: '영업이익', // 영업이익 막대 추가
+            data: [opIncomePrevious, opIncomeCurrent],
+            backgroundColor: 'rgba(255, 159, 64, 0.6)', // 주황색 계열
+            borderColor: 'rgb(255, 159, 64)',
+            borderWidth: 1,
+            yAxisID: 'y-axis-amount',
+            order: 2 // 막대 차트가 뒤에 오도록 order 설정
+          },
+          {
+            type: 'bar',
+            label: '당기순이익', // 당기순이익 막대 추가
+            data: [netIncomePrevious, netIncomeCurrent],
+            backgroundColor: 'rgba(75, 192, 192, 0.6)', // 청록색 계열
+            borderColor: 'rgb(75, 192, 192)',
+            borderWidth: 1,
+            yAxisID: 'y-axis-amount',
+            order: 2 // 막대 차트가 뒤에 오도록 order 설정
+          },
+          // --- 선 차트 그룹 ---
+          {
+            type: 'line',
             label: '영업이익률 (%)',
             data: [opMarginPrevious, opMarginCurrent],
             borderColor: 'rgb(255, 99, 132)',
@@ -445,22 +469,23 @@ function displayIncomeStatementChart(analysis) {
             borderWidth: 2,
             fill: false,
             tension: 0.1,
-            yAxisID: 'y-axis-percent' // 오른쪽 Y축 사용
+            yAxisID: 'y-axis-percent',
+            order: 1 // 선 차트가 앞에 오도록 order 설정
           },
           {
-            type: 'line', // 당기순이익률은 선
+            type: 'line',
             label: '당기순이익률 (%)',
             data: [netMarginPrevious, netMarginCurrent],
-            borderColor: 'rgb(75, 192, 75)', // 초록색 계열
-            backgroundColor: 'rgba(75, 192, 75, 0.2)',
+            borderColor: 'rgb(153, 102, 255)', // 보라색 계열 (기존 녹색에서 변경)
+            backgroundColor: 'rgba(153, 102, 255, 0.2)',
             borderWidth: 2,
             fill: false,
             tension: 0.1,
-            yAxisID: 'y-axis-percent' // 오른쪽 Y축 사용
+            yAxisID: 'y-axis-percent',
+            order: 1 // 선 차트가 앞에 오도록 order 설정
           }
         ]
       };
-    // console.log('Income Statement Chart Data:', JSON.stringify(chartData)); // 이전 로그는 주석 처리 또는 유지
 
     const hasValidData = salesCurrent !== 0 || salesPrevious !== 0; // 매출액 기준으로 유효성 판단
     if (!hasValidData) {
@@ -471,16 +496,19 @@ function displayIncomeStatementChart(analysis) {
 
     console.log('Creating Income Statement Chart...');
     incomeStatementChart = new Chart(ctx, {
-      // type: 'bar', // 타입을 datasets에서 개별 지정
       data: chartData,
+      plugins: [ChartDataLabels], // DataLabels 플러그인 추가
       options: {
         responsive: true,
         maintainAspectRatio: false,
         plugins: {
           title: {
             display: true,
-            text: '매출 및 주요 이익률 추이', // 제목 변경
-            font: { size: 14, weight: 'bold' }
+            text: '주요 손익 현황 및 이익률 추이', // 제목 변경
+            font: { size: 14, weight: 'bold' },
+            padding: {
+              bottom: 20 // 제목 아래에 20px 여백 추가
+            }
           },
           tooltip: {
             callbacks: {
@@ -498,7 +526,25 @@ function displayIncomeStatementChart(analysis) {
               }
             }
           },
-          legend: { display: true, position: 'bottom' }
+          legend: { display: true, position: 'bottom' },
+          datalabels: { // DataLabels 설정
+            display: true,
+            anchor: 'end', // 데이터 포인트 끝에 레이블 표시
+            align: 'end', // 레이블 정렬
+            formatter: (value, context) => {
+              if (context.dataset.yAxisID === 'y-axis-percent') {
+                // 비율 데이터는 소수점 둘째자리까지 %로 표시
+                return `${parseFloat(value).toFixed(2)}%`;
+              } else {
+                // 금액 데이터는 formatAmountBetter 함수 사용 (shortFormat=true)
+                return formatAmountBetter(value, true);
+              }
+            },
+            font: {
+              size: 10
+            },
+            color: '#666' // 레이블 색상
+          }
         },
         scales: {
           'y-axis-amount': { // 왼쪽 Y축 (금액)
@@ -508,7 +554,7 @@ function displayIncomeStatementChart(analysis) {
             beginAtZero: true,
             title: {
                 display: true,
-                text: '매출액 (원)'
+                text: '금액 (원)' // 축 제목 수정
             },
             ticks: {
               callback: function(value) { return formatAmountBetter(value, true); }
@@ -533,7 +579,7 @@ function displayIncomeStatementChart(analysis) {
         }
       }
     });
-    console.log('Income Statement Chart CREATED.');
+    console.log('Income Statement Chart CREATED with new datasets and labels.');
   } catch (error) {
     console.error('Error in displayIncomeStatementChart:', error);
     if(incomeStatementChartCanvas) incomeStatementChartCanvas.parentElement.innerHTML = '<p class="text-center text-danger small">손익 차트 오류</p>';

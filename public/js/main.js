@@ -148,13 +148,12 @@ function selectCompany(company) {
     </div>
   `;
   
-  // 재무제표 조회 옵션 표시
-  financialOptionsCard.style.display = 'block';
+  // disclosure list 표시
+  fetchAndDisplayDisclosureList(company.corp_code);
   
-  // 초기화
+  // disclosure list 외 기존 옵션 숨김
+  financialOptionsCard.style.display = 'none';
   analysisCard.style.display = 'none';
-  
-  // 차트 초기화
   if (incomeStatementChart) {
     incomeStatementChart.destroy();
     incomeStatementChart = null;
@@ -162,17 +161,12 @@ function selectCompany(company) {
   if (balanceSheetVisContainer) {
     balanceSheetVisContainer.innerHTML = '';
   }
-  // if (assetCompositionChart) {
-  //   assetCompositionChart.destroy();
-  //   assetCompositionChart = null;
-  // }
-  // if (liabilityEquityChart) {
-  //   liabilityEquityChart.destroy();
-  //   liabilityEquityChart = null;
-  // }
+  if (analysisCard) {
+    document.getElementById('chartRow').style.display = 'none';
+  }
   
   // 화면 스크롤
-  financialOptionsCard.scrollIntoView({ behavior: 'smooth' });
+  document.getElementById('disclosureListContainer').scrollIntoView({ behavior: 'smooth' });
 }
 
 // 통합 재무분석 조회 함수
@@ -857,4 +851,111 @@ function formatAmountBetter(amount, shortFormat = false) {
     const wonSuffix = unit ? '원' : '원';
     return `${signPrefix}${formattedAmount}${unit}${wonSuffix}`;
   }
+}
+
+// disclosure list 표시 함수 추가
+async function fetchAndDisplayDisclosureList(corpCode) {
+  const container = document.getElementById('disclosureListContainer');
+  container.style.display = 'block';
+  container.innerHTML = '<div class="loading">공시 목록을 불러오는 중...</div>';
+  try {
+    const response = await fetch(`/api/disclosure-list?corp_code=${corpCode}`);
+    const data = await response.json();
+    if (data.status !== '000' || !data.list || data.list.length === 0) {
+      container.innerHTML = '<div class="alert alert-warning">최근 3년간 정기공시가 없습니다.</div>';
+      return;
+    }
+    // 최근 3년치만 필터링
+    const nowYear = new Date().getFullYear();
+    const minYear = nowYear - 2;
+    // 명확한 보고서만 추림 (1분기/반기/3분기/사업보고서 + 분기보고서(03,09))
+    const filtered = data.list.filter(item => {
+      // 연도 추출
+      const yearMatch = item.report_nm.match(/(\d{4})/);
+      const year = yearMatch ? parseInt(yearMatch[1]) : null;
+      if (!year || year < minYear) return false;
+      if (item.report_nm.includes('사업보고서')) return true;
+      if (item.report_nm.includes('반기보고서')) return true;
+      if (item.report_nm.includes('1분기보고서')) return true;
+      if (item.report_nm.includes('3분기보고서')) return true;
+      // 분기보고서(1/3분기 명시 없는 경우) 월로 판별
+      if (item.report_nm.includes('분기보고서')) {
+        const monthMatch = item.report_nm.match(/\((\d{4})\.(\d{2})/);
+        if (monthMatch) {
+          const mm = monthMatch[2];
+          if (mm === '03' || mm === '09') return true;
+        }
+      }
+      return false;
+    });
+    if (filtered.length === 0) {
+      container.innerHTML = '<div class="alert alert-warning">최근 3년간 사업/반기/분기보고서가 없습니다.</div>';
+      return;
+    }
+    // 최신순 정렬
+    filtered.sort((a, b) => b.rcept_dt.localeCompare(a.rcept_dt));
+    // 리스트 표시
+    let html = '<div class="card"><div class="card-header">최근 3년 정기공시 보고서</div><ul class="list-group list-group-flush">';
+    filtered.forEach(item => {
+      html += `<li class="list-group-item d-flex justify-content-between align-items-center disclosure-item" style="cursor:pointer" data-rcept_no="${item.rcept_no}" data-report_nm="${item.report_nm}">
+        <span><strong>${item.report_nm}</strong> <small class="text-muted">(${item.rcept_dt})</small></span>
+        <a href="https://dart.fss.or.kr/dsaf001/main.do?rcpNo=${item.rcept_no}" target="_blank" class="btn btn-sm btn-outline-secondary">원문</a>
+      </li>`;
+    });
+    html += '</ul></div>';
+    container.innerHTML = html;
+    // 이벤트 리스너 등록
+    document.querySelectorAll('.disclosure-item').forEach(el => {
+      el.addEventListener('click', function() {
+        const rceptNo = this.getAttribute('data-rcept_no');
+        const reportNm = this.getAttribute('data-report_nm');
+        handleDisclosureSelect(rceptNo, reportNm);
+      });
+    });
+  } catch (e) {
+    container.innerHTML = '<div class="alert alert-danger">공시 목록 조회 실패</div>';
+  }
+}
+
+// 보고서 선택 시 분석 함수
+function handleDisclosureSelect(rceptNo, reportNm) {
+  // 연도 및 보고서코드 추출
+  let year = '';
+  let reprtCode = '';
+  // 연도 추출 (보고서명에서 (YYYY.MM) 또는 (YYYY.MM.DD) 형식)
+  const yearMatch = reportNm.match(/(\d{4})/);
+  if (yearMatch) year = yearMatch[1];
+  // 보고서코드 추출 (명확히 구분)
+  if (reportNm.includes('사업보고서')) reprtCode = '11011';
+  else if (reportNm.includes('반기보고서')) reprtCode = '11012';
+  else if (reportNm.includes('1분기보고서')) reprtCode = '11013';
+  else if (reportNm.includes('3분기보고서')) reprtCode = '11014';
+  else if (reportNm.includes('분기보고서')) {
+    // 1/3분기 명시 없는 분기보고서: 월로 판별
+    const monthMatch = reportNm.match(/\((\d{4})\.(\d{2})/);
+    if (monthMatch) {
+      const mm = monthMatch[2];
+      if (mm === '03') reprtCode = '11013';
+      else if (mm === '09') reprtCode = '11014';
+      else {
+        alert('1분기/3분기 분기보고서만 지원합니다.');
+        return;
+      }
+    } else {
+      alert('분기보고서의 월 정보를 인식할 수 없습니다.');
+      return;
+    }
+  } else {
+    alert('1분기/반기/3분기/사업보고서만 지원합니다.');
+    return;
+  }
+  if (!year || !reprtCode) {
+    alert('연도 또는 보고서 유형을 인식할 수 없습니다.');
+    return;
+  }
+  // 기존 연도/보고서 select 값 설정(호환성)
+  yearSelect.value = year;
+  reportTypeSelect.value = reprtCode;
+  // 분석 함수 호출
+  fetchFinancialAnalysis();
 } 

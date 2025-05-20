@@ -18,6 +18,10 @@ app.use(express.json());
 // 데이터베이스 연결
 const db = financialService.connectDB();
 
+// REPORT_CODE 상수 가져오기 (클라이언트에서 보고서 이름을 표시하기 위함)
+const REPORT_CODE_MAP = financialService.REPORT_CODE;
+const REVERSE_REPORT_CODE_MAP = Object.fromEntries(Object.entries(REPORT_CODE_MAP).map(([key, value]) => [value, key]));
+
 // 메인 페이지
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
@@ -80,6 +84,108 @@ app.get('/api/companies/stock/:stockCode', async (req, res) => {
     res.status(500).json({ 
       status: 'error', 
       message: '서버 오류가 발생했습니다.' 
+    });
+  }
+});
+
+// 회사의 사용 가능한 사업연도 및 보고서 유형 조회 API
+app.get('/api/company-report-options/:corpCode', async (req, res) => {
+  try {
+    const corpCode = req.params.corpCode;
+
+    if (!corpCode) {
+      return res.status(400).json({
+        status: 'error',
+        message: '회사 코드가 필요합니다.'
+      });
+    }
+
+    // financial_statements 테이블에서 해당 회사의 모든 bsns_year와 reprt_code를 조회
+    // Vercel 환경에서는 DB에 데이터가 없을 수 있으므로,
+    // 이 API는 실제 DART API를 호출해서 해당 회사가 어떤 연도/보고서 공시를 했는지
+    // 확인하는 로직이 더 적합할 수 있으나, 현재 구조에서는 DB 우선 조회.
+    // TODO: 장기적으로는 DART API를 통해 특정 기업의 공시 목록을 가져오는 기능 추가 고려
+    const query = `
+      SELECT DISTINCT bsns_year, reprt_code 
+      FROM financial_statements 
+      WHERE corp_code = ? 
+      ORDER BY bsns_year DESC, reprt_code ASC
+    `;
+
+    db.all(query, [corpCode], (err, rows) => {
+      if (err) {
+        console.error('보고서 옵션 조회 중 DB 오류:', err);
+        return res.status(500).json({
+          status: 'error',
+          message: '데이터베이스 오류가 발생했습니다.'
+        });
+      }
+
+      if (rows.length === 0) {
+        // DB에 데이터가 없는 경우, 기본값 (최근 5년, 모든 보고서 유형) 제공 또는 에러 처리
+        // 여기서는 빈 결과를 반환하여 클라이언트에서 기본값을 사용하도록 유도할 수 있음
+        // 또는 DART API를 통해 직접 조회하는 로직 추가 (구현 복잡도 증가)
+        console.warn(`보고서 옵션 조회: ${corpCode}에 대한 데이터가 DB에 없습니다.`);
+        // 기본 옵션 (최근 5년, 모든 보고서 유형)을 제공해볼 수 있음
+        const currentYear = new Date().getFullYear();
+        const defaultYears = Array.from({ length: 5 }, (_, i) => String(currentYear - i));
+        const defaultReportTypes = Object.keys(REPORT_CODE_MAP); // 또는 값인 코드 ['11011', '11012', ...]
+
+        const reportTypesByYear = {};
+        defaultYears.forEach(year => {
+          reportTypesByYear[year] = defaultReportTypes.map(name => ({
+            code: REPORT_CODE_MAP[name],
+            name: name
+          }));
+        });
+        
+        return res.json({
+          status: 'success',
+          data: {
+            years: defaultYears,
+            reportTypesByYear: reportTypesByYear,
+            isDefault: true // 기본값 사용 여부 플래그
+          }
+        });
+      }
+
+      const years = [...new Set(rows.map(row => row.bsns_year))].sort((a, b) => b - a); // 중복 제거 및 내림차순 정렬
+      const reportTypesByYear = {};
+
+      rows.forEach(row => {
+        if (!reportTypesByYear[row.bsns_year]) {
+          reportTypesByYear[row.bsns_year] = [];
+        }
+        reportTypesByYear[row.bsns_year].push({
+          code: row.reprt_code,
+          name: REVERSE_REPORT_CODE_MAP[row.reprt_code] || '알수없음' // 코드를 이름으로 변환
+        });
+      });
+      
+      // 각 연도별 보고서 유형 정렬 (예: 사업보고서 우선)
+      for (const year in reportTypesByYear) {
+        reportTypesByYear[year].sort((a, b) => {
+          // 정렬 순서 (예: 사업보고서 > 반기 > 3분기 > 1분기)
+          const order = {'11011': 1, '11012': 2, '11014': 3, '11013': 4};
+          return (order[a.code] || 99) - (order[b.code] || 99);
+        });
+      }
+
+      res.json({
+        status: 'success',
+        data: {
+          years: years,
+          reportTypesByYear: reportTypesByYear,
+          isDefault: false
+        }
+      });
+    });
+
+  } catch (error) {
+    console.error('보고서 옵션 조회 API 오류:', error);
+    res.status(500).json({
+      status: 'error',
+      message: '서버 오류가 발생했습니다.'
     });
   }
 });
@@ -581,6 +687,29 @@ ${JSON.stringify(financialData, null, 2)}
 - 전체 분석은 3-4개 문단으로 간결하게 작성해주세요.
 `;
 }
+
+// DART 공시목록 프록시 API
+app.get('/api/disclosure-list', async (req, res) => {
+  try {
+    const { corp_code } = req.query;
+    if (!corp_code) {
+      return res.status(400).json({ status: 'error', message: 'corp_code는 필수입니다.' });
+    }
+    // 오늘 날짜, 5년 전 날짜 계산
+    const endDate = new Date();
+    const startDate = new Date();
+    startDate.setFullYear(endDate.getFullYear() - 5);
+    const formatDate = d => d.toISOString().slice(0,10).replace(/-/g,'');
+    const bgn_de = formatDate(startDate);
+    const end_de = formatDate(endDate);
+
+    const url = `https://opendart.fss.or.kr/api/list.json?crtfc_key=${config.OPEN_DART_API_KEY}&corp_code=${corp_code}&bgn_de=${bgn_de}&end_de=${end_de}&pblntf_ty=A&page_count=100`;
+    const response = await axios.get(url);
+    res.json(response.data);
+  } catch (error) {
+    res.status(500).json({ status: 'error', message: error.message });
+  }
+});
 
 // Vercel 환경이 아닌 경우 (로컬 개발 환경 등)에만 서버를 직접 실행
 if (process.env.NODE_ENV !== 'production') {

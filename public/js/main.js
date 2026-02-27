@@ -5,6 +5,7 @@ let incomeStatementChart = null;
 // let liabilityEquityChart = null;
 let currentYear = null;
 let previousYear = null;
+let isFinancialCompany = false; // 금융회사 여부
 
 // DOM 요소
 const companySearchInput = document.getElementById('companySearch');
@@ -252,11 +253,15 @@ async function fetchFinancialAnalysis() {
 
 // 통합 재무분석 표시 함수
 function displayFinancialAnalysis(analysis) {
-  console.log('--- displayFinancialAnalysis called ---', analysis); 
+  console.log('--- displayFinancialAnalysis called ---', analysis);
   try {
     // !!! 여기서 메인 로딩 인디케이터 숨기기 !!!
     loadingIndicator.style.display = 'none';
-    
+
+    // 금융회사 여부 저장
+    isFinancialCompany = analysis.isFinancialCompany || false;
+    console.log('금융회사 여부:', isFinancialCompany);
+
     // 1. 개요 탭 내용 생성
     console.log('Calling chart/vis display functions...');
     displayIncomeStatementChart(analysis);
@@ -299,7 +304,8 @@ async function fetchAIFinancialAnalysis(analysis) {
       previousYear: previousYear,
       balanceSheet: analysis.balanceSheet,
       incomeStatement: analysis.incomeStatement,
-      ratio: analysis.ratio
+      ratio: analysis.ratio,
+      isFinancialCompany: isFinancialCompany
     };
     
     const response = await fetch('/api/ai-financial-analysis', {
@@ -381,11 +387,15 @@ function displayIncomeStatementChart(analysis) {
 
     const ctx = incomeStatementChartCanvas.getContext('2d');
 
+    // 금융회사의 경우 '영업수익'을 매출액 대신 사용
+    const revenueKey = isFinancialCompany ? '영업수익' : '매출액';
+    const revenueLabel = isFinancialCompany ? '영업수익' : '매출액';
+
     // 데이터 준비
-    const salesCurrent = analysis.incomeStatement?.['매출액']?.current || 0;
+    const salesCurrent = analysis.incomeStatement?.[revenueKey]?.current || 0;
     const opIncomeCurrent = analysis.incomeStatement?.['영업이익']?.current || 0;
     const netIncomeCurrent = analysis.incomeStatement?.['당기순이익']?.current || 0;
-    const salesPrevious = analysis.incomeStatement?.['매출액']?.previous || 0;
+    const salesPrevious = analysis.incomeStatement?.[revenueKey]?.previous || 0;
     const opIncomePrevious = analysis.incomeStatement?.['영업이익']?.previous || 0;
     const netIncomePrevious = analysis.incomeStatement?.['당기순이익']?.previous || 0;
 
@@ -425,7 +435,7 @@ function displayIncomeStatementChart(analysis) {
           // --- 막대 차트 그룹 ---
           {
             type: 'bar',
-            label: '매출액',
+            label: revenueLabel,
             data: [salesPrevious, salesCurrent],
             backgroundColor: 'rgba(54, 162, 235, 0.6)',
             borderColor: 'rgb(54, 162, 235)',
@@ -746,12 +756,16 @@ function displayIncomeStatementTable(incomeStatement) {
 // 재무비율 테이블 표시 함수
 function displayRatioTable(ratio) {
   ratioTableBody.innerHTML = '';
-  
-  // 테이블에 표시할 비율 항목 (순서대로)
-  const items = [
-    '유동비율', '당좌비율', '부채비율', '자기자본비율', 
+
+  // 테이블에 표시할 비율 항목 (금융회사/일반기업 구분)
+  const generalItems = [
+    '유동비율', '당좌비율', '부채비율', '자기자본비율',
     '매출액영업이익률', '매출액순이익률', 'ROE', 'ROA'
   ];
+  const financialItems = [
+    '부채비율', '자기자본비율', '영업이익률', '순이익률', 'ROE', 'ROA'
+  ];
+  const items = isFinancialCompany ? financialItems : generalItems;
   
   // 테이블 생성
   if (Object.keys(ratio).length === 0) {

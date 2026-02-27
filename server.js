@@ -22,6 +22,32 @@ const db = financialService.connectDB();
 const REPORT_CODE_MAP = financialService.REPORT_CODE;
 const REVERSE_REPORT_CODE_MAP = Object.fromEntries(Object.entries(REPORT_CODE_MAP).map(([key, value]) => [value, key]));
 
+// 금융회사 판별 키워드
+const FINANCIAL_COMPANY_KEYWORDS = ['금융', '은행', '보험', '증권', '캐피탈', '카드', '투자', '자산운용', '저축은행', '생명', '화재', '손해'];
+
+// 금융회사 여부 판별 함수
+function isFinancialCompany(companyName) {
+  if (!companyName) return false;
+  return FINANCIAL_COMPANY_KEYWORDS.some(keyword => companyName.includes(keyword));
+}
+
+// 일반 기업 재무제표 계정명
+const GENERAL_BS_ITEMS = ['자산총계', '부채총계', '자본총계', '유동자산', '비유동자산', '유동부채', '비유동부채'];
+const GENERAL_IS_ITEMS = ['매출액', '영업이익', '법인세비용차감전순이익', '당기순이익'];
+
+// 금융회사 재무제표 계정명 (은행, 보험, 증권 등)
+const FINANCIAL_BS_ITEMS = ['자산총계', '부채총계', '자본총계', '현금및예치금', '대출채권', '유가증권', '책임준비금'];
+const FINANCIAL_IS_ITEMS = [
+  // 수익 관련 (매출액 대체)
+  { name: '영업수익', aliases: ['영업수익', '순영업수익', '이자수익', '순이자손익', '보험료수익'] },
+  // 영업이익
+  { name: '영업이익', aliases: ['영업이익', '영업손익'] },
+  // 법인세비용차감전순이익
+  { name: '법인세비용차감전순이익', aliases: ['법인세비용차감전순이익', '법인세비용차감전순손익', '법인세비용차감전계속사업이익'] },
+  // 당기순이익
+  { name: '당기순이익', aliases: ['당기순이익', '당기순손익', '분기순이익', '반기순이익'] }
+];
+
 // 메인 페이지
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
@@ -377,23 +403,43 @@ app.get('/api/financial-analysis', async (req, res) => {
       });
     }
     
+    // 회사명 조회 (금융회사 판별용)
+    let companyName = '';
+    try {
+      const company = await new Promise((resolve, reject) => {
+        db.get('SELECT corp_name FROM companies WHERE corp_code = ?', [corp_code], (err, row) => {
+          if (err) reject(err);
+          else resolve(row);
+        });
+      });
+      companyName = company?.corp_name || '';
+    } catch (e) {
+      console.warn('회사명 조회 실패:', e.message);
+    }
+
+    // 금융회사 여부 판별
+    const isFinancial = isFinancialCompany(companyName);
+    console.log(`재무분석 API - ${corp_code} (${companyName}) 금융회사 여부: ${isFinancial}`);
+
     // 전체 재무제표에서 주요 항목 추출
     const analysis = {
-      balanceSheet: {}, 
-      incomeStatement: {}, 
-      ratio: {} 
+      balanceSheet: {},
+      incomeStatement: {},
+      ratio: {},
+      isFinancialCompany: isFinancial,
+      companyName: companyName
     };
-    
+
     // 재무상태표 데이터 추출
     const bsItems = financialStatements.filter(item => item.sj_div === 'BS');
-    
+
     // 손익계산서 데이터 추출
     const isItems = financialStatements.filter(item => item.sj_div === 'IS');
-    
+
     console.log(`재무분석 API - ${corp_code} 회사의 ${bsns_year}년 재무제표 데이터: BS=${bsItems.length}개, IS=${isItems.length}개`);
-    
-    // 주요 재무상태표 항목 추출
-    const bsKeyItems = ['자산총계', '부채총계', '자본총계', '유동자산', '비유동자산', '유동부채', '비유동부채'];
+
+    // 주요 재무상태표 항목 추출 (일반 기업 및 금융회사 공통)
+    const bsKeyItems = GENERAL_BS_ITEMS;
     bsKeyItems.forEach(itemName => {
       const item = bsItems.find(i => i.account_nm === itemName);
       if (item) {
@@ -403,18 +449,52 @@ app.get('/api/financial-analysis', async (req, res) => {
         };
       }
     });
-    
-    // 주요 손익계산서 항목 추출
-    const isKeyItems = ['매출액', '영업이익', '법인세비용차감전순이익', '당기순이익'];
-    isKeyItems.forEach(itemName => {
-      const item = isItems.find(i => i.account_nm === itemName);
-      if (item) {
-        analysis.incomeStatement[itemName] = {
-          current: item.thstrm_amount ? parseInt(item.thstrm_amount.replace(/,/g, '')) : 0,
-          previous: item.frmtrm_amount ? parseInt(item.frmtrm_amount.replace(/,/g, '')) : 0
-        };
-      }
-    });
+
+    // 금융회사의 경우 추가 재무상태표 항목 추출
+    if (isFinancial) {
+      const financialBsItems = ['현금및예치금', '대출채권', '유가증권', '책임준비금', '예수부채', '차입부채'];
+      financialBsItems.forEach(itemName => {
+        const item = bsItems.find(i => i.account_nm.includes(itemName.replace('및', '').replace('부채', '')));
+        if (item) {
+          analysis.balanceSheet[itemName] = {
+            current: item.thstrm_amount ? parseInt(item.thstrm_amount.replace(/,/g, '')) : 0,
+            previous: item.frmtrm_amount ? parseInt(item.frmtrm_amount.replace(/,/g, '')) : 0
+          };
+        }
+      });
+    }
+
+    // 손익계산서 항목 추출 (금융회사 대응)
+    if (isFinancial) {
+      // 금융회사용 손익계산서 항목 (alias 포함 검색)
+      FINANCIAL_IS_ITEMS.forEach(itemConfig => {
+        let foundItem = null;
+        // 별칭들 중에서 데이터가 있는 항목 찾기
+        for (const alias of itemConfig.aliases) {
+          foundItem = isItems.find(i => i.account_nm === alias || i.account_nm.includes(alias));
+          if (foundItem) break;
+        }
+        if (foundItem) {
+          analysis.incomeStatement[itemConfig.name] = {
+            current: foundItem.thstrm_amount ? parseInt(foundItem.thstrm_amount.replace(/,/g, '')) : 0,
+            previous: foundItem.frmtrm_amount ? parseInt(foundItem.frmtrm_amount.replace(/,/g, '')) : 0,
+            originalName: foundItem.account_nm // 원래 계정명 저장
+          };
+        }
+      });
+    } else {
+      // 일반 기업용 손익계산서 항목
+      const isKeyItems = GENERAL_IS_ITEMS;
+      isKeyItems.forEach(itemName => {
+        const item = isItems.find(i => i.account_nm === itemName);
+        if (item) {
+          analysis.incomeStatement[itemName] = {
+            current: item.thstrm_amount ? parseInt(item.thstrm_amount.replace(/,/g, '')) : 0,
+            previous: item.frmtrm_amount ? parseInt(item.frmtrm_amount.replace(/,/g, '')) : 0
+          };
+        }
+      });
+    }
     
     // 데이터의 유효성 검사
     const hasBalanceSheetData = Object.keys(analysis.balanceSheet).length > 0;
@@ -430,87 +510,91 @@ app.get('/api/financial-analysis', async (req, res) => {
     
     // 재무 비율 계산
     try {
-      // 1. 유동비율 = 유동자산 / 유동부채 * 100
-      if (analysis.balanceSheet['유동자산'] && analysis.balanceSheet['유동부채'] && analysis.balanceSheet['유동부채'].current !== 0) {
+      // 금융회사의 경우 '영업수익'을 매출액 대신 사용
+      const revenueKey = isFinancial ? '영업수익' : '매출액';
+      const revenueData = analysis.incomeStatement[revenueKey];
+
+      // 1. 유동비율 = 유동자산 / 유동부채 * 100 (금융회사는 해당 없음)
+      if (!isFinancial && analysis.balanceSheet['유동자산'] && analysis.balanceSheet['유동부채'] && analysis.balanceSheet['유동부채'].current !== 0) {
         analysis.ratio['유동비율'] = {
           current: (analysis.balanceSheet['유동자산'].current / analysis.balanceSheet['유동부채'].current * 100).toFixed(2),
-          previous: analysis.balanceSheet['유동부채'].previous !== 0 ? 
+          previous: analysis.balanceSheet['유동부채'].previous !== 0 ?
             (analysis.balanceSheet['유동자산'].previous / analysis.balanceSheet['유동부채'].previous * 100).toFixed(2) : 0
         };
       }
-      
+
       // 2. 부채비율 = 부채총계 / 자본총계 * 100
       if (analysis.balanceSheet['부채총계'] && analysis.balanceSheet['자본총계'] && analysis.balanceSheet['자본총계'].current !== 0) {
         analysis.ratio['부채비율'] = {
           current: (analysis.balanceSheet['부채총계'].current / analysis.balanceSheet['자본총계'].current * 100).toFixed(2),
-          previous: analysis.balanceSheet['자본총계'].previous !== 0 ? 
+          previous: analysis.balanceSheet['자본총계'].previous !== 0 ?
             (analysis.balanceSheet['부채총계'].previous / analysis.balanceSheet['자본총계'].previous * 100).toFixed(2) : 0
         };
       }
-      
-      // 3. 자기자본비율 = 자본총계 / 자산총계 * 100
+
+      // 3. 자기자본비율 = 자본총계 / 자산총계 * 100 (금융회사의 경우 BIS 비율과 유사한 의미)
       if (analysis.balanceSheet['자본총계'] && analysis.balanceSheet['자산총계'] && analysis.balanceSheet['자산총계'].current !== 0) {
         analysis.ratio['자기자본비율'] = {
           current: (analysis.balanceSheet['자본총계'].current / analysis.balanceSheet['자산총계'].current * 100).toFixed(2),
-          previous: analysis.balanceSheet['자산총계'].previous !== 0 ? 
+          previous: analysis.balanceSheet['자산총계'].previous !== 0 ?
             (analysis.balanceSheet['자본총계'].previous / analysis.balanceSheet['자산총계'].previous * 100).toFixed(2) : 0
         };
       }
-      
-      // 4. 매출액영업이익률 = 영업이익 / 매출액 * 100
-      if (analysis.incomeStatement['영업이익'] && analysis.incomeStatement['매출액'] && analysis.incomeStatement['매출액'].current !== 0) {
-        analysis.ratio['매출액영업이익률'] = {
-          current: (analysis.incomeStatement['영업이익'].current / analysis.incomeStatement['매출액'].current * 100).toFixed(2),
-          previous: analysis.incomeStatement['매출액'].previous !== 0 ? 
-            (analysis.incomeStatement['영업이익'].previous / analysis.incomeStatement['매출액'].previous * 100).toFixed(2) : 0
+
+      // 4. 영업이익률 = 영업이익 / 영업수익(또는 매출액) * 100
+      if (analysis.incomeStatement['영업이익'] && revenueData && revenueData.current !== 0) {
+        const ratioName = isFinancial ? '영업이익률' : '매출액영업이익률';
+        analysis.ratio[ratioName] = {
+          current: (analysis.incomeStatement['영업이익'].current / revenueData.current * 100).toFixed(2),
+          previous: revenueData.previous !== 0 ?
+            (analysis.incomeStatement['영업이익'].previous / revenueData.previous * 100).toFixed(2) : 0
         };
       }
-      
-      // 5. 매출액순이익률 = 당기순이익 / 매출액 * 100
-      if (analysis.incomeStatement['당기순이익'] && analysis.incomeStatement['매출액'] && analysis.incomeStatement['매출액'].current !== 0) {
-        analysis.ratio['매출액순이익률'] = {
-          current: (analysis.incomeStatement['당기순이익'].current / analysis.incomeStatement['매출액'].current * 100).toFixed(2),
-          previous: analysis.incomeStatement['매출액'].previous !== 0 ? 
-            (analysis.incomeStatement['당기순이익'].previous / analysis.incomeStatement['매출액'].previous * 100).toFixed(2) : 0
+
+      // 5. 순이익률 = 당기순이익 / 영업수익(또는 매출액) * 100
+      if (analysis.incomeStatement['당기순이익'] && revenueData && revenueData.current !== 0) {
+        const ratioName = isFinancial ? '순이익률' : '매출액순이익률';
+        analysis.ratio[ratioName] = {
+          current: (analysis.incomeStatement['당기순이익'].current / revenueData.current * 100).toFixed(2),
+          previous: revenueData.previous !== 0 ?
+            (analysis.incomeStatement['당기순이익'].previous / revenueData.previous * 100).toFixed(2) : 0
         };
       }
-      
+
       // 6. ROE(자기자본이익률) = 당기순이익 / 자본총계 * 100
       if (analysis.incomeStatement['당기순이익'] && analysis.balanceSheet['자본총계'] && analysis.balanceSheet['자본총계'].current !== 0) {
         analysis.ratio['ROE'] = {
           current: (analysis.incomeStatement['당기순이익'].current / analysis.balanceSheet['자본총계'].current * 100).toFixed(2),
-          previous: analysis.balanceSheet['자본총계'].previous !== 0 ? 
+          previous: analysis.balanceSheet['자본총계'].previous !== 0 ?
             (analysis.incomeStatement['당기순이익'].previous / analysis.balanceSheet['자본총계'].previous * 100).toFixed(2) : 0
         };
       }
-      
+
       // 7. ROA(총자산이익률) = 당기순이익 / 자산총계 * 100
       if (analysis.incomeStatement['당기순이익'] && analysis.balanceSheet['자산총계'] && analysis.balanceSheet['자산총계'].current !== 0) {
         analysis.ratio['ROA'] = {
           current: (analysis.incomeStatement['당기순이익'].current / analysis.balanceSheet['자산총계'].current * 100).toFixed(2),
-          previous: analysis.balanceSheet['자산총계'].previous !== 0 ? 
+          previous: analysis.balanceSheet['자산총계'].previous !== 0 ?
             (analysis.incomeStatement['당기순이익'].previous / analysis.balanceSheet['자산총계'].previous * 100).toFixed(2) : 0
         };
       }
-      
-      // 8. 당좌비율 = (유동자산 - 재고자산) / 유동부채 * 100
-      if (analysis.balanceSheet['유동자산'] && analysis.balanceSheet['유동부채'] && 
+
+      // 8. 당좌비율 (금융회사 제외)
+      if (!isFinancial && analysis.balanceSheet['유동자산'] && analysis.balanceSheet['유동부채'] &&
           analysis.balanceSheet['유동부채'].current !== 0) {
-        // 재고자산이 없는 경우 0으로 처리
-        const inventoryCurrent = 0; // 항목이 없으면 0으로 간주
+        const inventoryCurrent = 0;
         const inventoryPrevious = 0;
-        
+
         analysis.ratio['당좌비율'] = {
-          current: ((analysis.balanceSheet['유동자산'].current - inventoryCurrent) / 
+          current: ((analysis.balanceSheet['유동자산'].current - inventoryCurrent) /
                   analysis.balanceSheet['유동부채'].current * 100).toFixed(2),
-          previous: analysis.balanceSheet['유동부채'].previous !== 0 ? 
-            ((analysis.balanceSheet['유동자산'].previous - inventoryPrevious) / 
+          previous: analysis.balanceSheet['유동부채'].previous !== 0 ?
+            ((analysis.balanceSheet['유동자산'].previous - inventoryPrevious) /
              analysis.balanceSheet['유동부채'].previous * 100).toFixed(2) : 0
         };
       }
     } catch (ratioError) {
       console.error(`재무분석 API - 재무비율 계산 중 오류 발생:`, ratioError);
-      // 재무비율 계산 오류가 전체 분석을 중단시키지는 않음
     }
     
     console.log(`재무분석 API - ${corp_code} 회사의 ${bsns_year}년 재무분석 완료:`, {
@@ -536,19 +620,21 @@ app.get('/api/financial-analysis', async (req, res) => {
 // AI 기반 재무분석 API
 app.post('/api/ai-financial-analysis', async (req, res) => {
   try {
-    const { companyName, year, previousYear, balanceSheet, incomeStatement, ratio } = req.body;
-    
+    const { companyName, year, previousYear, balanceSheet, incomeStatement, ratio, isFinancialCompany: isFinancial } = req.body;
+
     if (!companyName || !year || !balanceSheet || !incomeStatement) {
-      return res.status(400).json({ 
-        status: 'error', 
-        message: '회사명, 연도, 재무상태표, 손익계산서는 필수 입력값입니다.' 
+      return res.status(400).json({
+        status: 'error',
+        message: '회사명, 연도, 재무상태표, 손익계산서는 필수 입력값입니다.'
       });
     }
-    
-    console.log(`AI 재무분석 요청: ${companyName} (${year}년)`);
-    
+
+    // 금융회사 여부 판별 (클라이언트에서 전달받거나 서버에서 판별)
+    const isFinancialComp = isFinancial !== undefined ? isFinancial : isFinancialCompany(companyName);
+    console.log(`AI 재무분석 요청: ${companyName} (${year}년) - 금융회사: ${isFinancialComp}`);
+
     // 재무 데이터 분석 프롬프트 구성
-    const prompt = createFinancialAnalysisPrompt(companyName, year, previousYear, balanceSheet, incomeStatement, ratio);
+    const prompt = createFinancialAnalysisPrompt(companyName, year, previousYear, balanceSheet, incomeStatement, ratio, isFinancialComp);
     
     // Gemini API 호출
     const analysis = await callGeminiAPI(prompt);
@@ -575,9 +661,9 @@ async function callGeminiAPI(prompt) {
       throw new Error('Gemini API 키가 설정되지 않았습니다. config.js 파일에 GEMINI_API_KEY를 설정해주세요.');
     }
     
-    // API 엔드포인트 URL 수정 (모델 이름 변경)
+    // API 엔드포인트 URL (Gemini 3 Flash 모델 사용)
     const response = await axios.post(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`,
       {
         contents: [
           {
@@ -616,17 +702,18 @@ async function callGeminiAPI(prompt) {
 }
 
 // 재무분석 프롬프트 생성 함수
-function createFinancialAnalysisPrompt(companyName, year, previousYear, balanceSheet, incomeStatement, ratio) {
+function createFinancialAnalysisPrompt(companyName, year, previousYear, balanceSheet, incomeStatement, ratio, isFinancialCompany = false) {
   // 재무 데이터 정리
   const financialData = {
     company: companyName,
     year: year,
     previousYear: previousYear,
+    isFinancialCompany: isFinancialCompany,
     balanceSheet: {},
     incomeStatement: {},
     ratio: {}
   };
-  
+
   // 재무상태표 데이터 정리
   if (balanceSheet) {
     Object.entries(balanceSheet).forEach(([key, value]) => {
@@ -638,7 +725,7 @@ function createFinancialAnalysisPrompt(companyName, year, previousYear, balanceS
       };
     });
   }
-  
+
   // 손익계산서 데이터 정리
   if (incomeStatement) {
     Object.entries(incomeStatement).forEach(([key, value]) => {
@@ -650,7 +737,7 @@ function createFinancialAnalysisPrompt(companyName, year, previousYear, balanceS
       };
     });
   }
-  
+
   // 재무비율 데이터 정리
   if (ratio) {
     Object.entries(ratio).forEach(([key, value]) => {
@@ -662,7 +749,34 @@ function createFinancialAnalysisPrompt(companyName, year, previousYear, balanceS
     });
   }
 
-  // 프롬프트 구성
+  // 금융회사용 프롬프트
+  if (isFinancialCompany) {
+    return `
+다음은 ${companyName}의 ${year}년 재무제표 데이터입니다. 이 회사는 금융회사(은행, 보험, 증권 등)입니다. 금융업 특성을 고려하여 재무 상태에 대한 간결하고 통찰력 있는 분석을 제공해주세요.
+
+재무 데이터:
+${JSON.stringify(financialData, null, 2)}
+
+다음 지침을 따라 금융회사 관점에서 분석해주세요:
+1. 영업수익(또는 순이자손익), 영업이익, 당기순이익의 변화를 분석하고 수익성 추이를 설명해주세요.
+2. 자산(대출채권, 유가증권 등), 부채(예수금, 차입금 등), 자본의 구조 변화를 분석하고 금융회사의 건전성을 평가해주세요.
+3. 주요 재무비율(자기자본비율, ROE, ROA, 부채비율 등)을 해석하여 금융회사의 안정성과 수익성을 평가해주세요.
+4. 전년 대비 주요 변화점과 그 의미를 금융업 관점에서 설명해주세요.
+5. 회사의 재무 상태에 대한 전반적인 평가와 간단한 요약을 제공해주세요.
+
+형식 지침:
+- **Markdown 코드 블록(\`\`\`)을 사용하지 마세요.**
+- 문단은 <p> 태그로 감싸주세요. 예: <p>분석 내용입니다.</p>
+- 긍정적인 내용은 <span class="positive">내용</span> 형식으로 표시해주세요.
+- 부정적인 내용은 <span class="negative">내용</span> 형식으로 표시해주세요.
+- 중립적인 내용은 <span class="neutral">내용</span> 형식으로 표시해주세요.
+- 중요한 수치나 용어는 <strong>내용</strong> 형식으로 강조해주세요.
+- 제목으로 "${companyName} ${year}년 재무 분석"을 첫 줄에 추가해주세요.
+- 전체 분석은 3-4개 문단으로 간결하게 작성해주세요.
+`;
+  }
+
+  // 일반 기업용 프롬프트
   return `
 다음은 ${companyName}의 ${year}년 재무제표 데이터입니다. 이 데이터를 분석하여 회사의 재무 상태에 대한 간결하고 통찰력 있는 분석을 제공해주세요.
 

@@ -66,7 +66,7 @@ document.addEventListener('DOMContentLoaded', () => {
   });
   
   // 통합 재무분석 버튼 클릭 이벤트
-  fetchAnalysisBtn.addEventListener('click', fetchFinancialAnalysis);
+  fetchAnalysisBtn.addEventListener('click', () => fetchFinancialAnalysis());
 });
 
 // 회사 검색 함수
@@ -277,6 +277,10 @@ function displayFinancialAnalysis(analysis) {
 
     // 3. 개요 탭 내용 (차트 영역) 표시
     document.getElementById('chartRow').style.display = 'flex'; 
+    
+    // 분석 가이드 업데이트
+    const reportCodeMap = { '11011': '사업보고서', '11012': '반기보고서', '11013': '1분기보고서', '11014': '3분기보고서' };
+    updateAnalysisGuide(`${selectedCompany.corp_name} ${currentYear}년 ${reportCodeMap[reportTypeSelect.value] || '보고서'}`);
     
     // 화면 스크롤
     analysisCard.scrollIntoView({ behavior: 'smooth' });
@@ -909,21 +913,32 @@ async function fetchAndDisplayDisclosureList(corpCode) {
     // 최신순 정렬
     filtered.sort((a, b) => b.rcept_dt.localeCompare(a.rcept_dt));
     // 리스트 표시
-    let html = '<div class="card"><div class="card-header">최근 3년 정기공시 보고서</div><ul class="list-group list-group-flush">';
+    let html = '<div class="card disclosure-card"><div class="card-header"><h3><i class="bi bi-journal-text me-2"></i>최근 3년 정기공시 보고서</h3></div><ul class="list-group list-group-flush">';
     filtered.forEach(item => {
-      html += `<li class="list-group-item d-flex justify-content-between align-items-center disclosure-item" style="cursor:pointer" data-rcept_no="${item.rcept_no}" data-report_nm="${item.report_nm}">
-        <span><strong>${item.report_nm}</strong> <small class="text-muted">(${item.rcept_dt})</small></span>
-        <a href="https://dart.fss.or.kr/dsaf001/main.do?rcpNo=${item.rcept_no}" target="_blank" class="btn btn-sm btn-outline-secondary">원문</a>
+      html += `<li class="list-group-item disclosure-item" data-rcept_no="${item.rcept_no}" data-report_nm="${item.report_nm}">
+        <div class="disclosure-info">
+          <span class="disclosure-title">${item.report_nm}</span>
+          <span class="disclosure-date">${item.rcept_dt}</span>
+        </div>
+        <div class="disclosure-actions">
+          <button class="btn btn-sm btn-analyze" data-rcept_no="${item.rcept_no}" data-report_nm="${item.report_nm}">
+            <i class="bi bi-bar-chart-line me-1"></i>분석하기
+          </button>
+          <a href="https://dart.fss.or.kr/dsaf001/main.do?rcpNo=${item.rcept_no}" target="_blank" class="btn btn-sm btn-outline-secondary" onclick="event.stopPropagation()">
+            <i class="bi bi-box-arrow-up-right me-1"></i>원문
+          </a>
+        </div>
       </li>`;
     });
     html += '</ul></div>';
     container.innerHTML = html;
-    // 이벤트 리스너 등록
-    document.querySelectorAll('.disclosure-item').forEach(el => {
-      el.addEventListener('click', function() {
+    // 분석하기 버튼 이벤트 리스너
+    document.querySelectorAll('.btn-analyze').forEach(btn => {
+      btn.addEventListener('click', function(e) {
+        e.stopPropagation();
         const rceptNo = this.getAttribute('data-rcept_no');
         const reportNm = this.getAttribute('data-report_nm');
-        handleDisclosureSelect(rceptNo, reportNm);
+        handleDisclosureSelect(rceptNo, reportNm, this);
       });
     });
   } catch (e) {
@@ -932,20 +947,16 @@ async function fetchAndDisplayDisclosureList(corpCode) {
 }
 
 // 보고서 선택 시 분석 함수
-function handleDisclosureSelect(rceptNo, reportNm) {
-  // 연도 및 보고서코드 추출
+function handleDisclosureSelect(rceptNo, reportNm, btnElement) {
   let year = '';
   let reprtCode = '';
-  // 연도 추출 (보고서명에서 (YYYY.MM) 또는 (YYYY.MM.DD) 형식)
   const yearMatch = reportNm.match(/(\d{4})/);
   if (yearMatch) year = yearMatch[1];
-  // 보고서코드 추출 (명확히 구분)
   if (reportNm.includes('사업보고서')) reprtCode = '11011';
   else if (reportNm.includes('반기보고서')) reprtCode = '11012';
   else if (reportNm.includes('1분기보고서')) reprtCode = '11013';
   else if (reportNm.includes('3분기보고서')) reprtCode = '11014';
   else if (reportNm.includes('분기보고서')) {
-    // 1/3분기 명시 없는 분기보고서: 월로 판별
     const monthMatch = reportNm.match(/\((\d{4})\.(\d{2})/);
     if (monthMatch) {
       const mm = monthMatch[2];
@@ -967,9 +978,90 @@ function handleDisclosureSelect(rceptNo, reportNm) {
     alert('연도 또는 보고서 유형을 인식할 수 없습니다.');
     return;
   }
-  // 기존 연도/보고서 select 값 설정(호환성)
+
+  // 선택된 항목 하이라이트
+  document.querySelectorAll('.disclosure-item').forEach(el => {
+    el.classList.remove('disclosure-active');
+  });
+  if (btnElement) {
+    const parentItem = btnElement.closest('.disclosure-item');
+    if (parentItem) parentItem.classList.add('disclosure-active');
+  }
+
+  // 버튼 로딩 상태
+  if (btnElement) {
+    document.querySelectorAll('.btn-analyze').forEach(b => {
+      b.disabled = false;
+      b.innerHTML = '<i class="bi bi-bar-chart-line me-1"></i>분석하기';
+    });
+    btnElement.disabled = true;
+    btnElement.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>분석 중...';
+  }
+
   yearSelect.value = year;
   reportTypeSelect.value = reprtCode;
-  // 분석 함수 호출
-  fetchFinancialAnalysis();
+
+  // 결과 안내 배너 표시
+  showAnalysisGuide(reportNm);
+
+  fetchFinancialAnalysis().finally(() => {
+    if (btnElement) {
+      btnElement.disabled = false;
+      btnElement.innerHTML = '<i class="bi bi-check-circle me-1"></i>분석 완료';
+      btnElement.classList.add('btn-analyze-done');
+      setTimeout(() => {
+        btnElement.innerHTML = '<i class="bi bi-bar-chart-line me-1"></i>재분석';
+        btnElement.classList.remove('btn-analyze-done');
+      }, 3000);
+    }
+  });
+}
+
+// 분석 결과 안내 배너
+function showAnalysisGuide(reportNm) {
+  let guide = document.getElementById('analysisGuide');
+  if (!guide) {
+    guide = document.createElement('div');
+    guide.id = 'analysisGuide';
+    const container = document.querySelector('.main-content') || document.querySelector('.container.mt-4');
+    if (container) container.insertBefore(guide, container.firstChild);
+  }
+  guide.className = 'analysis-guide';
+  guide.innerHTML = `
+    <div class="analysis-guide-content">
+      <div class="analysis-guide-icon">
+        <span class="spinner-border spinner-border-sm"></span>
+      </div>
+      <div class="analysis-guide-text">
+        <strong>${reportNm}</strong> 분석 중입니다...
+      </div>
+      <button class="btn btn-sm btn-analysis-guide-scroll" onclick="document.getElementById('analysisCard').scrollIntoView({behavior:'smooth'})">
+        <i class="bi bi-arrow-down-circle me-1"></i>결과 보기
+      </button>
+    </div>
+  `;
+  guide.style.display = 'block';
+}
+
+// 분석 완료 시 가이드 업데이트
+function updateAnalysisGuide(reportNm) {
+  const guide = document.getElementById('analysisGuide');
+  if (!guide) return;
+  guide.innerHTML = `
+    <div class="analysis-guide-content analysis-guide-done">
+      <div class="analysis-guide-icon">
+        <i class="bi bi-check-circle-fill"></i>
+      </div>
+      <div class="analysis-guide-text">
+        <strong>${reportNm}</strong> 분석이 완료되었습니다
+      </div>
+      <button class="btn btn-sm btn-analysis-guide-scroll" onclick="document.getElementById('analysisCard').scrollIntoView({behavior:'smooth'})">
+        <i class="bi bi-arrow-down-circle me-1"></i>결과 보기
+      </button>
+    </div>
+  `;
+  setTimeout(() => {
+    guide.classList.add('analysis-guide-fade');
+    setTimeout(() => { guide.style.display = 'none'; guide.classList.remove('analysis-guide-fade'); }, 500);
+  }, 5000);
 } 

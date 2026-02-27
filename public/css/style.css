@@ -866,4 +866,172 @@ body {
     font-size: 1.4rem;
     border-radius: 14px;
   }
+
+  .disclosure-item {
+    flex-direction: column;
+    align-items: flex-start !important;
+    gap: 0.75rem;
+  }
+
+  .disclosure-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+}
+
+/* =============================================
+   Disclosure List
+   ============================================= */
+.disclosure-card .card-header h3 {
+  font-size: 1.2rem;
+}
+
+.disclosure-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 1.25rem;
+  transition: all 0.2s ease;
+  border-left: 3px solid transparent;
+  gap: 1rem;
+}
+
+.disclosure-item:hover {
+  background-color: #f8fafc;
+}
+
+.disclosure-active {
+  background-color: #eff6ff !important;
+  border-left-color: var(--primary) !important;
+}
+
+.disclosure-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-width: 0;
+  flex: 1;
+}
+
+.disclosure-title {
+  font-weight: 600;
+  color: var(--text-primary);
+  font-size: 0.95rem;
+}
+
+.disclosure-date {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.disclosure-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+.btn-analyze {
+  background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+  color: #fff;
+  border: none;
+  font-weight: 600;
+  padding: 0.45rem 1rem;
+  border-radius: var(--radius-sm);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  white-space: nowrap;
+}
+
+.btn-analyze:hover {
+  background: linear-gradient(135deg, var(--primary-dark), #1e3a8a);
+  transform: translateY(-1px);
+  box-shadow: 0 3px 10px rgba(37, 99, 235, 0.3);
+  color: #fff;
+}
+
+.btn-analyze:disabled {
+  opacity: 0.85;
+  transform: none;
+  box-shadow: none;
+  cursor: not-allowed;
+}
+
+.btn-analyze-done {
+  background: linear-gradient(135deg, #059669, #10b981) !important;
+}
+
+/* =============================================
+   Analysis Guide Banner
+   ============================================= */
+.analysis-guide {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  margin-bottom: 1rem;
+  animation: slideDown 0.4s ease-out;
+}
+
+.analysis-guide-content {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.85rem 1.25rem;
+  background: linear-gradient(135deg, #eff6ff, #dbeafe);
+  border: 1px solid #bfdbfe;
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+}
+
+.analysis-guide-done {
+  background: linear-gradient(135deg, #ecfdf5, #d1fae5) !important;
+  border-color: #a7f3d0 !important;
+}
+
+.analysis-guide-done .analysis-guide-icon {
+  color: #059669;
+}
+
+.analysis-guide-icon {
+  color: var(--primary);
+  font-size: 1.1rem;
+  flex-shrink: 0;
+}
+
+.analysis-guide-text {
+  flex: 1;
+  font-size: 0.9rem;
+  color: var(--text-primary);
+}
+
+.btn-analysis-guide-scroll {
+  background: var(--primary);
+  color: #fff;
+  border: none;
+  font-weight: 600;
+  padding: 0.35rem 0.85rem;
+  border-radius: var(--radius-sm);
+  white-space: nowrap;
+  transition: all 0.2s ease;
+  font-size: 0.85rem;
+}
+
+.btn-analysis-guide-scroll:hover {
+  background: var(--primary-dark);
+  color: #fff;
+  transform: translateY(-1px);
+}
+
+.analysis-guide-fade {
+  opacity: 0;
+  transition: opacity 0.5s ease;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }

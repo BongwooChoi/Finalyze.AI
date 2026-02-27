@@ -1,4 +1,4 @@
-const CACHE_NAME = 'financial-app-cache-v7';
+const CACHE_NAME = 'financial-app-cache-v8';
 const urlsToCache = [
   '/',
   '/index.html',
@@ -9,55 +9,56 @@ const urlsToCache = [
   '/icons/icon-512x512.png',
   'https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css',
   'https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js',
+  'https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css',
   'https://cdn.jsdelivr.net/npm/chart.js'
 ];
 
-// 서비스 워커 설치
 self.addEventListener('install', event => {
+  self.skipWaiting();
   event.waitUntil(
     caches.open(CACHE_NAME)
-      .then(cache => {
-        console.log('Opened cache');
-        return cache.addAll(urlsToCache);
-      })
-      .catch(err => {
-        console.error('Failed to cache', err);
-      })
+      .then(cache => cache.addAll(urlsToCache))
+      .catch(err => console.error('Failed to cache', err))
   );
 });
 
-// 요청 처리 (캐시 우선, API 요청은 제외)
 self.addEventListener('fetch', event => {
-  // API 요청은 캐시하지 않고 네트워크로 바로 전달
   if (event.request.url.includes('/api/')) {
     event.respondWith(fetch(event.request));
     return;
   }
 
-  // 그 외 요청은 캐시 우선 전략 사용
-  event.respondWith(
-    caches.match(event.request)
-      .then(response => {
-        if (response) {
+  const url = new URL(event.request.url);
+  const isAppShell = url.origin === location.origin &&
+    (url.pathname === '/' || url.pathname.endsWith('.html') ||
+     url.pathname.endsWith('.css') || url.pathname.endsWith('.js'));
+
+  if (isAppShell) {
+    event.respondWith(
+      fetch(event.request)
+        .then(response => {
+          const clone = response.clone();
+          caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
           return response;
-        }
-        return fetch(event.request);
-      })
-  );
+        })
+        .catch(() => caches.match(event.request))
+    );
+  } else {
+    event.respondWith(
+      caches.match(event.request)
+        .then(response => response || fetch(event.request))
+    );
+  }
 });
 
-// 오래된 캐시 삭제
 self.addEventListener('activate', event => {
   event.waitUntil(
     caches.keys().then(cacheNames => {
       return Promise.all(
-        cacheNames.map(cacheName => {
-          if (cacheName !== CACHE_NAME) {
-            console.log('Deleting old cache:', cacheName);
-            return caches.delete(cacheName);
-          }
-        })
+        cacheNames
+          .filter(name => name !== CACHE_NAME)
+          .map(name => caches.delete(name))
       );
-    })
+    }).then(() => self.clients.claim())
   );
 }); 

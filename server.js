@@ -33,7 +33,12 @@ function isFinancialCompany(companyName) {
 
 // 일반 기업 재무제표 계정명
 const GENERAL_BS_ITEMS = ['자산총계', '부채총계', '자본총계', '유동자산', '비유동자산', '유동부채', '비유동부채'];
-const GENERAL_IS_ITEMS = ['매출액', '영업이익', '법인세비용차감전순이익', '당기순이익'];
+const GENERAL_IS_ITEMS = [
+  { name: '매출액', aliases: ['매출액', '수익(매출액)', '매출'] },
+  { name: '영업이익', aliases: ['영업이익', '영업이익(손실)'] },
+  { name: '법인세비용차감전순이익', aliases: ['법인세비용차감전순이익', '법인세차감전 순이익', '법인세비용차감전순손익', '법인세비용차감전계속사업이익'] },
+  { name: '당기순이익', aliases: ['당기순이익', '당기순이익(손실)', '당기순손익', '분기순이익', '반기순이익'] }
+];
 
 // 금융회사 재무제표 계정명 (은행, 보험, 증권 등)
 const FINANCIAL_BS_ITEMS = ['자산총계', '부채총계', '자본총계', '현금및예치금', '대출채권', '유가증권', '책임준비금'];
@@ -433,8 +438,8 @@ app.get('/api/financial-analysis', async (req, res) => {
     // 재무상태표 데이터 추출
     const bsItems = financialStatements.filter(item => item.sj_div === 'BS');
 
-    // 손익계산서 데이터 추출
-    const isItems = financialStatements.filter(item => item.sj_div === 'IS');
+    // 손익계산서 데이터 추출 (IS: 손익계산서, CIS: 포괄손익계산서)
+    const isItems = financialStatements.filter(item => item.sj_div === 'IS' || item.sj_div === 'CIS');
 
     console.log(`재무분석 API - ${corp_code} 회사의 ${bsns_year}년 재무제표 데이터: BS=${bsItems.length}개, IS=${isItems.length}개`);
 
@@ -483,14 +488,18 @@ app.get('/api/financial-analysis', async (req, res) => {
         }
       });
     } else {
-      // 일반 기업용 손익계산서 항목
-      const isKeyItems = GENERAL_IS_ITEMS;
-      isKeyItems.forEach(itemName => {
-        const item = isItems.find(i => i.account_nm === itemName);
-        if (item) {
-          analysis.incomeStatement[itemName] = {
-            current: item.thstrm_amount ? parseInt(item.thstrm_amount.replace(/,/g, '')) : 0,
-            previous: item.frmtrm_amount ? parseInt(item.frmtrm_amount.replace(/,/g, '')) : 0
+      // 일반 기업용 손익계산서 항목 (alias 포함 검색)
+      GENERAL_IS_ITEMS.forEach(itemConfig => {
+        let foundItem = null;
+        for (const alias of itemConfig.aliases) {
+          foundItem = isItems.find(i => i.account_nm === alias || i.account_nm.includes(alias));
+          if (foundItem) break;
+        }
+        if (foundItem) {
+          analysis.incomeStatement[itemConfig.name] = {
+            current: foundItem.thstrm_amount ? parseInt(foundItem.thstrm_amount.replace(/,/g, '')) : 0,
+            previous: foundItem.frmtrm_amount ? parseInt(foundItem.frmtrm_amount.replace(/,/g, '')) : 0,
+            originalName: foundItem.account_nm
           };
         }
       });

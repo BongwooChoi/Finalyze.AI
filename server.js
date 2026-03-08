@@ -670,9 +670,8 @@ async function callGeminiAPI(prompt) {
       throw new Error('Gemini API 키가 설정되지 않았습니다. config.js 파일에 GEMINI_API_KEY를 설정해주세요.');
     }
     
-    // API 엔드포인트 URL (Gemini 3 Flash 모델 사용)
     const response = await axios.post(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key=${apiKey}`,
       {
         contents: [
           {

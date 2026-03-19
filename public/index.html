@@ -45,7 +45,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Noto+Sans+KR:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/style.css?v=2.3">
+  <link rel="stylesheet" href="css/style.css?v=2.4">
   <link rel="manifest" href="/manifest.json">
   <meta name="theme-color" content="#2563eb">
 
@@ -363,10 +363,29 @@
     </div>
   </footer>
 
+  <!-- PWA 설치 팝업 -->
+  <div id="pwaInstallBanner" class="pwa-install-banner" style="display: none;">
+    <div class="pwa-install-content">
+      <div class="pwa-install-icon">
+        <img src="/icons/icon-96x96.png" alt="Finalyze.AI" width="48" height="48">
+      </div>
+      <div class="pwa-install-text">
+        <strong>앱으로 설치하기</strong>
+        <span>홈 화면에 추가하면 더 빠르게 이용할 수 있어요</span>
+      </div>
+      <div class="pwa-install-actions">
+        <button type="button" class="btn btn-sm btn-pwa-install" id="pwaInstallBtn">
+          <i class="bi bi-download me-1"></i>설치
+        </button>
+        <button type="button" class="btn btn-sm btn-pwa-dismiss" id="pwaDismissBtn">나중에</button>
+      </div>
+    </div>
+  </div>
+
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
-  <script src="js/main.js?v=1.7"></script>
+  <script src="js/main.js?v=1.8"></script>
   <noscript>
     <div style="padding:2rem;text-align:center;font-family:sans-serif;">
       <h2>Finalyze.AI</h2>

@@ -54,6 +54,9 @@ document.addEventListener('DOMContentLoaded', () => {
         console.error('Service Worker registration failed:', error);
       });
   }
+
+  // PWA 설치 팝업
+  initPwaInstallBanner();
   
   // 검색 버튼 클릭 이벤트
   searchBtn.addEventListener('click', searchCompany);
@@ -1064,4 +1067,56 @@ function updateAnalysisGuide(reportNm) {
     guide.classList.add('analysis-guide-fade');
     setTimeout(() => { guide.style.display = 'none'; guide.classList.remove('analysis-guide-fade'); }, 500);
   }, 5000);
+}
+
+// PWA 설치 팝업
+function initPwaInstallBanner() {
+  const banner = document.getElementById('pwaInstallBanner');
+  const installBtn = document.getElementById('pwaInstallBtn');
+  const dismissBtn = document.getElementById('pwaDismissBtn');
+
+  if (!banner || !installBtn || !dismissBtn) return;
+
+  // 이미 앱으로 실행 중이면 표시 안 함
+  if (window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone) {
+    return;
+  }
+
+  let deferredPrompt = null;
+
+  window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredPrompt = e;
+
+    // 이번 세션에서 이미 거절했으면 표시 안 함
+    if (sessionStorage.getItem('pwaInstallDismissed')) return;
+
+    // 3초 후 팝업 표시
+    setTimeout(() => {
+      if (deferredPrompt) {
+        banner.style.display = 'block';
+      }
+    }, 3000);
+  });
+
+  installBtn.addEventListener('click', async () => {
+    if (!deferredPrompt) return;
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    if (outcome === 'accepted') {
+      banner.style.display = 'none';
+    }
+    deferredPrompt = null;
+  });
+
+  dismissBtn.addEventListener('click', () => {
+    banner.style.display = 'none';
+    sessionStorage.setItem('pwaInstallDismissed', '1');
+  });
+
+  // 설치 완료 시 팝업 숨김
+  window.addEventListener('appinstalled', () => {
+    banner.style.display = 'none';
+    deferredPrompt = null;
+  });
 } 

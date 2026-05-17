@@ -1133,8 +1133,8 @@ function initPwaInstallBanner() {
 
 let cachedKoreanFontBase64 = null;
 const KOREAN_FONT_NAME = 'NanumGothic';
-const KOREAN_FONT_URL = 'https://cdn.jsdelivr.net/gh/google/fonts/ofl/nanumgothic/NanumGothic-Regular.ttf';
-const KOREAN_FONT_BOLD_URL = 'https://cdn.jsdelivr.net/gh/google/fonts/ofl/nanumgothic/NanumGothic-Bold.ttf';
+const KOREAN_FONT_URL = 'https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/nanumgothic/NanumGothic-Regular.ttf';
+const KOREAN_FONT_BOLD_URL = 'https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/nanumgothic/NanumGothic-Bold.ttf';
 let cachedKoreanFontBoldBase64 = null;
 
 async function arrayBufferToBase64(buffer) {

@@ -1131,69 +1131,41 @@ function initPwaInstallBanner() {
 // 분석 결과 내보내기
 // =============================================
 
-// 내보낼 컨테이너를 모든 탭 내용이 보이도록 준비
-function prepareExportContainer() {
-  const card = document.getElementById('analysisCard');
-  if (!card) return null;
+let cachedKoreanFontBase64 = null;
+const KOREAN_FONT_NAME = 'NanumGothic';
+const KOREAN_FONT_URL = 'https://cdn.jsdelivr.net/gh/google/fonts/ofl/nanumgothic/NanumGothic-Regular.ttf';
+const KOREAN_FONT_BOLD_URL = 'https://cdn.jsdelivr.net/gh/google/fonts/ofl/nanumgothic/NanumGothic-Bold.ttf';
+let cachedKoreanFontBoldBase64 = null;
 
-  // 1. 카드를 클론해서 모든 탭 내용이 한꺼번에 보이도록 처리
-  const clone = card.cloneNode(true);
-  clone.id = 'analysisCardExportClone';
-  clone.style.display = 'block';
-
-  // 내보내기 버튼은 클론에서 제거
-  const exportActions = clone.querySelector('.export-actions');
-  if (exportActions) exportActions.remove();
-
-  // 탭 메뉴 제거하고 모든 탭 콘텐츠를 표시
-  const tabs = clone.querySelector('.nav-tabs');
-  if (tabs) tabs.remove();
-  clone.querySelectorAll('.tab-pane').forEach(pane => {
-    pane.classList.add('show', 'active');
-    pane.style.display = 'block';
-
-    // 각 탭 콘텐츠 앞에 제목 추가
-    let title = '';
-    if (pane.id === 'overview') title = '개요';
-    else if (pane.id === 'bs') title = '재무상태표';
-    else if (pane.id === 'is') title = '손익계산서';
-    else if (pane.id === 'ratio') title = '재무비율';
-    if (title && pane.id !== 'overview') {
-      const h = document.createElement('h4');
-      h.textContent = title;
-      h.style.cssText = 'margin-top:1.5rem;padding:0.5rem 0;border-bottom:2px solid #2563eb;color:#2563eb;font-weight:700;';
-      pane.insertBefore(h, pane.firstChild);
-    }
-  });
-
-  // 차트 캔버스를 이미지로 교체 (html2canvas가 캔버스 내용을 캡쳐하지 못하는 문제 회피)
-  const originalCanvas = document.getElementById('incomeStatementChart');
-  const cloneCanvas = clone.querySelector('#incomeStatementChart');
-  if (originalCanvas && cloneCanvas) {
-    try {
-      const dataUrl = originalCanvas.toDataURL('image/png');
-      const img = document.createElement('img');
-      img.src = dataUrl;
-      img.style.cssText = 'max-width:100%;height:auto;';
-      cloneCanvas.parentNode.replaceChild(img, cloneCanvas);
-    } catch (e) {
-      console.warn('차트 이미지 변환 실패:', e);
-    }
+async function arrayBufferToBase64(buffer) {
+  const bytes = new Uint8Array(buffer);
+  let binary = '';
+  const chunkSize = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunkSize));
   }
-
-  // 화면 밖에 배치하여 사용자에게 보이지 않게
-  const wrapper = document.createElement('div');
-  wrapper.id = 'exportWrapper';
-  wrapper.style.cssText = 'position:fixed;left:-9999px;top:0;width:1100px;background:#fff;padding:20px;z-index:-1;';
-  wrapper.appendChild(clone);
-  document.body.appendChild(wrapper);
-
-  return wrapper;
+  return btoa(binary);
 }
 
-function cleanupExportContainer() {
-  const wrapper = document.getElementById('exportWrapper');
-  if (wrapper) wrapper.remove();
+async function loadKoreanFont() {
+  if (!cachedKoreanFontBase64) {
+    const resp = await fetch(KOREAN_FONT_URL);
+    if (!resp.ok) throw new Error('한글 폰트 로드 실패');
+    const buffer = await resp.arrayBuffer();
+    cachedKoreanFontBase64 = await arrayBufferToBase64(buffer);
+  }
+  if (!cachedKoreanFontBoldBase64) {
+    try {
+      const resp = await fetch(KOREAN_FONT_BOLD_URL);
+      if (resp.ok) {
+        const buffer = await resp.arrayBuffer();
+        cachedKoreanFontBoldBase64 = await arrayBufferToBase64(buffer);
+      }
+    } catch (e) {
+      console.warn('한글 Bold 폰트 로드 실패, Regular로 대체:', e);
+    }
+  }
+  return { regular: cachedKoreanFontBase64, bold: cachedKoreanFontBoldBase64 };
 }
 
 function getExportFileName(ext) {
@@ -1216,53 +1188,265 @@ function showExportLoading(btn, loadingText) {
   };
 }
 
-// 분석 결과를 PDF로 내보내기
+// 캔버스 차트를 PNG dataURL로 변환
+function getChartImage() {
+  const canvas = document.getElementById('incomeStatementChart');
+  if (!canvas) return null;
+  try {
+    return canvas.toDataURL('image/png');
+  } catch (e) {
+    return null;
+  }
+}
+
+// 재무상태표 시각화 영역을 이미지로 변환 (HTML 기반이므로 html2canvas 사용)
+async function getBalanceSheetVisImage() {
+  const container = document.getElementById('balanceSheetVisContainer');
+  if (!container || !window.html2canvas) return null;
+  try {
+    const canvas = await html2canvas(container, {
+      scale: 2,
+      backgroundColor: '#ffffff',
+      logging: false
+    });
+    return canvas.toDataURL('image/png');
+  } catch (e) {
+    console.warn('재무상태표 시각화 캡쳐 실패:', e);
+    return null;
+  }
+}
+
+// 테이블 데이터를 행렬로 추출
+function extractTableData(tbody) {
+  if (!tbody) return [];
+  const rows = [];
+  tbody.querySelectorAll('tr').forEach(tr => {
+    const row = [];
+    tr.querySelectorAll('td').forEach(td => {
+      row.push(td.innerText.replace(/\s+/g, ' ').trim());
+    });
+    if (row.length > 0) rows.push(row);
+  });
+  return rows;
+}
+
+// AI 분석 텍스트 추출 (HTML 태그 제거하되 구조는 유지)
+function extractAiAnalysisText() {
+  const aiContent = document.getElementById('aiAnalysisContent');
+  if (!aiContent || aiContent.style.display === 'none') return null;
+  const aiAnalysis = aiContent.querySelector('.ai-analysis');
+  if (!aiAnalysis) return null;
+
+  const blocks = [];
+  aiAnalysis.childNodes.forEach(node => {
+    if (node.nodeType === Node.ELEMENT_NODE) {
+      const text = node.innerText.replace(/\s+/g, ' ').trim();
+      if (text) {
+        blocks.push({
+          tag: node.tagName.toLowerCase(),
+          text: text
+        });
+      }
+    } else if (node.nodeType === Node.TEXT_NODE) {
+      const text = node.textContent.trim();
+      if (text) blocks.push({ tag: 'p', text });
+    }
+  });
+  return blocks;
+}
+
+// 분석 결과를 PDF로 내보내기 (텍스트/표 selectable)
 async function exportAnalysisAsPdf() {
   const btn = document.getElementById('exportPdfBtn');
-  const restore = showExportLoading(btn, 'PDF 생성 중...');
+  const restore = showExportLoading(btn, '폰트 로드 중...');
 
   try {
-    if (!window.jspdf || !window.html2canvas) {
+    if (!window.jspdf) {
       alert('PDF 라이브러리를 불러오는 중입니다. 잠시 후 다시 시도해주세요.');
       return;
     }
 
-    const wrapper = prepareExportContainer();
-    if (!wrapper) {
-      alert('내보낼 분석 결과가 없습니다.');
-      return;
+    // 1. 한글 폰트 로드 (캐싱)
+    const fonts = await loadKoreanFont();
+
+    if (restore) {
+      const newRestore = showExportLoading(btn, 'PDF 생성 중...');
+      restore.replaced = true;
     }
 
-    // 잠시 대기 (이미지 로드 등)
-    await new Promise(resolve => setTimeout(resolve, 200));
-
-    const canvas = await html2canvas(wrapper.firstChild, {
-      scale: 2,
-      useCORS: true,
-      backgroundColor: '#ffffff',
-      logging: false
-    });
-
-    const imgData = canvas.toDataURL('image/jpeg', 0.92);
-
+    // 2. jsPDF 초기화
     const { jsPDF } = window.jspdf;
     const pdf = new jsPDF('p', 'mm', 'a4');
-    const pdfWidth = pdf.internal.pageSize.getWidth();
-    const pdfHeight = pdf.internal.pageSize.getHeight();
-    const imgWidth = pdfWidth - 20; // 좌우 여백 10mm씩
-    const imgHeight = (canvas.height * imgWidth) / canvas.width;
+    const pageWidth = pdf.internal.pageSize.getWidth();
+    const pageHeight = pdf.internal.pageSize.getHeight();
+    const margin = 15;
+    const contentWidth = pageWidth - margin * 2;
 
-    let heightLeft = imgHeight;
-    let position = 10;
+    // 한글 폰트 등록
+    pdf.addFileToVFS('NanumGothic-Regular.ttf', fonts.regular);
+    pdf.addFont('NanumGothic-Regular.ttf', KOREAN_FONT_NAME, 'normal');
+    if (fonts.bold) {
+      pdf.addFileToVFS('NanumGothic-Bold.ttf', fonts.bold);
+      pdf.addFont('NanumGothic-Bold.ttf', KOREAN_FONT_NAME, 'bold');
+    }
+    pdf.setFont(KOREAN_FONT_NAME, 'normal');
 
-    pdf.addImage(imgData, 'JPEG', 10, position, imgWidth, imgHeight);
-    heightLeft -= (pdfHeight - 20);
+    let y = margin;
 
-    while (heightLeft > 0) {
-      position = heightLeft - imgHeight + 10;
-      pdf.addPage();
-      pdf.addImage(imgData, 'JPEG', 10, position, imgWidth, imgHeight);
-      heightLeft -= (pdfHeight - 20);
+    // 페이지 넘김 헬퍼
+    const ensureSpace = (needed) => {
+      if (y + needed > pageHeight - margin) {
+        pdf.addPage();
+        y = margin;
+      }
+    };
+
+    // 3. 제목
+    const titleText = document.getElementById('analysisCardTitle')?.textContent || '재무분석 결과';
+    pdf.setFont(KOREAN_FONT_NAME, fonts.bold ? 'bold' : 'normal');
+    pdf.setFontSize(16);
+    pdf.setTextColor(37, 99, 235);
+    pdf.text(titleText, pageWidth / 2, y, { align: 'center' });
+    y += 8;
+
+    // 부제 (생성일)
+    pdf.setFont(KOREAN_FONT_NAME, 'normal');
+    pdf.setFontSize(9);
+    pdf.setTextColor(120, 120, 120);
+    const now = new Date();
+    const dateStr = `생성일: ${now.toISOString().slice(0, 10)} ${now.toTimeString().slice(0, 5)} | Finalyze.AI`;
+    pdf.text(dateStr, pageWidth / 2, y, { align: 'center' });
+    y += 8;
+
+    // 가로선
+    pdf.setDrawColor(37, 99, 235);
+    pdf.setLineWidth(0.5);
+    pdf.line(margin, y, pageWidth - margin, y);
+    y += 8;
+
+    // 4. 손익 차트 (이미지)
+    const chartImg = getChartImage();
+    if (chartImg) {
+      pdf.setFont(KOREAN_FONT_NAME, fonts.bold ? 'bold' : 'normal');
+      pdf.setFontSize(12);
+      pdf.setTextColor(37, 99, 235);
+      ensureSpace(8);
+      pdf.text('1. 주요 재무 시각화', margin, y);
+      y += 6;
+
+      const chartHeight = 80;
+      ensureSpace(chartHeight + 5);
+      pdf.addImage(chartImg, 'PNG', margin, y, contentWidth, chartHeight);
+      y += chartHeight + 5;
+    }
+
+    // 5. 재무상태표 시각화 (이미지)
+    const bsImg = await getBalanceSheetVisImage();
+    if (bsImg) {
+      const bsHeight = 60;
+      ensureSpace(bsHeight + 5);
+      pdf.addImage(bsImg, 'PNG', margin + 30, y, contentWidth - 60, bsHeight);
+      y += bsHeight + 8;
+    }
+
+    // 6. AI 재무분석 (텍스트, 복사 가능)
+    const aiBlocks = extractAiAnalysisText();
+    if (aiBlocks && aiBlocks.length > 0) {
+      ensureSpace(15);
+      pdf.setFont(KOREAN_FONT_NAME, fonts.bold ? 'bold' : 'normal');
+      pdf.setFontSize(12);
+      pdf.setTextColor(37, 99, 235);
+      pdf.text('2. AI 재무분석', margin, y);
+      y += 7;
+
+      pdf.setFont(KOREAN_FONT_NAME, 'normal');
+      pdf.setTextColor(40, 40, 40);
+
+      aiBlocks.forEach(block => {
+        const isHeading = ['h1', 'h2', 'h3', 'h4', 'h5'].includes(block.tag);
+        const isList = block.tag === 'ul' || block.tag === 'ol' || block.tag === 'li';
+        pdf.setFontSize(isHeading ? 11 : 10);
+        if (isHeading && fonts.bold) {
+          pdf.setFont(KOREAN_FONT_NAME, 'bold');
+        } else {
+          pdf.setFont(KOREAN_FONT_NAME, 'normal');
+        }
+        const lines = pdf.splitTextToSize(block.text, contentWidth);
+        const lineHeight = isHeading ? 6 : 5;
+        lines.forEach(line => {
+          ensureSpace(lineHeight);
+          pdf.text(line, margin, y);
+          y += lineHeight;
+        });
+        y += isHeading ? 2 : 1;
+      });
+      y += 4;
+    }
+
+    // 7. 테이블 (autoTable, 텍스트 selectable)
+    const tableSets = [
+      { title: '3. 재무상태표', tbody: document.getElementById('bsTableBody'),
+        head: ['항목', '당기', '전기', '증감', '증감율'] },
+      { title: '4. 손익계산서', tbody: document.getElementById('isTableBody'),
+        head: ['항목', '당기', '전기', '증감', '증감율'] },
+      { title: '5. 재무비율', tbody: document.getElementById('ratioTableBody'),
+        head: ['비율', '당기', '전기', '증감(%p)'] }
+    ];
+
+    for (const set of tableSets) {
+      const rows = extractTableData(set.tbody);
+      if (rows.length === 0) continue;
+
+      ensureSpace(15);
+      pdf.setFont(KOREAN_FONT_NAME, fonts.bold ? 'bold' : 'normal');
+      pdf.setFontSize(12);
+      pdf.setTextColor(37, 99, 235);
+      pdf.text(set.title, margin, y);
+      y += 5;
+
+      pdf.autoTable({
+        startY: y,
+        head: [set.head],
+        body: rows,
+        margin: { left: margin, right: margin },
+        styles: {
+          font: KOREAN_FONT_NAME,
+          fontStyle: 'normal',
+          fontSize: 9,
+          cellPadding: 2.5,
+          textColor: [40, 40, 40],
+          lineColor: [220, 220, 220],
+          lineWidth: 0.2
+        },
+        headStyles: {
+          font: KOREAN_FONT_NAME,
+          fontStyle: fonts.bold ? 'bold' : 'normal',
+          fillColor: [239, 246, 255],
+          textColor: [37, 99, 235],
+          halign: 'center'
+        },
+        bodyStyles: {
+          halign: 'right'
+        },
+        columnStyles: {
+          0: { halign: 'left', fontStyle: fonts.bold ? 'bold' : 'normal' }
+        },
+        alternateRowStyles: {
+          fillColor: [249, 250, 251]
+        }
+      });
+
+      y = pdf.lastAutoTable.finalY + 7;
+    }
+
+    // 8. 푸터 (각 페이지에)
+    const totalPages = pdf.internal.getNumberOfPages();
+    for (let i = 1; i <= totalPages; i++) {
+      pdf.setPage(i);
+      pdf.setFont(KOREAN_FONT_NAME, 'normal');
+      pdf.setFontSize(8);
+      pdf.setTextColor(150, 150, 150);
+      pdf.text(`Finalyze.AI | ${i} / ${totalPages}`, pageWidth / 2, pageHeight - 8, { align: 'center' });
     }
 
     pdf.save(getExportFileName('pdf'));
@@ -1270,12 +1454,16 @@ async function exportAnalysisAsPdf() {
     console.error('PDF 내보내기 오류:', error);
     alert('PDF 내보내기 중 오류가 발생했습니다: ' + error.message);
   } finally {
-    cleanupExportContainer();
-    if (restore) restore();
+    if (restore && !restore.replaced) restore();
+    const newBtn = document.getElementById('exportPdfBtn');
+    if (newBtn && newBtn.disabled) {
+      newBtn.disabled = false;
+      newBtn.innerHTML = '<i class="bi bi-file-earmark-pdf me-1"></i>PDF 내보내기';
+    }
   }
 }
 
-// 분석 결과를 PNG 이미지로 내보내기
+// 분석 결과를 PNG 이미지로 내보내기 (html2canvas 기반)
 async function exportAnalysisAsImage() {
   const btn = document.getElementById('exportImageBtn');
   const restore = showExportLoading(btn, '이미지 생성 중...');
@@ -1286,20 +1474,61 @@ async function exportAnalysisAsImage() {
       return;
     }
 
-    const wrapper = prepareExportContainer();
-    if (!wrapper) {
+    const card = document.getElementById('analysisCard');
+    if (!card) {
       alert('내보낼 분석 결과가 없습니다.');
       return;
     }
 
+    // 클론하여 모든 탭이 보이도록
+    const clone = card.cloneNode(true);
+    const exportActions = clone.querySelector('.export-actions');
+    if (exportActions) exportActions.remove();
+    const tabs = clone.querySelector('.nav-tabs');
+    if (tabs) tabs.remove();
+    clone.querySelectorAll('.tab-pane').forEach(pane => {
+      pane.classList.add('show', 'active');
+      pane.style.display = 'block';
+      let title = '';
+      if (pane.id === 'bs') title = '재무상태표';
+      else if (pane.id === 'is') title = '손익계산서';
+      else if (pane.id === 'ratio') title = '재무비율';
+      if (title) {
+        const h = document.createElement('h4');
+        h.textContent = title;
+        h.style.cssText = 'margin-top:1.5rem;padding:0.5rem 0;border-bottom:2px solid #2563eb;color:#2563eb;font-weight:700;';
+        pane.insertBefore(h, pane.firstChild);
+      }
+    });
+
+    // 차트 캔버스를 이미지로 교체
+    const originalCanvas = document.getElementById('incomeStatementChart');
+    const cloneCanvas = clone.querySelector('#incomeStatementChart');
+    if (originalCanvas && cloneCanvas) {
+      try {
+        const dataUrl = originalCanvas.toDataURL('image/png');
+        const img = document.createElement('img');
+        img.src = dataUrl;
+        img.style.cssText = 'max-width:100%;height:auto;';
+        cloneCanvas.parentNode.replaceChild(img, cloneCanvas);
+      } catch (e) {}
+    }
+
+    const wrapper = document.createElement('div');
+    wrapper.style.cssText = 'position:fixed;left:-9999px;top:0;width:1100px;background:#fff;padding:20px;z-index:-1;';
+    wrapper.appendChild(clone);
+    document.body.appendChild(wrapper);
+
     await new Promise(resolve => setTimeout(resolve, 200));
 
-    const canvas = await html2canvas(wrapper.firstChild, {
+    const canvas = await html2canvas(clone, {
       scale: 2,
       useCORS: true,
       backgroundColor: '#ffffff',
       logging: false
     });
+
+    wrapper.remove();
 
     canvas.toBlob((blob) => {
       const url = URL.createObjectURL(blob);
@@ -1315,7 +1544,6 @@ async function exportAnalysisAsImage() {
     console.error('이미지 내보내기 오류:', error);
     alert('이미지 내보내기 중 오류가 발생했습니다: ' + error.message);
   } finally {
-    cleanupExportContainer();
     if (restore) restore();
   }
 } 

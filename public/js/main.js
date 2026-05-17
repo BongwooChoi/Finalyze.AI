@@ -70,6 +70,12 @@ document.addEventListener('DOMContentLoaded', () => {
   
   // 통합 재무분석 버튼 클릭 이벤트
   fetchAnalysisBtn.addEventListener('click', () => fetchFinancialAnalysis());
+
+  // 내보내기 버튼 이벤트
+  const exportPdfBtn = document.getElementById('exportPdfBtn');
+  const exportImageBtn = document.getElementById('exportImageBtn');
+  if (exportPdfBtn) exportPdfBtn.addEventListener('click', exportAnalysisAsPdf);
+  if (exportImageBtn) exportImageBtn.addEventListener('click', exportAnalysisAsImage);
 });
 
 // 회사 검색 함수
@@ -1119,4 +1125,197 @@ function initPwaInstallBanner() {
     banner.style.display = 'none';
     deferredPrompt = null;
   });
+}
+
+// =============================================
+// 분석 결과 내보내기
+// =============================================
+
+// 내보낼 컨테이너를 모든 탭 내용이 보이도록 준비
+function prepareExportContainer() {
+  const card = document.getElementById('analysisCard');
+  if (!card) return null;
+
+  // 1. 카드를 클론해서 모든 탭 내용이 한꺼번에 보이도록 처리
+  const clone = card.cloneNode(true);
+  clone.id = 'analysisCardExportClone';
+  clone.style.display = 'block';
+
+  // 내보내기 버튼은 클론에서 제거
+  const exportActions = clone.querySelector('.export-actions');
+  if (exportActions) exportActions.remove();
+
+  // 탭 메뉴 제거하고 모든 탭 콘텐츠를 표시
+  const tabs = clone.querySelector('.nav-tabs');
+  if (tabs) tabs.remove();
+  clone.querySelectorAll('.tab-pane').forEach(pane => {
+    pane.classList.add('show', 'active');
+    pane.style.display = 'block';
+
+    // 각 탭 콘텐츠 앞에 제목 추가
+    let title = '';
+    if (pane.id === 'overview') title = '개요';
+    else if (pane.id === 'bs') title = '재무상태표';
+    else if (pane.id === 'is') title = '손익계산서';
+    else if (pane.id === 'ratio') title = '재무비율';
+    if (title && pane.id !== 'overview') {
+      const h = document.createElement('h4');
+      h.textContent = title;
+      h.style.cssText = 'margin-top:1.5rem;padding:0.5rem 0;border-bottom:2px solid #2563eb;color:#2563eb;font-weight:700;';
+      pane.insertBefore(h, pane.firstChild);
+    }
+  });
+
+  // 차트 캔버스를 이미지로 교체 (html2canvas가 캔버스 내용을 캡쳐하지 못하는 문제 회피)
+  const originalCanvas = document.getElementById('incomeStatementChart');
+  const cloneCanvas = clone.querySelector('#incomeStatementChart');
+  if (originalCanvas && cloneCanvas) {
+    try {
+      const dataUrl = originalCanvas.toDataURL('image/png');
+      const img = document.createElement('img');
+      img.src = dataUrl;
+      img.style.cssText = 'max-width:100%;height:auto;';
+      cloneCanvas.parentNode.replaceChild(img, cloneCanvas);
+    } catch (e) {
+      console.warn('차트 이미지 변환 실패:', e);
+    }
+  }
+
+  // 화면 밖에 배치하여 사용자에게 보이지 않게
+  const wrapper = document.createElement('div');
+  wrapper.id = 'exportWrapper';
+  wrapper.style.cssText = 'position:fixed;left:-9999px;top:0;width:1100px;background:#fff;padding:20px;z-index:-1;';
+  wrapper.appendChild(clone);
+  document.body.appendChild(wrapper);
+
+  return wrapper;
+}
+
+function cleanupExportContainer() {
+  const wrapper = document.getElementById('exportWrapper');
+  if (wrapper) wrapper.remove();
+}
+
+function getExportFileName(ext) {
+  const company = selectedCompany?.corp_name || 'Finalyze';
+  const year = currentYear || '';
+  const reportCodeMap = { '11011': '사업', '11012': '반기', '11013': '1분기', '11014': '3분기' };
+  const reportName = reportCodeMap[reportTypeSelect?.value] || '';
+  const date = new Date().toISOString().slice(0, 10);
+  return `Finalyze_${company}_${year}${reportName}_${date}.${ext}`;
+}
+
+function showExportLoading(btn, loadingText) {
+  if (!btn) return null;
+  const origHtml = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = `<span class="spinner-border spinner-border-sm me-1"></span>${loadingText}`;
+  return () => {
+    btn.disabled = false;
+    btn.innerHTML = origHtml;
+  };
+}
+
+// 분석 결과를 PDF로 내보내기
+async function exportAnalysisAsPdf() {
+  const btn = document.getElementById('exportPdfBtn');
+  const restore = showExportLoading(btn, 'PDF 생성 중...');
+
+  try {
+    if (!window.jspdf || !window.html2canvas) {
+      alert('PDF 라이브러리를 불러오는 중입니다. 잠시 후 다시 시도해주세요.');
+      return;
+    }
+
+    const wrapper = prepareExportContainer();
+    if (!wrapper) {
+      alert('내보낼 분석 결과가 없습니다.');
+      return;
+    }
+
+    // 잠시 대기 (이미지 로드 등)
+    await new Promise(resolve => setTimeout(resolve, 200));
+
+    const canvas = await html2canvas(wrapper.firstChild, {
+      scale: 2,
+      useCORS: true,
+      backgroundColor: '#ffffff',
+      logging: false
+    });
+
+    const imgData = canvas.toDataURL('image/jpeg', 0.92);
+
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF('p', 'mm', 'a4');
+    const pdfWidth = pdf.internal.pageSize.getWidth();
+    const pdfHeight = pdf.internal.pageSize.getHeight();
+    const imgWidth = pdfWidth - 20; // 좌우 여백 10mm씩
+    const imgHeight = (canvas.height * imgWidth) / canvas.width;
+
+    let heightLeft = imgHeight;
+    let position = 10;
+
+    pdf.addImage(imgData, 'JPEG', 10, position, imgWidth, imgHeight);
+    heightLeft -= (pdfHeight - 20);
+
+    while (heightLeft > 0) {
+      position = heightLeft - imgHeight + 10;
+      pdf.addPage();
+      pdf.addImage(imgData, 'JPEG', 10, position, imgWidth, imgHeight);
+      heightLeft -= (pdfHeight - 20);
+    }
+
+    pdf.save(getExportFileName('pdf'));
+  } catch (error) {
+    console.error('PDF 내보내기 오류:', error);
+    alert('PDF 내보내기 중 오류가 발생했습니다: ' + error.message);
+  } finally {
+    cleanupExportContainer();
+    if (restore) restore();
+  }
+}
+
+// 분석 결과를 PNG 이미지로 내보내기
+async function exportAnalysisAsImage() {
+  const btn = document.getElementById('exportImageBtn');
+  const restore = showExportLoading(btn, '이미지 생성 중...');
+
+  try {
+    if (!window.html2canvas) {
+      alert('이미지 라이브러리를 불러오는 중입니다. 잠시 후 다시 시도해주세요.');
+      return;
+    }
+
+    const wrapper = prepareExportContainer();
+    if (!wrapper) {
+      alert('내보낼 분석 결과가 없습니다.');
+      return;
+    }
+
+    await new Promise(resolve => setTimeout(resolve, 200));
+
+    const canvas = await html2canvas(wrapper.firstChild, {
+      scale: 2,
+      useCORS: true,
+      backgroundColor: '#ffffff',
+      logging: false
+    });
+
+    canvas.toBlob((blob) => {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = getExportFileName('png');
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }, 'image/png');
+  } catch (error) {
+    console.error('이미지 내보내기 오류:', error);
+    alert('이미지 내보내기 중 오류가 발생했습니다: ' + error.message);
+  } finally {
+    cleanupExportContainer();
+    if (restore) restore();
+  }
 } 

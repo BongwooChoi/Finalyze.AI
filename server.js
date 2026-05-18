@@ -686,7 +686,7 @@ async function callGeminiAPI(prompt) {
           temperature: 0.2,
           topK: 40,
           topP: 0.95,
-          maxOutputTokens: 4096
+          maxOutputTokens: 8192
         }
       }
     );

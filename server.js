@@ -661,51 +661,67 @@ app.post('/api/ai-financial-analysis', async (req, res) => {
   }
 });
 
-// Gemini API 호출 함수
+// Gemini API 호출 함수 (429 Rate Limit 대응을 위한 자동 재시도 로직 포함)
 async function callGeminiAPI(prompt) {
-  try {
-    const apiKey = config.GEMINI_API_KEY;
-    
-    if (!apiKey) {
-      throw new Error('Gemini API 키가 설정되지 않았습니다. config.js 파일에 GEMINI_API_KEY를 설정해주세요.');
-    }
-    
-    const response = await axios.post(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key=${apiKey}`,
-      {
-        contents: [
-          {
-            parts: [
-              {
-                text: prompt
-              }
-            ]
+  const apiKey = config.GEMINI_API_KEY;
+  
+  if (!apiKey) {
+    throw new Error('Gemini API 키가 설정되지 않았습니다. config.js 파일에 GEMINI_API_KEY를 설정해주세요.');
+  }
+
+  const maxRetries = 3;
+  let delay = 1000; // 초기 대기 시간 1초
+
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      const response = await axios.post(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key=${apiKey}`,
+        {
+          contents: [
+            {
+              parts: [
+                {
+                  text: prompt
+                }
+              ]
+            }
+          ],
+          generationConfig: {
+            temperature: 0.2,
+            topK: 40,
+            topP: 0.95,
+            maxOutputTokens: 8192
           }
-        ],
-        generationConfig: {
-          temperature: 0.2,
-          topK: 40,
-          topP: 0.95,
-          maxOutputTokens: 8192
         }
+      );
+
+      // 응답에서 텍스트 추출
+      if (response.data.candidates && response.data.candidates.length > 0 && 
+          response.data.candidates[0].content && response.data.candidates[0].content.parts && 
+          response.data.candidates[0].content.parts.length > 0) {
+        return response.data.candidates[0].content.parts[0].text;
+      } else {
+        console.error('유효하지 않은 Gemini API 응답:', JSON.stringify(response.data));
+        throw new Error('AI 응답 형식이 유효하지 않습니다.');
       }
-    );
-    
-    // 응답에서 텍스트 추출
-    if (response.data.candidates && response.data.candidates.length > 0 && 
-        response.data.candidates[0].content && response.data.candidates[0].content.parts && 
-        response.data.candidates[0].content.parts.length > 0) {
-      return response.data.candidates[0].content.parts[0].text;
-    } else {
-      console.error('유효하지 않은 Gemini API 응답:', JSON.stringify(response.data));
-      throw new Error('AI 응답 형식이 유효하지 않습니다.');
+    } catch (error) {
+      const isRateLimit = error.response && error.response.status === 429;
+      
+      if (isRateLimit && attempt < maxRetries) {
+        console.warn(`Gemini API 429 (Rate Limit) 감지. ${delay}ms 후 재시도합니다... (시도 ${attempt}/${maxRetries})`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+        delay *= 2; // 지수 백오프
+        continue;
+      }
+
+      console.error(`Gemini API 호출 중 오류 발생 (시도 ${attempt}/${maxRetries}):`, error);
+      if (attempt === maxRetries) {
+        if (error.response) {
+          console.error('API 오류 응답:', error.response.data);
+        }
+        throw new Error(`Gemini API 호출 실패: ${error.message}`);
+      }
     }
-  } catch (error) {
-    console.error('Gemini API 호출 중 오류 발생:', error);
-    if (error.response) {
-      console.error('API 오류 응답:', error.response.data);
-    }
-    throw new Error(`Gemini API 호출 실패: ${error.message}`);
   }
 }
 

@@ -819,10 +819,13 @@ app.get('/api/disclosure-list', async (req, res) => {
       return res.status(400).json({ status: 'error', message: 'corp_code는 필수입니다.' });
     }
     // 오늘 날짜, 5년 전 날짜 계산
-    const endDate = new Date();
-    const startDate = new Date();
-    startDate.setFullYear(endDate.getFullYear() - 5);
-    const formatDate = d => d.toISOString().slice(0,10).replace(/-/g,'');
+    // DART 공시는 한국 시간 기준이므로 KST(UTC+9)로 계산해야
+    // 서버가 UTC로 도는 환경(Vercel)에서도 당일 공시가 잘리지 않음
+    const KST_OFFSET_MS = 9 * 60 * 60 * 1000;
+    const endDate = new Date(Date.now() + KST_OFFSET_MS);
+    const startDate = new Date(endDate);
+    startDate.setUTCFullYear(endDate.getUTCFullYear() - 5);
+    const formatDate = d => d.toISOString().slice(0, 10).replace(/-/g, '');
     const bgn_de = formatDate(startDate);
     const end_de = formatDate(endDate);
 

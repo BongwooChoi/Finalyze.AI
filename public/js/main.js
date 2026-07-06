@@ -230,6 +230,7 @@ async function fetchFinancialAnalysis() {
         overviewError.style.display = 'block';
         overviewError.textContent = `${year}년 ${reportName}는 아직 공시되지 않았습니다.`;
         console.warn(`데이터 없음: ${year}년 ${reportName}`); // 콘솔에도 로그 추가
+        failAnalysisGuide(`${year}년 ${reportName}`);
         return; // 함수 종료
       }
       // 기타 HTTP 오류 처리
@@ -250,13 +251,15 @@ async function fetchFinancialAnalysis() {
       overviewError.style.display = 'block';
       overviewError.textContent = data.message || '데이터를 불러오는 중 오류';
       console.error('재무분석 API 오류:', data.message);
+      failAnalysisGuide(`${year}년 ${reportName}`);
     }
   } catch (error) {
     // 네트워크/기타 오류 처리 (loadingIndicator 숨김)
     console.error('재무분석 데이터 조회 중 오류 발생:', error);
-    loadingIndicator.style.display = 'none'; 
+    loadingIndicator.style.display = 'none';
     overviewError.style.display = 'block';
     overviewError.textContent = `데이터 조회 오류: ${error.message || '알 수 없는 오류'}`;
+    failAnalysisGuide(`${year}년 ${reportName}`);
   }
 }
 
@@ -1069,6 +1072,7 @@ async function handleProvisionalSelect(rceptNo, reportNm, btnElement) {
   const loading = document.getElementById('provisionalLoading');
   const errorBox = document.getElementById('provisionalError');
   const content = document.getElementById('provisionalContent');
+  const chartWrap = document.getElementById('provisionalChartWrap');
   const corpName = selectedCompany ? selectedCompany.corp_name : '';
 
   title.textContent = `${corpName} - ${reportNm} 분석`;
@@ -1077,6 +1081,7 @@ async function handleProvisionalSelect(rceptNo, reportNm, btnElement) {
   errorBox.style.display = 'none';
   content.style.display = 'none';
   content.innerHTML = '';
+  chartWrap.style.display = 'none';
 
   try {
     const params = new URLSearchParams({ rcept_no: rceptNo, corp_name: corpName, report_nm: reportNm });
@@ -1102,14 +1107,9 @@ async function handleProvisionalSelect(rceptNo, reportNm, btnElement) {
 
     content.innerHTML = `<div class="ai-analysis">${htmlContent}</div>`;
     content.style.display = 'block';
+    renderProvisionalChart(data.chartData);
     updateAnalysisGuide(reportNm, 'provisionalCard');
     card.scrollIntoView({ behavior: 'smooth' });
-  } catch (error) {
-    console.error('잠정실적 분석 중 오류 발생:', error);
-    errorBox.textContent = error.message || '잠정실적 분석 중 오류가 발생했습니다.';
-    errorBox.style.display = 'block';
-  } finally {
-    loading.style.display = 'none';
     if (btnElement) {
       btnElement.disabled = false;
       btnElement.innerHTML = '<i class="bi bi-check-circle me-1"></i>분석 완료';
@@ -1119,7 +1119,74 @@ async function handleProvisionalSelect(rceptNo, reportNm, btnElement) {
         btnElement.classList.remove('btn-analyze-done');
       }, 3000);
     }
+  } catch (error) {
+    console.error('잠정실적 분석 중 오류 발생:', error);
+    errorBox.textContent = error.message || '잠정실적 분석 중 오류가 발생했습니다.';
+    errorBox.style.display = 'block';
+    failAnalysisGuide(reportNm);
+    card.scrollIntoView({ behavior: 'smooth' });
+    if (btnElement) {
+      btnElement.disabled = false;
+      btnElement.innerHTML = '<i class="bi bi-bar-chart-line me-1"></i>분석하기';
+    }
+  } finally {
+    loading.style.display = 'none';
   }
+}
+
+// 잠정실적 비교 차트 렌더링 (당기 vs 전기 vs 전년동기)
+let provisionalChart = null;
+function renderProvisionalChart(chartData) {
+  const wrap = document.getElementById('provisionalChartWrap');
+  const canvas = document.getElementById('provisionalChart');
+  if (!wrap || !canvas) return;
+
+  const metrics = (chartData && Array.isArray(chartData.metrics) ? chartData.metrics : [])
+    .filter(m => m && m.name && (m.current != null || m.previous != null || m.yearAgo != null));
+  if (metrics.length === 0) {
+    wrap.style.display = 'none';
+    return;
+  }
+
+  const periodLabels = chartData.labels || {};
+  const labels = [
+    periodLabels.yearAgo ? `전년동기 (${periodLabels.yearAgo})` : '전년동기',
+    periodLabels.previous ? `전기 (${periodLabels.previous})` : '전기',
+    periodLabels.current ? `당기 (${periodLabels.current})` : '당기'
+  ];
+  const colors = [
+    { bg: 'rgba(54, 162, 235, 0.6)', border: 'rgb(54, 162, 235)' },
+    { bg: 'rgba(255, 159, 64, 0.6)', border: 'rgb(255, 159, 64)' },
+    { bg: 'rgba(75, 192, 192, 0.6)', border: 'rgb(75, 192, 192)' }
+  ];
+  const datasets = metrics.slice(0, 3).map((m, i) => ({
+    label: m.name,
+    data: [m.yearAgo, m.previous, m.current],
+    backgroundColor: colors[i % colors.length].bg,
+    borderColor: colors[i % colors.length].border,
+    borderWidth: 1
+  }));
+
+  if (provisionalChart) provisionalChart.destroy();
+  wrap.style.display = 'block';
+  provisionalChart = new Chart(canvas.getContext('2d'), {
+    type: 'bar',
+    data: { labels, datasets },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        title: {
+          display: true,
+          text: `잠정실적 비교${chartData.unit ? ` (단위: ${chartData.unit})` : ''}`
+        },
+        legend: { position: 'bottom' }
+      },
+      scales: {
+        y: { beginAtZero: true }
+      }
+    }
+  });
 }
 
 // 분석 결과 안내 배너
@@ -1163,6 +1230,26 @@ function updateAnalysisGuide(reportNm, targetId = 'analysisCard') {
       <button class="btn btn-sm btn-analysis-guide-scroll" onclick="document.getElementById('${targetId}').scrollIntoView({behavior:'smooth'})">
         <i class="bi bi-arrow-down-circle me-1"></i>결과 보기
       </button>
+    </div>
+  `;
+  setTimeout(() => {
+    guide.classList.add('analysis-guide-fade');
+    setTimeout(() => { guide.style.display = 'none'; guide.classList.remove('analysis-guide-fade'); }, 500);
+  }, 5000);
+}
+
+// 분석 실패 시 가이드 업데이트 (스피너가 계속 돌지 않도록)
+function failAnalysisGuide(reportNm) {
+  const guide = document.getElementById('analysisGuide');
+  if (!guide || guide.style.display === 'none') return;
+  guide.innerHTML = `
+    <div class="analysis-guide-content analysis-guide-done">
+      <div class="analysis-guide-icon">
+        <i class="bi bi-x-circle-fill"></i>
+      </div>
+      <div class="analysis-guide-text">
+        <strong>${reportNm}</strong> 분석에 실패했습니다
+      </div>
     </div>
   `;
   setTimeout(() => {

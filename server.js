@@ -931,6 +931,9 @@ ${documentText}
 - 중요한 수치나 용어는 <strong>내용</strong> 형식으로 강조해주세요.
 - 제목으로 "${companyName} 잠정실적 분석"을 첫 줄에 추가해주세요.
 - 전체 분석은 3-4개 문단으로 간결하게 작성해주세요.
+- 분석 본문이 끝난 뒤 맨 마지막 줄에, 차트 생성용 데이터를 아래 형식의 JSON 한 줄로 추가해주세요. 이 줄은 태그로 감싸지 말고 설명도 붙이지 마세요:
+CHART_DATA:{"unit":"원문에 표기된 금액 단위(예: 조원, 억원, 백만원)","labels":{"current":"당기 라벨(예: 26.1Q)","previous":"전기 라벨","yearAgo":"전년동기 라벨"},"metrics":[{"name":"매출액","current":숫자,"previous":숫자,"yearAgo":숫자},{"name":"영업이익","current":숫자,"previous":숫자,"yearAgo":숫자},{"name":"당기순이익","current":숫자,"previous":숫자,"yearAgo":숫자}]}
+- CHART_DATA의 수치는 원문에 표기된 단위 그대로, 천 단위 쉼표 없이 적어주세요. 원문에 없는 수치는 null로 표기해주세요.
 `;
 }
 
@@ -963,9 +966,21 @@ app.get('/api/provisional-analysis', async (req, res) => {
     console.log(`잠정실적 분석 요청: ${corp_name || ''} ${report_nm || ''} (rcept_no: ${rcept_no}, 본문 ${documentText.length}자)`);
 
     const prompt = createProvisionalAnalysisPrompt(corp_name || '해당 회사', report_nm || '잠정실적 공시', documentText);
-    const analysis = await callGeminiAPI(prompt);
+    let analysis = await callGeminiAPI(prompt);
 
-    res.json({ status: 'success', analysis });
+    // 응답 마지막의 CHART_DATA JSON 분리 (없거나 파싱 실패해도 분석 텍스트는 그대로 반환)
+    let chartData = null;
+    const chartMatch = analysis.match(/CHART_DATA\s*:\s*(\{[\s\S]*\})/);
+    if (chartMatch) {
+      try {
+        chartData = JSON.parse(chartMatch[1]);
+      } catch (e) {
+        console.warn('CHART_DATA JSON 파싱 실패:', e.message);
+      }
+      analysis = analysis.replace(/(<p>\s*)?CHART_DATA\s*:\s*\{[\s\S]*\}(\s*<\/p>)?/, '').trim();
+    }
+
+    res.json({ status: 'success', analysis, chartData });
   } catch (error) {
     console.error('잠정실적 분석 중 오류 발생:', error);
     res.status(500).json({

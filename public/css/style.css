@@ -959,6 +959,25 @@ body {
   background: linear-gradient(135deg, #059669, #10b981) !important;
 }
 
+.disclosure-badge {
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 0.2rem 0.5rem;
+  border-radius: 999px;
+  margin-right: 0.5rem;
+  vertical-align: middle;
+}
+
+.badge-periodic {
+  background-color: #eff6ff;
+  color: #2563eb;
+}
+
+.badge-provisional {
+  background-color: #fef3c7;
+  color: #b45309;
+}
+
 /* =============================================
    Analysis Guide Banner
    ============================================= */

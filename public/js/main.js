@@ -880,6 +880,11 @@ function formatAmountBetter(amount, shortFormat = false) {
   }
 }
 
+// 잠정실적(공정공시) 공시 여부 판별
+function isProvisionalDisclosure(reportNm) {
+  return reportNm.includes('잠정') && reportNm.includes('실적');
+}
+
 // disclosure list 표시 함수 추가
 async function fetchAndDisplayDisclosureList(corpCode) {
   const container = document.getElementById('disclosureListContainer');
@@ -889,18 +894,19 @@ async function fetchAndDisplayDisclosureList(corpCode) {
     const response = await fetch(`/api/disclosure-list?corp_code=${corpCode}`);
     const data = await response.json();
     if (data.status !== '000' || !data.list || data.list.length === 0) {
-      container.innerHTML = '<div class="alert alert-warning">최근 3년간 정기공시가 없습니다.</div>';
+      container.innerHTML = '<div class="alert alert-warning">최근 3년간 공시가 없습니다.</div>';
       return;
     }
     // 최근 3년치만 필터링
     const nowYear = new Date().getFullYear();
     const minYear = nowYear - 2;
-    // 명확한 보고서만 추림 (1분기/반기/3분기/사업보고서 + 분기보고서(03,09))
+    // 명확한 보고서만 추림 (1분기/반기/3분기/사업보고서 + 분기보고서(03,09) + 잠정실적)
     const filtered = data.list.filter(item => {
-      // 연도 추출
+      // 연도 추출 (보고서명에 연도가 없으면 접수일 기준)
       const yearMatch = item.report_nm.match(/(\d{4})/);
-      const year = yearMatch ? parseInt(yearMatch[1]) : null;
+      const year = yearMatch ? parseInt(yearMatch[1]) : parseInt(item.rcept_dt.slice(0, 4));
       if (!year || year < minYear) return false;
+      if (isProvisionalDisclosure(item.report_nm)) return true;
       if (item.report_nm.includes('사업보고서')) return true;
       if (item.report_nm.includes('반기보고서')) return true;
       if (item.report_nm.includes('1분기보고서')) return true;
@@ -916,17 +922,20 @@ async function fetchAndDisplayDisclosureList(corpCode) {
       return false;
     });
     if (filtered.length === 0) {
-      container.innerHTML = '<div class="alert alert-warning">최근 3년간 사업/반기/분기보고서가 없습니다.</div>';
+      container.innerHTML = '<div class="alert alert-warning">최근 3년간 사업/반기/분기보고서 및 잠정실적 공시가 없습니다.</div>';
       return;
     }
     // 최신순 정렬
     filtered.sort((a, b) => b.rcept_dt.localeCompare(a.rcept_dt));
     // 리스트 표시
-    let html = '<div class="card disclosure-card"><div class="card-header"><h3><i class="bi bi-journal-text me-2"></i>최근 3년 정기공시 보고서</h3></div><ul class="list-group list-group-flush">';
+    let html = '<div class="card disclosure-card"><div class="card-header"><h3><i class="bi bi-journal-text me-2"></i>최근 3년 정기공시·잠정실적 공시</h3></div><ul class="list-group list-group-flush">';
     filtered.forEach(item => {
+      const badge = isProvisionalDisclosure(item.report_nm)
+        ? '<span class="badge disclosure-badge badge-provisional">잠정실적</span>'
+        : '<span class="badge disclosure-badge badge-periodic">정기공시</span>';
       html += `<li class="list-group-item disclosure-item" data-rcept_no="${item.rcept_no}" data-report_nm="${item.report_nm}">
         <div class="disclosure-info">
-          <span class="disclosure-title">${item.report_nm}</span>
+          <span class="disclosure-title">${badge}${item.report_nm}</span>
           <span class="disclosure-date">${item.rcept_dt}</span>
         </div>
         <div class="disclosure-actions">
@@ -957,6 +966,11 @@ async function fetchAndDisplayDisclosureList(corpCode) {
 
 // 보고서 선택 시 분석 함수
 function handleDisclosureSelect(rceptNo, reportNm, btnElement) {
+  // 잠정실적 공시는 원문 기반 AI 분석으로 처리
+  if (isProvisionalDisclosure(reportNm)) {
+    handleProvisionalSelect(rceptNo, reportNm, btnElement);
+    return;
+  }
   let year = '';
   let reprtCode = '';
   const yearMatch = reportNm.match(/(\d{4})/);
@@ -1026,8 +1040,90 @@ function handleDisclosureSelect(rceptNo, reportNm, btnElement) {
   });
 }
 
+// 잠정실적 공시 선택 시 분석 함수
+async function handleProvisionalSelect(rceptNo, reportNm, btnElement) {
+  // 선택된 항목 하이라이트
+  document.querySelectorAll('.disclosure-item').forEach(el => {
+    el.classList.remove('disclosure-active');
+  });
+  if (btnElement) {
+    const parentItem = btnElement.closest('.disclosure-item');
+    if (parentItem) parentItem.classList.add('disclosure-active');
+  }
+
+  // 버튼 로딩 상태
+  if (btnElement) {
+    document.querySelectorAll('.btn-analyze').forEach(b => {
+      b.disabled = false;
+      b.innerHTML = '<i class="bi bi-bar-chart-line me-1"></i>분석하기';
+    });
+    btnElement.disabled = true;
+    btnElement.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>분석 중...';
+  }
+
+  // 결과 안내 배너 표시
+  showAnalysisGuide(reportNm, 'provisionalCard');
+
+  const card = document.getElementById('provisionalCard');
+  const title = document.getElementById('provisionalCardTitle');
+  const loading = document.getElementById('provisionalLoading');
+  const errorBox = document.getElementById('provisionalError');
+  const content = document.getElementById('provisionalContent');
+  const corpName = selectedCompany ? selectedCompany.corp_name : '';
+
+  title.textContent = `${corpName} - ${reportNm} 분석`;
+  card.style.display = 'block';
+  loading.style.display = 'block';
+  errorBox.style.display = 'none';
+  content.style.display = 'none';
+  content.innerHTML = '';
+
+  try {
+    const params = new URLSearchParams({ rcept_no: rceptNo, corp_name: corpName, report_nm: reportNm });
+    const response = await fetch(`/api/provisional-analysis?${params.toString()}`);
+    const data = await response.json();
+    if (!response.ok || data.status !== 'success') {
+      throw new Error(data.message || '잠정실적 분석에 실패했습니다.');
+    }
+
+    // 마크다운 코드 블록 제거 및 제목/문단 처리
+    let analysisText = data.analysis.replace(/^```html\s*\n?/, '').replace(/\n?```$/, '').trim();
+    const lines = analysisText.split('\n');
+    const analysisTitle = lines.length > 0 ? lines[0] : '';
+    const contentText = lines.slice(1).join('\n');
+    let htmlContent = `<h4 class="mb-3">${analysisTitle}</h4>`;
+    contentText.split('\n\n').filter(p => p.trim() !== '').forEach(para => {
+      if (para.startsWith('<') && para.endsWith('>')) {
+        htmlContent += para;
+      } else {
+        htmlContent += `<p>${para}</p>`;
+      }
+    });
+
+    content.innerHTML = `<div class="ai-analysis">${htmlContent}</div>`;
+    content.style.display = 'block';
+    updateAnalysisGuide(reportNm, 'provisionalCard');
+    card.scrollIntoView({ behavior: 'smooth' });
+  } catch (error) {
+    console.error('잠정실적 분석 중 오류 발생:', error);
+    errorBox.textContent = error.message || '잠정실적 분석 중 오류가 발생했습니다.';
+    errorBox.style.display = 'block';
+  } finally {
+    loading.style.display = 'none';
+    if (btnElement) {
+      btnElement.disabled = false;
+      btnElement.innerHTML = '<i class="bi bi-check-circle me-1"></i>분석 완료';
+      btnElement.classList.add('btn-analyze-done');
+      setTimeout(() => {
+        btnElement.innerHTML = '<i class="bi bi-bar-chart-line me-1"></i>재분석';
+        btnElement.classList.remove('btn-analyze-done');
+      }, 3000);
+    }
+  }
+}
+
 // 분석 결과 안내 배너
-function showAnalysisGuide(reportNm) {
+function showAnalysisGuide(reportNm, targetId = 'analysisCard') {
   let guide = document.getElementById('analysisGuide');
   if (!guide) {
     guide = document.createElement('div');
@@ -1044,7 +1140,7 @@ function showAnalysisGuide(reportNm) {
       <div class="analysis-guide-text">
         <strong>${reportNm}</strong> 분석 중입니다...
       </div>
-      <button class="btn btn-sm btn-analysis-guide-scroll" onclick="document.getElementById('analysisCard').scrollIntoView({behavior:'smooth'})">
+      <button class="btn btn-sm btn-analysis-guide-scroll" onclick="document.getElementById('${targetId}').scrollIntoView({behavior:'smooth'})">
         <i class="bi bi-arrow-down-circle me-1"></i>결과 보기
       </button>
     </div>
@@ -1053,7 +1149,7 @@ function showAnalysisGuide(reportNm) {
 }
 
 // 분석 완료 시 가이드 업데이트
-function updateAnalysisGuide(reportNm) {
+function updateAnalysisGuide(reportNm, targetId = 'analysisCard') {
   const guide = document.getElementById('analysisGuide');
   if (!guide) return;
   guide.innerHTML = `
@@ -1064,7 +1160,7 @@ function updateAnalysisGuide(reportNm) {
       <div class="analysis-guide-text">
         <strong>${reportNm}</strong> 분석이 완료되었습니다
       </div>
-      <button class="btn btn-sm btn-analysis-guide-scroll" onclick="document.getElementById('analysisCard').scrollIntoView({behavior:'smooth'})">
+      <button class="btn btn-sm btn-analysis-guide-scroll" onclick="document.getElementById('${targetId}').scrollIntoView({behavior:'smooth'})">
         <i class="bi bi-arrow-down-circle me-1"></i>결과 보기
       </button>
     </div>

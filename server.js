@@ -2,6 +2,7 @@ const express = require('express');
 const path = require('path');
 const financialService = require('./financialService');
 const axios = require('axios');
+const AdmZip = require('adm-zip');
 const dotenv = require('dotenv');
 const config = require('./config');
 
@@ -841,11 +842,136 @@ app.get('/api/disclosure-list', async (req, res) => {
     const bgn_de = formatDate(startDate);
     const end_de = formatDate(endDate);
 
-    const url = `https://opendart.fss.or.kr/api/list.json?crtfc_key=${config.OPEN_DART_API_KEY}&corp_code=${corp_code}&bgn_de=${bgn_de}&end_de=${end_de}&pblntf_ty=A&page_count=100`;
-    const response = await axios.get(url);
-    res.json(response.data);
+    // 정기공시(A)와 거래소공시(I, 잠정실적 등 공정공시 포함)를 함께 조회
+    const baseUrl = `https://opendart.fss.or.kr/api/list.json?crtfc_key=${config.OPEN_DART_API_KEY}&corp_code=${corp_code}&bgn_de=${bgn_de}&end_de=${end_de}&page_count=100`;
+    const [periodicRes, exchangeRes] = await Promise.all([
+      axios.get(`${baseUrl}&pblntf_ty=A`),
+      axios.get(`${baseUrl}&pblntf_ty=I`)
+    ]);
+
+    const merged = [];
+    let errorData = null;
+    for (const { data } of [periodicRes, exchangeRes]) {
+      if (data.status === '000' && Array.isArray(data.list)) {
+        merged.push(...data.list);
+      } else {
+        errorData = data;
+      }
+    }
+    if (merged.length === 0) {
+      return res.json(errorData || { status: '013', message: '조회된 데이터가 없습니다.' });
+    }
+    res.json({ status: '000', message: '정상', list: merged });
   } catch (error) {
     res.status(500).json({ status: 'error', message: error.message });
+  }
+});
+
+// DART 공시서류 원본(zip) 버퍼에서 본문 텍스트 추출
+function extractDocumentText(zipBuffer) {
+  const zip = new AdmZip(zipBuffer);
+  const xmlEntries = zip.getEntries().filter(entry => entry.entryName.toLowerCase().endsWith('.xml'));
+  if (xmlEntries.length === 0) {
+    throw new Error('공시 원본에서 XML 파일을 찾을 수 없습니다.');
+  }
+  // 본문(가장 큰 파일) 우선
+  xmlEntries.sort((a, b) => b.header.size - a.header.size);
+  const buffer = xmlEntries[0].getData();
+
+  // XML 선언부에서 인코딩 감지 (DART 원본은 utf-8 또는 euc-kr)
+  const head = buffer.slice(0, 200).toString('ascii');
+  const encMatch = head.match(/encoding=["']([\w-]+)["']/i);
+  const encoding = encMatch ? encMatch[1].toLowerCase() : 'utf-8';
+  let xml;
+  try {
+    xml = new TextDecoder(encoding).decode(buffer);
+  } catch (e) {
+    xml = buffer.toString('utf8');
+  }
+
+  // 표 구조(셀 구분/행 바꿈)를 유지하면서 태그 제거
+  return xml
+    .replace(/<style[\s\S]*?<\/style>/gi, '')
+    .replace(/<script[\s\S]*?<\/script>/gi, '')
+    .replace(/<\/(TD|TE|TH|TU)>/gi, ' | ')
+    .replace(/<\/TR>/gi, '\n')
+    .replace(/<\/(P|TABLE|TITLE)>/gi, '\n')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&#\d+;/g, ' ')
+    .replace(/[ \t]+/g, ' ')
+    .replace(/\s*\n\s*/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
+// 잠정실적 공시 분석 프롬프트 생성 함수
+function createProvisionalAnalysisPrompt(companyName, reportNm, documentText) {
+  return `
+당신은 재무 분석 전문가입니다. 다음은 ${companyName}의 "${reportNm}" 공시(잠정실적) 원문에서 추출한 내용입니다:
+
+${documentText}
+
+다음 지침을 따라 분석해주세요:
+1. 매출액, 영업이익, 당기순이익 등 잠정실적 수치를 정리하고 의미를 설명해주세요.
+2. 전년 동기 대비, 직전 분기 대비 증감률이 있다면 해석해주세요.
+3. 공시에 포함된 실적 변동 요인이나 회사 측 설명이 있다면 요약해주세요.
+4. 전반적인 실적 평가와 간단한 요약을 제공해주세요. 잠정실적이므로 확정 실적과 다를 수 있다는 점을 언급해주세요.
+
+형식 지침:
+- **Markdown 코드 블록(\`\`\`)을 사용하지 마세요.**
+- 문단은 <p> 태그로 감싸주세요. 예: <p>분석 내용입니다.</p>
+- 긍정적인 내용은 <span class="positive">내용</span> 형식으로 표시해주세요.
+- 부정적인 내용은 <span class="negative">내용</span> 형식으로 표시해주세요.
+- 중립적인 내용은 <span class="neutral">내용</span> 형식으로 표시해주세요.
+- 중요한 수치나 용어는 <strong>내용</strong> 형식으로 강조해주세요.
+- 제목으로 "${companyName} 잠정실적 분석"을 첫 줄에 추가해주세요.
+- 전체 분석은 3-4개 문단으로 간결하게 작성해주세요.
+`;
+}
+
+// 잠정실적 공시 AI 분석 API
+app.get('/api/provisional-analysis', async (req, res) => {
+  try {
+    const { rcept_no, corp_name, report_nm } = req.query;
+    if (!rcept_no) {
+      return res.status(400).json({ status: 'error', message: 'rcept_no는 필수입니다.' });
+    }
+
+    // 공시서류 원본파일 다운로드
+    const url = `https://opendart.fss.or.kr/api/document.xml?crtfc_key=${config.OPEN_DART_API_KEY}&rcept_no=${rcept_no}`;
+    const response = await axios.get(url, { responseType: 'arraybuffer' });
+
+    // 오류 시 zip 대신 XML 오류 메시지가 반환됨
+    const contentType = response.headers['content-type'] || '';
+    if (contentType.includes('xml') || contentType.includes('json')) {
+      const errText = Buffer.from(response.data).toString('utf8');
+      const msgMatch = errText.match(/<message>([^<]+)<\/message>/);
+      throw new Error(msgMatch ? msgMatch[1] : '공시 원본을 내려받지 못했습니다.');
+    }
+
+    let documentText = extractDocumentText(Buffer.from(response.data));
+    const MAX_DOC_LENGTH = 20000;
+    if (documentText.length > MAX_DOC_LENGTH) {
+      documentText = documentText.slice(0, MAX_DOC_LENGTH);
+    }
+
+    console.log(`잠정실적 분석 요청: ${corp_name || ''} ${report_nm || ''} (rcept_no: ${rcept_no}, 본문 ${documentText.length}자)`);
+
+    const prompt = createProvisionalAnalysisPrompt(corp_name || '해당 회사', report_nm || '잠정실적 공시', documentText);
+    const analysis = await callGeminiAPI(prompt);
+
+    res.json({ status: 'success', analysis });
+  } catch (error) {
+    console.error('잠정실적 분석 중 오류 발생:', error);
+    res.status(500).json({
+      status: 'error',
+      message: `잠정실적 분석 중 오류가 발생했습니다: ${error.message}`
+    });
   }
 });
 

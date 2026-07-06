@@ -7,16 +7,23 @@ let currentYear = null;
 let previousYear = null;
 let isFinancialCompany = false; // 금융회사 여부
 
+// 차트 공통 색상 (계정과목별로 모든 차트에서 동일한 색 사용, CVD 검증 통과 팔레트)
+const CHART_COLORS = {
+  revenue:   { border: '#2563eb', bg: 'rgba(37, 99, 235, 0.65)' },   // 매출액
+  opIncome:  { border: '#d97706', bg: 'rgba(217, 119, 6, 0.65)' },   // 영업이익
+  netIncome: { border: '#0d9488', bg: 'rgba(13, 148, 136, 0.65)' },  // 당기순이익
+  opMargin:  { border: '#7c3aed', bg: 'rgba(124, 58, 237, 0.15)' },  // 영업이익률
+  netMargin: { border: '#db2777', bg: 'rgba(219, 39, 119, 0.15)' }   // 순이익률
+};
+
 // DOM 요소
 const companySearchInput = document.getElementById('companySearch');
 const searchBtn = document.getElementById('searchBtn');
 const searchResults = document.getElementById('searchResults');
 const companyInfoCard = document.getElementById('companyInfoCard');
 const companyInfo = document.getElementById('companyInfo');
-const financialOptionsCard = document.getElementById('financialOptionsCard');
 const yearSelect = document.getElementById('year');
 const reportTypeSelect = document.getElementById('reportType');
-const fetchAnalysisBtn = document.getElementById('fetchAnalysisBtn');
 const analysisCard = document.getElementById('analysisCard');
 const analysisCardTitle = document.getElementById('analysisCardTitle');
 const bsTableBody = document.getElementById('bsTableBody');
@@ -59,46 +66,155 @@ document.addEventListener('DOMContentLoaded', () => {
   initPwaInstallBanner();
   
   // 검색 버튼 클릭 이벤트
-  searchBtn.addEventListener('click', searchCompany);
-  
+  searchBtn.addEventListener('click', () => searchCompany());
+
   // 엔터 키 입력 이벤트
   companySearchInput.addEventListener('keypress', (e) => {
     if (e.key === 'Enter') {
       searchCompany();
     }
   });
-  
-  // 통합 재무분석 버튼 클릭 이벤트
-  fetchAnalysisBtn.addEventListener('click', () => fetchFinancialAnalysis());
+
+  // 입력 중 자동완성 (300ms 디바운스)
+  let searchDebounceTimer = null;
+  companySearchInput.addEventListener('input', () => {
+    clearTimeout(searchDebounceTimer);
+    const keyword = companySearchInput.value.trim();
+    if (keyword.length < 2) {
+      searchResults.innerHTML = '';
+      return;
+    }
+    searchDebounceTimer = setTimeout(() => searchCompany(true), 300);
+  });
+
+  // 인기 검색 칩
+  document.querySelectorAll('#popularChips .chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      companySearchInput.value = chip.dataset.name;
+      searchCompany();
+    });
+  });
 
   // 내보내기 버튼 이벤트
   const exportPdfBtn = document.getElementById('exportPdfBtn');
   const exportImageBtn = document.getElementById('exportImageBtn');
   if (exportPdfBtn) exportPdfBtn.addEventListener('click', exportAnalysisAsPdf);
   if (exportImageBtn) exportImageBtn.addEventListener('click', exportAnalysisAsImage);
+
+  // 잠정실적 내보내기 버튼 이벤트
+  const provisionalPdfBtn = document.getElementById('provisionalPdfBtn');
+  const provisionalImageBtn = document.getElementById('provisionalImageBtn');
+  if (provisionalPdfBtn) provisionalPdfBtn.addEventListener('click', exportProvisionalAsPdf);
+  if (provisionalImageBtn) provisionalImageBtn.addEventListener('click', exportProvisionalAsImage);
+
+  // 연간 추이 탭: 처음 열릴 때 데이터 로드
+  const trendTab = document.getElementById('trend-tab');
+  if (trendTab) trendTab.addEventListener('shown.bs.tab', loadTrendChart);
+
+  // URL 파라미터로부터 상태 복원 (딥링크)
+  restoreStateFromUrl();
+
+  // 뒤로가기/앞으로가기 시 해당 상태로 다시 로드
+  window.addEventListener('popstate', () => location.reload());
 });
 
-// 회사 검색 함수
-async function searchCompany() {
+// 토스트 메시지 표시
+function showToast(message, type = 'info') {
+  let stack = document.getElementById('toastStack');
+  if (!stack) {
+    stack = document.createElement('div');
+    stack.id = 'toastStack';
+    stack.className = 'toast-stack';
+    document.body.appendChild(stack);
+  }
+  const toast = document.createElement('div');
+  toast.className = `app-toast${type === 'error' ? ' toast-error' : ''}`;
+  toast.textContent = message;
+  stack.appendChild(toast);
+  setTimeout(() => {
+    toast.classList.add('toast-fade');
+    setTimeout(() => toast.remove(), 400);
+  }, 3000);
+}
+
+// URL 파라미터로부터 회사·공시 선택 상태 복원
+async function restoreStateFromUrl() {
+  const params = new URLSearchParams(window.location.search);
+  const corpCode = params.get('corp');
+  if (!corpCode) return;
+
+  const name = params.get('name') || '';
+  let company = null;
+  if (name) {
+    try {
+      const response = await fetch(`/api/companies/search?keyword=${encodeURIComponent(name)}`);
+      const data = await response.json();
+      if (data.status === 'success') {
+        company = (data.data || []).find(c => c.corp_code === corpCode) || null;
+      }
+    } catch (e) {
+      console.warn('URL 상태 복원 중 회사 조회 실패:', e);
+    }
+  }
+  if (!company) {
+    company = { corp_code: corpCode, corp_name: name || `기업 (${corpCode})`, corp_eng_name: '', stock_code: '', modify_date: '' };
+  }
+
+  companySearchInput.value = company.corp_name;
+  await selectCompany(company, { skipHistory: true });
+
+  // 공시 항목까지 지정된 경우 해당 분석 자동 실행
+  const rcept = params.get('rcept');
+  if (rcept) {
+    const btn = document.querySelector(`.disclosure-item[data-rcept_no="${rcept}"] .btn-analyze`);
+    if (btn) btn.click();
+  }
+}
+
+// 현재 선택 상태를 URL에 반영
+function updateUrlState(rceptNo, { push = false } = {}) {
+  if (!selectedCompany) return;
+  const params = new URLSearchParams();
+  params.set('corp', selectedCompany.corp_code);
+  params.set('name', selectedCompany.corp_name);
+  if (rceptNo) params.set('rcept', rceptNo);
+  const url = `${window.location.pathname}?${params.toString()}`;
+  if (push) {
+    history.pushState({}, '', url);
+  } else {
+    history.replaceState({}, '', url);
+  }
+}
+
+// 회사 검색 함수 (quiet: 자동완성 호출 — 안내 메시지·로딩 표시 없이 조용히 갱신)
+let searchRequestSeq = 0;
+async function searchCompany(quiet = false) {
   const keyword = companySearchInput.value.trim();
-  
+
   if (keyword.length < 2) {
-    alert('검색어는 2글자 이상 입력해주세요.');
+    if (!quiet) {
+      searchResults.innerHTML = '<div class="alert alert-info">검색어는 2글자 이상 입력해주세요.</div>';
+    }
     return;
   }
-  
-  searchResults.innerHTML = '<div class="loading">검색 중...</div>';
-  
+
+  if (!quiet) {
+    searchResults.innerHTML = '<div class="loading">검색 중...</div>';
+  }
+
+  const requestId = ++searchRequestSeq;
   try {
     const response = await fetch(`/api/companies/search?keyword=${encodeURIComponent(keyword)}`);
     const data = await response.json();
-    
+    if (requestId !== searchRequestSeq) return; // 더 최신 요청이 있으면 무시
+
     if (data.status === 'success') {
       displaySearchResults(data.data);
     } else {
       searchResults.innerHTML = `<div class="alert alert-danger">${data.message}</div>`;
     }
   } catch (error) {
+    if (requestId !== searchRequestSeq) return;
     console.error('회사 검색 중 오류 발생:', error);
     searchResults.innerHTML = '<div class="alert alert-danger">서버 연결 중 오류가 발생했습니다.</div>';
   }
@@ -112,10 +228,14 @@ function displaySearchResults(companies) {
     searchResults.innerHTML = '<div class="alert alert-info">검색 결과가 없습니다.</div>';
     return;
   }
-  
+
+  // 상장사(종목코드 보유) 우선 정렬
+  const isListed = c => (c.stock_code && c.stock_code.trim() ? 1 : 0);
+  companies = [...companies].sort((a, b) => isListed(b) - isListed(a));
+
   const resultDiv = document.createElement('div');
   resultDiv.className = 'list-group';
-  
+
   companies.forEach(company => {
     const item = document.createElement('div');
     item.className = 'list-group-item company-item';
@@ -139,9 +259,20 @@ function displaySearchResults(companies) {
 }
 
 // 회사 선택 함수
-function selectCompany(company) {
+async function selectCompany(company, { skipHistory = false } = {}) {
   selectedCompany = company;
-  
+
+  // 앱 모드 전환 (히어로 축소, 기능소개 숨김)
+  document.body.classList.add('app-mode');
+
+  // 검색 결과 닫기
+  searchResults.innerHTML = '';
+
+  // URL에 회사 상태 반영
+  if (!skipHistory) {
+    updateUrlState(null, { push: true });
+  }
+
   // 회사 정보 표시
   companyInfoCard.style.display = 'block';
   companyInfo.innerHTML = `
@@ -157,13 +288,10 @@ function selectCompany(company) {
       </div>
     </div>
   `;
-  
-  // disclosure list 표시
-  fetchAndDisplayDisclosureList(company.corp_code);
-  
-  // disclosure list 외 기존 옵션 숨김
-  financialOptionsCard.style.display = 'none';
+
+  // 이전 회사의 분석 결과 초기화
   analysisCard.style.display = 'none';
+  document.getElementById('provisionalCard').style.display = 'none';
   if (incomeStatementChart) {
     incomeStatementChart.destroy();
     incomeStatementChart = null;
@@ -174,7 +302,11 @@ function selectCompany(company) {
   if (analysisCard) {
     document.getElementById('chartRow').style.display = 'none';
   }
-  
+  resetTrendChart();
+
+  // disclosure list 표시
+  await fetchAndDisplayDisclosureList(company.corp_code);
+
   // 화면 스크롤
   document.getElementById('disclosureListContainer').scrollIntoView({ behavior: 'smooth' });
 }
@@ -182,7 +314,7 @@ function selectCompany(company) {
 // 통합 재무분석 조회 함수
 async function fetchFinancialAnalysis() {
   if (!selectedCompany) {
-    alert('회사를 먼저 선택해주세요.');
+    showToast('회사를 먼저 선택해주세요.', 'error');
     return;
   }
   
@@ -453,9 +585,10 @@ function displayIncomeStatementChart(analysis) {
             type: 'bar',
             label: revenueLabel,
             data: [salesPrevious, salesCurrent],
-            backgroundColor: 'rgba(54, 162, 235, 0.6)',
-            borderColor: 'rgb(54, 162, 235)',
+            backgroundColor: CHART_COLORS.revenue.bg,
+            borderColor: CHART_COLORS.revenue.border,
             borderWidth: 1,
+            borderRadius: 4,
             yAxisID: 'y-axis-amount',
             order: 2 // 막대 차트가 뒤에 오도록 order 설정
           },
@@ -463,9 +596,10 @@ function displayIncomeStatementChart(analysis) {
             type: 'bar',
             label: '영업이익', // 영업이익 막대 추가
             data: [opIncomePrevious, opIncomeCurrent],
-            backgroundColor: 'rgba(255, 159, 64, 0.6)', // 주황색 계열
-            borderColor: 'rgb(255, 159, 64)',
+            backgroundColor: CHART_COLORS.opIncome.bg,
+            borderColor: CHART_COLORS.opIncome.border,
             borderWidth: 1,
+            borderRadius: 4,
             yAxisID: 'y-axis-amount',
             order: 2 // 막대 차트가 뒤에 오도록 order 설정
           },
@@ -473,9 +607,10 @@ function displayIncomeStatementChart(analysis) {
             type: 'bar',
             label: '당기순이익', // 당기순이익 막대 추가
             data: [netIncomePrevious, netIncomeCurrent],
-            backgroundColor: 'rgba(75, 192, 192, 0.6)', // 청록색 계열
-            borderColor: 'rgb(75, 192, 192)',
+            backgroundColor: CHART_COLORS.netIncome.bg,
+            borderColor: CHART_COLORS.netIncome.border,
             borderWidth: 1,
+            borderRadius: 4,
             yAxisID: 'y-axis-amount',
             order: 2 // 막대 차트가 뒤에 오도록 order 설정
           },
@@ -484,8 +619,8 @@ function displayIncomeStatementChart(analysis) {
             type: 'line',
             label: '영업이익률 (%)',
             data: [opMarginPrevious, opMarginCurrent],
-            borderColor: 'rgb(255, 99, 132)',
-            backgroundColor: 'rgba(255, 99, 132, 0.2)',
+            borderColor: CHART_COLORS.opMargin.border,
+            backgroundColor: CHART_COLORS.opMargin.bg,
             borderWidth: 2,
             fill: false,
             tension: 0.1,
@@ -496,8 +631,8 @@ function displayIncomeStatementChart(analysis) {
             type: 'line',
             label: '당기순이익률 (%)',
             data: [netMarginPrevious, netMarginCurrent],
-            borderColor: 'rgb(153, 102, 255)', // 보라색 계열 (기존 녹색에서 변경)
-            backgroundColor: 'rgba(153, 102, 255, 0.2)',
+            borderColor: CHART_COLORS.netMargin.border,
+            backgroundColor: CHART_COLORS.netMargin.bg,
             borderWidth: 2,
             fill: false,
             tension: 0.1,
@@ -603,6 +738,118 @@ function displayIncomeStatementChart(analysis) {
   } catch (error) {
     console.error('Error in displayIncomeStatementChart:', error);
     if(incomeStatementChartCanvas) incomeStatementChartCanvas.parentElement.innerHTML = '<p class="text-center text-danger small">손익 차트 오류</p>';
+  }
+}
+
+// =============================================
+// 연간 추이 차트 (최근 5개년)
+// =============================================
+let trendChart = null;
+let trendLoadedFor = null;
+
+function resetTrendChart() {
+  trendLoadedFor = null;
+  if (trendChart) {
+    trendChart.destroy();
+    trendChart = null;
+  }
+  const trendError = document.getElementById('trendError');
+  if (trendError) trendError.style.display = 'none';
+}
+
+async function loadTrendChart() {
+  if (!selectedCompany) return;
+  if (trendLoadedFor === selectedCompany.corp_code) return;
+
+  const loading = document.getElementById('trendLoading');
+  const errorBox = document.getElementById('trendError');
+  const canvas = document.getElementById('trendChart');
+  if (!canvas) return;
+
+  loading.style.display = 'block';
+  errorBox.style.display = 'none';
+
+  try {
+    const response = await fetch(`/api/financial-trend?corp_code=${selectedCompany.corp_code}`);
+    const data = await response.json();
+    if (!response.ok || data.status !== 'success') {
+      throw new Error(data.message || '추이 데이터를 불러오지 못했습니다.');
+    }
+
+    const { years, series } = data.data;
+    trendLoadedFor = selectedCompany.corp_code;
+
+    if (trendChart) trendChart.destroy();
+    trendChart = new Chart(canvas.getContext('2d'), {
+      data: {
+        labels: years.map(y => `${y}년`),
+        datasets: [
+          {
+            type: 'bar',
+            label: '매출액',
+            data: series.revenue,
+            backgroundColor: CHART_COLORS.revenue.bg,
+            borderColor: CHART_COLORS.revenue.border,
+            borderWidth: 1,
+            borderRadius: 4,
+            order: 2
+          },
+          {
+            type: 'line',
+            label: '영업이익',
+            data: series.operatingIncome,
+            borderColor: CHART_COLORS.opIncome.border,
+            backgroundColor: CHART_COLORS.opIncome.bg,
+            borderWidth: 2,
+            tension: 0.1,
+            pointRadius: 4,
+            order: 1
+          },
+          {
+            type: 'line',
+            label: '당기순이익',
+            data: series.netIncome,
+            borderColor: CHART_COLORS.netIncome.border,
+            backgroundColor: CHART_COLORS.netIncome.bg,
+            borderWidth: 2,
+            tension: 0.1,
+            pointRadius: 4,
+            order: 1
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          title: {
+            display: true,
+            text: `${selectedCompany.corp_name} 최근 5개년 연간 실적 추이 (사업보고서 기준)`,
+            font: { size: 14, weight: 'bold' },
+            padding: { bottom: 20 }
+          },
+          legend: { position: 'bottom' },
+          tooltip: {
+            callbacks: {
+              label: ctx => `${ctx.dataset.label}: ${formatAmountBetter(ctx.raw)}`
+            }
+          }
+        },
+        scales: {
+          y: {
+            beginAtZero: true,
+            title: { display: true, text: '금액 (원)' },
+            ticks: { callback: value => formatAmountBetter(value, true) }
+          }
+        }
+      }
+    });
+  } catch (error) {
+    console.error('추이 차트 로드 중 오류 발생:', error);
+    errorBox.textContent = error.message || '추이 데이터를 불러오지 못했습니다.';
+    errorBox.style.display = 'block';
+  } finally {
+    loading.style.display = 'none';
   }
 }
 
@@ -713,12 +960,12 @@ function displayBalanceSheetTable(balanceSheet) {
     const row = document.createElement('tr');
     row.innerHTML = `
       <td>${item}</td>
-      <td class="text-end">${formatAmountBetter(current)} <small class="text-muted">(${currentPeriodString})</small></td>
-      <td class="text-end">${formatAmountBetter(previous)} <small class="text-muted">(${previousPeriodString})</small></td>
-      <td class="text-end ${diff >= 0 ? 'text-success' : 'text-danger'}">${formatAmountBetter(diff)}</td>
-      <td class="text-end ${diff >= 0 ? 'text-success' : 'text-danger'}">${diffRate !== '-' ? diffRate + '%' : '-'}</td>
+      <td class="text-end" data-label="당기">${formatAmountBetter(current)} <small class="text-muted">(${currentPeriodString})</small></td>
+      <td class="text-end" data-label="전기">${formatAmountBetter(previous)} <small class="text-muted">(${previousPeriodString})</small></td>
+      <td class="text-end ${diff >= 0 ? 'text-success' : 'text-danger'}" data-label="증감">${formatAmountBetter(diff)}</td>
+      <td class="text-end ${diff >= 0 ? 'text-success' : 'text-danger'}" data-label="증감율">${diffRate !== '-' ? diffRate + '%' : '-'}</td>
     `;
-    
+
     bsTableBody.appendChild(row);
   });
 }
@@ -759,12 +1006,12 @@ function displayIncomeStatementTable(incomeStatement) {
     const row = document.createElement('tr');
     row.innerHTML = `
       <td>${item}</td>
-      <td class="text-end">${formatAmountBetter(current)} <small class="text-muted">(${currentPeriodString})</small></td>
-      <td class="text-end">${formatAmountBetter(previous)} <small class="text-muted">(${previousPeriodString})</small></td>
-      <td class="text-end ${diff >= 0 ? 'text-success' : 'text-danger'}">${formatAmountBetter(diff)}</td>
-      <td class="text-end ${diff >= 0 ? 'text-success' : 'text-danger'}">${diffRate !== '-' ? diffRate + '%' : '-'}</td>
+      <td class="text-end" data-label="당기">${formatAmountBetter(current)} <small class="text-muted">(${currentPeriodString})</small></td>
+      <td class="text-end" data-label="전기">${formatAmountBetter(previous)} <small class="text-muted">(${previousPeriodString})</small></td>
+      <td class="text-end ${diff >= 0 ? 'text-success' : 'text-danger'}" data-label="증감">${formatAmountBetter(diff)}</td>
+      <td class="text-end ${diff >= 0 ? 'text-success' : 'text-danger'}" data-label="증감율">${diffRate !== '-' ? diffRate + '%' : '-'}</td>
     `;
-    
+
     isTableBody.appendChild(row);
   });
 }
@@ -815,11 +1062,11 @@ function displayRatioTable(ratio) {
       const row = document.createElement('tr');
       row.innerHTML = `
         <td>${item}</td>
-        <td class="text-end">${current}% <small class="text-muted">(${currentPeriodString})</small></td>
-        <td class="text-end">${previous}% <small class="text-muted">(${previousPeriodString})</small></td>
-        <td class="text-end ${diff >= 0 ? 'text-success' : 'text-danger'}">${diff}%p</td>
+        <td class="text-end" data-label="당기">${current}% <small class="text-muted">(${currentPeriodString})</small></td>
+        <td class="text-end" data-label="전기">${previous}% <small class="text-muted">(${previousPeriodString})</small></td>
+        <td class="text-end ${diff >= 0 ? 'text-success' : 'text-danger'}" data-label="증감">${diff}%p</td>
       `;
-      
+
       ratioTableBody.appendChild(row);
     }
   });
@@ -989,21 +1236,24 @@ function handleDisclosureSelect(rceptNo, reportNm, btnElement) {
       if (mm === '03') reprtCode = '11013';
       else if (mm === '09') reprtCode = '11014';
       else {
-        alert('1분기/3분기 분기보고서만 지원합니다.');
+        showToast('1분기/3분기 분기보고서만 지원합니다.', 'error');
         return;
       }
     } else {
-      alert('분기보고서의 월 정보를 인식할 수 없습니다.');
+      showToast('분기보고서의 월 정보를 인식할 수 없습니다.', 'error');
       return;
     }
   } else {
-    alert('1분기/반기/3분기/사업보고서만 지원합니다.');
+    showToast('1분기/반기/3분기/사업보고서만 지원합니다.', 'error');
     return;
   }
   if (!year || !reprtCode) {
-    alert('연도 또는 보고서 유형을 인식할 수 없습니다.');
+    showToast('연도 또는 보고서 유형을 인식할 수 없습니다.', 'error');
     return;
   }
+
+  // URL에 선택한 공시 반영
+  updateUrlState(rceptNo);
 
   // 선택된 항목 하이라이트
   document.querySelectorAll('.disclosure-item').forEach(el => {
@@ -1045,6 +1295,9 @@ function handleDisclosureSelect(rceptNo, reportNm, btnElement) {
 
 // 잠정실적 공시 선택 시 분석 함수
 async function handleProvisionalSelect(rceptNo, reportNm, btnElement) {
+  // URL에 선택한 공시 반영
+  updateUrlState(rceptNo);
+
   // 선택된 항목 하이라이트
   document.querySelectorAll('.disclosure-item').forEach(el => {
     el.classList.remove('disclosure-active');
@@ -1154,18 +1407,25 @@ function renderProvisionalChart(chartData) {
     periodLabels.previous ? `전기 (${periodLabels.previous})` : '전기',
     periodLabels.current ? `당기 (${periodLabels.current})` : '당기'
   ];
-  const colors = [
-    { bg: 'rgba(54, 162, 235, 0.6)', border: 'rgb(54, 162, 235)' },
-    { bg: 'rgba(255, 159, 64, 0.6)', border: 'rgb(255, 159, 64)' },
-    { bg: 'rgba(75, 192, 192, 0.6)', border: 'rgb(75, 192, 192)' }
-  ];
-  const datasets = metrics.slice(0, 3).map((m, i) => ({
-    label: m.name,
-    data: [m.yearAgo, m.previous, m.current],
-    backgroundColor: colors[i % colors.length].bg,
-    borderColor: colors[i % colors.length].border,
-    borderWidth: 1
-  }));
+  // 계정과목별 고정 색 (다른 차트와 동일한 팔레트)
+  const fallbackColors = [CHART_COLORS.revenue, CHART_COLORS.opIncome, CHART_COLORS.netIncome];
+  const colorForMetric = (name, i) => {
+    if (name.includes('매출') || name.includes('영업수익')) return CHART_COLORS.revenue;
+    if (name.includes('영업이익')) return CHART_COLORS.opIncome;
+    if (name.includes('순이익')) return CHART_COLORS.netIncome;
+    return fallbackColors[i % fallbackColors.length];
+  };
+  const datasets = metrics.slice(0, 3).map((m, i) => {
+    const color = colorForMetric(m.name, i);
+    return {
+      label: m.name,
+      data: [m.yearAgo, m.previous, m.current],
+      backgroundColor: color.bg,
+      borderColor: color.border,
+      borderWidth: 1,
+      borderRadius: 4
+    };
+  });
 
   if (provisionalChart) provisionalChart.destroy();
   wrap.style.display = 'block';
@@ -1351,12 +1611,15 @@ async function loadKoreanFont() {
   return { regular: cachedKoreanFontBase64, bold: cachedKoreanFontBoldBase64 };
 }
 
-function getExportFileName(ext) {
+function getExportFileName(ext, label = null) {
   const company = selectedCompany?.corp_name || 'Finalyze';
+  const date = new Date().toISOString().slice(0, 10);
+  if (label) {
+    return `Finalyze_${company}_${label}_${date}.${ext}`;
+  }
   const year = currentYear || '';
   const reportCodeMap = { '11011': '사업', '11012': '반기', '11013': '1분기', '11014': '3분기' };
   const reportName = reportCodeMap[reportTypeSelect?.value] || '';
-  const date = new Date().toISOString().slice(0, 10);
   return `Finalyze_${company}_${year}${reportName}_${date}.${ext}`;
 }
 
@@ -1414,8 +1677,8 @@ function extractTableData(tbody) {
 }
 
 // AI 분석 텍스트 추출 (HTML 태그 제거하되 구조는 유지)
-function extractAiAnalysisText() {
-  const aiContent = document.getElementById('aiAnalysisContent');
+function extractAiAnalysisText(containerId = 'aiAnalysisContent') {
+  const aiContent = document.getElementById(containerId);
   if (!aiContent || aiContent.style.display === 'none') return null;
   const aiAnalysis = aiContent.querySelector('.ai-analysis');
   if (!aiAnalysis) return null;
@@ -1445,7 +1708,7 @@ async function exportAnalysisAsPdf() {
 
   try {
     if (!window.jspdf) {
-      alert('PDF 라이브러리를 불러오는 중입니다. 잠시 후 다시 시도해주세요.');
+      showToast('PDF 라이브러리를 불러오는 중입니다. 잠시 후 다시 시도해주세요.');
       return;
     }
 
@@ -1635,7 +1898,7 @@ async function exportAnalysisAsPdf() {
     pdf.save(getExportFileName('pdf'));
   } catch (error) {
     console.error('PDF 내보내기 오류:', error);
-    alert('PDF 내보내기 중 오류가 발생했습니다: ' + error.message);
+    showToast('PDF 내보내기 중 오류가 발생했습니다: ' + error.message, 'error');
   } finally {
     if (restore && !restore.replaced) restore();
     const newBtn = document.getElementById('exportPdfBtn');
@@ -1653,13 +1916,13 @@ async function exportAnalysisAsImage() {
 
   try {
     if (!window.html2canvas) {
-      alert('이미지 라이브러리를 불러오는 중입니다. 잠시 후 다시 시도해주세요.');
+      showToast('이미지 라이브러리를 불러오는 중입니다. 잠시 후 다시 시도해주세요.');
       return;
     }
 
     const card = document.getElementById('analysisCard');
     if (!card) {
-      alert('내보낼 분석 결과가 없습니다.');
+      showToast('내보낼 분석 결과가 없습니다.', 'error');
       return;
     }
 
@@ -1725,8 +1988,193 @@ async function exportAnalysisAsImage() {
     }, 'image/png');
   } catch (error) {
     console.error('이미지 내보내기 오류:', error);
-    alert('이미지 내보내기 중 오류가 발생했습니다: ' + error.message);
+    showToast('이미지 내보내기 중 오류가 발생했습니다: ' + error.message, 'error');
   } finally {
     if (restore) restore();
   }
-} 
+}
+
+// =============================================
+// 잠정실적 분석 내보내기
+// =============================================
+
+// 잠정실적 분석을 PDF로 내보내기
+async function exportProvisionalAsPdf() {
+  const btn = document.getElementById('provisionalPdfBtn');
+
+  const content = document.getElementById('provisionalContent');
+  if (!content || content.style.display === 'none' || !content.innerHTML.trim()) {
+    showToast('내보낼 분석 결과가 없습니다. 먼저 잠정실적을 분석해주세요.', 'error');
+    return;
+  }
+  if (!window.jspdf) {
+    showToast('PDF 라이브러리를 불러오는 중입니다. 잠시 후 다시 시도해주세요.');
+    return;
+  }
+
+  const restore = showExportLoading(btn, 'PDF 생성 중...');
+  try {
+    const fonts = await loadKoreanFont();
+
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF('p', 'mm', 'a4');
+    const pageWidth = pdf.internal.pageSize.getWidth();
+    const pageHeight = pdf.internal.pageSize.getHeight();
+    const margin = 15;
+    const contentWidth = pageWidth - margin * 2;
+
+    pdf.addFileToVFS('NanumGothic-Regular.ttf', fonts.regular);
+    pdf.addFont('NanumGothic-Regular.ttf', KOREAN_FONT_NAME, 'normal');
+    if (fonts.bold) {
+      pdf.addFileToVFS('NanumGothic-Bold.ttf', fonts.bold);
+      pdf.addFont('NanumGothic-Bold.ttf', KOREAN_FONT_NAME, 'bold');
+    }
+    pdf.setFont(KOREAN_FONT_NAME, 'normal');
+
+    let y = margin;
+    const ensureSpace = (needed) => {
+      if (y + needed > pageHeight - margin) {
+        pdf.addPage();
+        y = margin;
+      }
+    };
+
+    // 제목
+    const titleText = document.getElementById('provisionalCardTitle')?.textContent || '잠정실적 분석';
+    pdf.setFont(KOREAN_FONT_NAME, fonts.bold ? 'bold' : 'normal');
+    pdf.setFontSize(16);
+    pdf.setTextColor(37, 99, 235);
+    pdf.text(titleText, pageWidth / 2, y, { align: 'center', maxWidth: contentWidth });
+    y += 10;
+
+    pdf.setFont(KOREAN_FONT_NAME, 'normal');
+    pdf.setFontSize(9);
+    pdf.setTextColor(120, 120, 120);
+    const now = new Date();
+    pdf.text(`생성일: ${now.toISOString().slice(0, 10)} ${now.toTimeString().slice(0, 5)} | Finalyze.AI`, pageWidth / 2, y, { align: 'center' });
+    y += 8;
+
+    pdf.setDrawColor(37, 99, 235);
+    pdf.setLineWidth(0.5);
+    pdf.line(margin, y, pageWidth - margin, y);
+    y += 8;
+
+    // 잠정실적 비교 차트 (이미지)
+    const chartCanvas = document.getElementById('provisionalChart');
+    const chartWrap = document.getElementById('provisionalChartWrap');
+    if (chartCanvas && chartWrap && chartWrap.style.display !== 'none') {
+      try {
+        const chartImg = chartCanvas.toDataURL('image/png');
+        const chartHeight = 80;
+        ensureSpace(chartHeight + 5);
+        pdf.addImage(chartImg, 'PNG', margin, y, contentWidth, chartHeight);
+        y += chartHeight + 8;
+      } catch (e) {
+        console.warn('잠정실적 차트 캡쳐 실패:', e);
+      }
+    }
+
+    // AI 분석 텍스트
+    const blocks = extractAiAnalysisText('provisionalContent');
+    if (blocks && blocks.length > 0) {
+      pdf.setTextColor(40, 40, 40);
+      blocks.forEach(block => {
+        const isHeading = ['h1', 'h2', 'h3', 'h4', 'h5'].includes(block.tag);
+        pdf.setFontSize(isHeading ? 11 : 10);
+        pdf.setFont(KOREAN_FONT_NAME, isHeading && fonts.bold ? 'bold' : 'normal');
+        const lines = pdf.splitTextToSize(block.text, contentWidth);
+        const lineHeight = isHeading ? 6 : 5;
+        lines.forEach(line => {
+          ensureSpace(lineHeight);
+          pdf.text(line, margin, y);
+          y += lineHeight;
+        });
+        y += isHeading ? 2 : 1;
+      });
+    }
+
+    // 푸터
+    const totalPages = pdf.internal.getNumberOfPages();
+    for (let i = 1; i <= totalPages; i++) {
+      pdf.setPage(i);
+      pdf.setFont(KOREAN_FONT_NAME, 'normal');
+      pdf.setFontSize(8);
+      pdf.setTextColor(150, 150, 150);
+      pdf.text(`Finalyze.AI | ${i} / ${totalPages}`, pageWidth / 2, pageHeight - 8, { align: 'center' });
+    }
+
+    pdf.save(getExportFileName('pdf', '잠정실적'));
+  } catch (error) {
+    console.error('잠정실적 PDF 내보내기 오류:', error);
+    showToast('PDF 내보내기 중 오류가 발생했습니다: ' + error.message, 'error');
+  } finally {
+    if (restore) restore();
+  }
+}
+
+// 잠정실적 분석을 PNG 이미지로 내보내기
+async function exportProvisionalAsImage() {
+  const btn = document.getElementById('provisionalImageBtn');
+
+  const content = document.getElementById('provisionalContent');
+  if (!content || content.style.display === 'none' || !content.innerHTML.trim()) {
+    showToast('내보낼 분석 결과가 없습니다. 먼저 잠정실적을 분석해주세요.', 'error');
+    return;
+  }
+  if (!window.html2canvas) {
+    showToast('이미지 라이브러리를 불러오는 중입니다. 잠시 후 다시 시도해주세요.');
+    return;
+  }
+
+  const restore = showExportLoading(btn, '이미지 생성 중...');
+  try {
+    const card = document.getElementById('provisionalCard');
+    const clone = card.cloneNode(true);
+    const exportActions = clone.querySelector('.export-actions');
+    if (exportActions) exportActions.remove();
+
+    // 차트 캔버스를 이미지로 교체
+    const originalCanvas = document.getElementById('provisionalChart');
+    const cloneCanvas = clone.querySelector('#provisionalChart');
+    if (originalCanvas && cloneCanvas) {
+      try {
+        const img = document.createElement('img');
+        img.src = originalCanvas.toDataURL('image/png');
+        img.style.cssText = 'max-width:100%;height:auto;';
+        cloneCanvas.parentNode.replaceChild(img, cloneCanvas);
+      } catch (e) {}
+    }
+
+    const wrapper = document.createElement('div');
+    wrapper.style.cssText = 'position:fixed;left:-9999px;top:0;width:1100px;background:#fff;padding:20px;z-index:-1;';
+    wrapper.appendChild(clone);
+    document.body.appendChild(wrapper);
+
+    await new Promise(resolve => setTimeout(resolve, 200));
+
+    const canvas = await html2canvas(clone, {
+      scale: 2,
+      useCORS: true,
+      backgroundColor: '#ffffff',
+      logging: false
+    });
+
+    wrapper.remove();
+
+    canvas.toBlob((blob) => {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = getExportFileName('png', '잠정실적');
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }, 'image/png');
+  } catch (error) {
+    console.error('잠정실적 이미지 내보내기 오류:', error);
+    showToast('이미지 내보내기 중 오류가 발생했습니다: ' + error.message, 'error');
+  } finally {
+    if (restore) restore();
+  }
+}

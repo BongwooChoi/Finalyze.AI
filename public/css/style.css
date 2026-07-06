@@ -262,6 +262,83 @@ body {
   background: linear-gradient(135deg, var(--primary), var(--primary-dark));
 }
 
+/* Popular Search Chips */
+.popular-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+  justify-content: center;
+  margin-top: 1rem;
+}
+
+.chip-label {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.chip {
+  border: 1px solid var(--border-color);
+  background: #fff;
+  border-radius: 50px;
+  padding: 0.25rem 0.9rem;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.chip:hover {
+  border-color: var(--primary-light);
+  color: var(--primary);
+  background: #eff6ff;
+}
+
+/* =============================================
+   App Mode (회사 선택 후 히어로 축소)
+   ============================================= */
+body.app-mode .hero-section {
+  min-height: auto;
+  padding: 1.25rem 0 1.75rem;
+}
+
+body.app-mode .hero-badge,
+body.app-mode .hero-subtitle,
+body.app-mode .scroll-indicator,
+body.app-mode .search-icon-wrapper,
+body.app-mode .search-title,
+body.app-mode .search-desc {
+  display: none;
+}
+
+body.app-mode .hero-title {
+  font-size: 1.9rem;
+  margin-bottom: 1rem;
+  animation: none;
+}
+
+body.app-mode .hero-content {
+  padding: 0;
+}
+
+body.app-mode .hero-search-wrapper,
+body.app-mode .hero-search-card {
+  animation: none;
+}
+
+body.app-mode .hero-search-card {
+  padding: 1.25rem 1.5rem;
+  border-radius: var(--radius-lg);
+}
+
+body.app-mode .popular-chips {
+  margin-top: 0.75rem;
+}
+
+body.app-mode .features-section {
+  display: none;
+}
+
 /* Scroll Indicator */
 .scroll-indicator {
   position: absolute;
@@ -523,6 +600,12 @@ body {
   width: 100%;
 }
 
+.chart-container-trend {
+  position: relative;
+  height: 360px;
+  width: 100%;
+}
+
 /* =============================================
    Loading Indicator (기존 개선)
    ============================================= */
@@ -553,6 +636,71 @@ body {
   padding: 15px;
   margin-bottom: 20px;
   border-radius: var(--radius-sm);
+}
+
+/* AI 분석 스켈레톤 로딩 */
+.analysis-skeleton {
+  padding: 10px;
+}
+
+.skeleton-status {
+  display: flex;
+  align-items: center;
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  margin-bottom: 1.25rem;
+}
+
+.skeleton-line {
+  height: 14px;
+  border-radius: 6px;
+  margin-bottom: 12px;
+  background: linear-gradient(90deg, #eef2f7 25%, #e2e8f0 50%, #eef2f7 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s ease-in-out infinite;
+}
+
+.skeleton-line.w-40 { width: 40%; }
+.skeleton-line.w-60 { width: 60%; }
+.skeleton-line.w-80 { width: 80%; }
+
+@keyframes shimmer {
+  to { background-position: -200% 0; }
+}
+
+/* 토스트 메시지 */
+.toast-stack {
+  position: fixed;
+  bottom: 1.5rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1080;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  align-items: center;
+  pointer-events: none;
+}
+
+.app-toast {
+  background: rgba(15, 23, 42, 0.92);
+  color: #fff;
+  padding: 0.65rem 1.2rem;
+  border-radius: 50px;
+  font-size: 0.9rem;
+  box-shadow: var(--shadow-lg);
+  animation: fadeInUp 0.3s ease-out;
+  max-width: 90vw;
+  text-align: center;
+}
+
+.app-toast.toast-error {
+  background: rgba(220, 38, 38, 0.95);
+}
+
+.app-toast.toast-fade {
+  opacity: 0;
+  transition: opacity 0.4s ease;
 }
 
 @keyframes spin {
@@ -603,7 +751,7 @@ body {
   line-height: 1.8;
   color: var(--text-primary);
   padding: 10px;
-  text-align: justify;
+  text-align: left;
 }
 
 .ai-analysis h4 {
@@ -618,7 +766,6 @@ body {
 
 .ai-analysis p {
   margin-bottom: 15px;
-  text-indent: 1em;
   color: var(--text-primary);
 }
 
@@ -837,6 +984,53 @@ body {
 
   .chart-container {
     height: 300px;
+  }
+
+  /* 재무 테이블을 카드형으로 변환 */
+  .table-mobile-cards thead {
+    display: none;
+  }
+
+  .table-mobile-cards tbody tr {
+    display: block;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    margin-bottom: 0.75rem;
+    padding: 0.6rem 0.9rem;
+    background: #fff !important;
+  }
+
+  .table-mobile-cards tbody td {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 1rem;
+    padding: 0.3rem 0;
+    border: none;
+    text-align: right;
+    background: transparent !important;
+  }
+
+  .table-mobile-cards tbody td::before {
+    content: attr(data-label);
+    font-weight: 600;
+    color: var(--text-secondary);
+    font-size: 0.8rem;
+    text-align: left;
+    flex-shrink: 0;
+  }
+
+  .table-mobile-cards tbody td:first-child {
+    font-weight: 700;
+    color: var(--primary);
+    justify-content: flex-start;
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 0.45rem;
+    margin-bottom: 0.3rem;
+  }
+
+  .table-mobile-cards tbody td:first-child::before {
+    content: none;
   }
 
   .footer-links {

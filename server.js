@@ -281,78 +281,62 @@ app.get('/api/financial-statements', async (req, res) => {
   }
 });
 
-// 특정 계정과목의 연도별 데이터 가져오기 (차트 데이터용)
+// 최근 5개년 주요 손익 추이 (DART 단일회사 주요계정 API를 연도별 병렬 조회)
 app.get('/api/financial-trend', async (req, res) => {
   try {
-    const { corp_code, account_nm } = req.query;
-    let { years } = req.query;
-    
-    if (!corp_code || !account_nm) {
-      return res.status(400).json({ 
-        status: 'error', 
-        message: '회사 고유번호와 계정과목은 필수 입력값입니다.' 
+    const { corp_code } = req.query;
+    if (!corp_code) {
+      return res.status(400).json({
+        status: 'error',
+        message: '회사 고유번호는 필수 입력값입니다.'
       });
     }
-    
-    // 연도가 없는 경우 최근 5년으로 설정
-    if (!years) {
-      const currentYear = new Date().getFullYear();
-      years = Array.from({ length: 5 }, (_, i) => String(currentYear - 4 + i));
-    } else if (typeof years === 'string') {
-      years = years.split(',');
-    }
-    
-    console.log(`트렌드 API - ${corp_code} 회사의 ${account_nm} 데이터 조회, 대상 연도: ${years.join(',')}`);
-    
-    // 계정과목 데이터 조회
-    const accountData = await financialService.getSpecificAccount(
-      db, corp_code, account_nm, years
-    );
-    
-    console.log(`트렌드 API - 조회 결과: ${accountData.length}개 연도 데이터 발견`);
-    
-    // 차트 데이터 형식으로 변환
-    const chartData = {
-      labels: years,
-      datasets: [{
-        label: account_nm,
-        data: []
-      }]
-    };
-    
-    // 연도별 데이터 매핑
-    years.forEach(year => {
-      const yearData = accountData.find(item => item.bsns_year === year);
-      if (yearData) {
-        // 금액 문자열에서 쉼표 제거하고 숫자로 변환
-        const amount = parseInt(yearData.thstrm_amount.replace(/,/g, ''));
-        chartData.datasets[0].data.push(amount);
-      } else {
-        // 데이터가 없는 경우 null 처리
-        chartData.datasets[0].data.push(null);
-      }
+
+    // 사업보고서(연간) 기준 최근 5개년
+    const latestYear = new Date().getFullYear() - 1;
+    const years = Array.from({ length: 5 }, (_, i) => String(latestYear - 4 + i));
+
+    const responses = await Promise.all(years.map(year => {
+      const url = `https://opendart.fss.or.kr/api/fnlttSinglAcnt.json?crtfc_key=${config.OPEN_DART_API_KEY}&corp_code=${corp_code}&bsns_year=${year}&reprt_code=11011`;
+      return axios.get(url).then(r => r.data).catch(() => null);
+    }));
+
+    // 계정명이 회사마다 조금씩 다름 (예: 당기순이익(손실), 영업이익(손실))
+    const ACCOUNTS = [
+      { key: 'revenue', match: nm => nm === '매출액' || nm === '영업수익' },
+      { key: 'operatingIncome', match: nm => nm.startsWith('영업이익') },
+      { key: 'netIncome', match: nm => nm.startsWith('당기순이익') }
+    ];
+    const series = { revenue: [], operatingIncome: [], netIncome: [] };
+
+    responses.forEach(data => {
+      const list = data && data.status === '000' && Array.isArray(data.list) ? data.list : [];
+      // 연결(CFS) 우선, 없으면 개별(OFS)
+      const cfs = list.filter(r => r.fs_div === 'CFS');
+      const rows = cfs.length > 0 ? cfs : list.filter(r => r.fs_div === 'OFS');
+      ACCOUNTS.forEach(({ key, match }) => {
+        const row = rows.find(r => r.account_nm && match(r.account_nm));
+        const amount = row && row.thstrm_amount
+          ? parseInt(String(row.thstrm_amount).replace(/,/g, ''), 10)
+          : NaN;
+        series[key].push(Number.isFinite(amount) ? amount : null);
+      });
     });
-    
-    // 유효한 데이터가 하나라도 있는지 확인
-    const hasValidData = chartData.datasets[0].data.some(value => value !== null);
-    
+
+    const hasValidData = Object.values(series).some(arr => arr.some(v => v !== null));
     if (!hasValidData) {
-      console.warn(`트렌드 API - ${corp_code} 회사의 ${account_nm} 유효한 데이터가 없습니다.`);
-      return res.status(404).json({ 
-        status: 'error', 
-        message: '해당 계정과목의 데이터가 없습니다.' 
+      return res.status(404).json({
+        status: 'error',
+        message: '최근 5개년 연간 실적 데이터가 없습니다.'
       });
     }
-    
-    res.json({
-      status: 'success',
-      data: chartData
-    });
+
+    res.json({ status: 'success', data: { years, series } });
   } catch (error) {
-    console.error('재무 트렌드 조회 중 오류 발생:', error);
-    res.status(500).json({ 
-      status: 'error', 
-      message: '서버 오류가 발생했습니다.' 
+    console.error('재무 추이 조회 중 오류 발생:', error);
+    res.status(500).json({
+      status: 'error',
+      message: '서버 오류가 발생했습니다.'
     });
   }
 });

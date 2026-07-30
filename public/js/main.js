@@ -1933,12 +1933,18 @@ async function exportAnalysisAsImage() {
     const tabs = clone.querySelector('.nav-tabs');
     if (tabs) tabs.remove();
     clone.querySelectorAll('.tab-pane').forEach(pane => {
+      // 연간 추이 탭을 아직 열지 않았으면 빈 차트 영역만 남으므로 제외
+      if (pane.id === 'trend' && !trendChart) {
+        pane.remove();
+        return;
+      }
       pane.classList.add('show', 'active');
       pane.style.display = 'block';
       let title = '';
       if (pane.id === 'bs') title = '재무상태표';
       else if (pane.id === 'is') title = '손익계산서';
       else if (pane.id === 'ratio') title = '재무비율';
+      else if (pane.id === 'trend') title = '연간 추이';
       if (title) {
         const h = document.createElement('h4');
         h.textContent = title;
@@ -1947,18 +1953,21 @@ async function exportAnalysisAsImage() {
       }
     });
 
-    // 차트 캔버스를 이미지로 교체
-    const originalCanvas = document.getElementById('incomeStatementChart');
-    const cloneCanvas = clone.querySelector('#incomeStatementChart');
-    if (originalCanvas && cloneCanvas) {
+    // 차트 캔버스를 원본 비트맵 이미지로 교체 (클론된 캔버스는 비어 있음)
+    // 모바일에서는 캔버스 비트맵 비율(좁은 화면 폭 × DPR)이 내보내기 폭과 달라
+    // 고정 높이 컨테이너를 그대로 두면 이미지가 넘쳐 아래 텍스트와 겹치므로 height를 푼다
+    clone.querySelectorAll('canvas').forEach(cloneCanvas => {
+      const original = cloneCanvas.id ? document.getElementById(cloneCanvas.id) : null;
+      if (!original) return;
       try {
-        const dataUrl = originalCanvas.toDataURL('image/png');
         const img = document.createElement('img');
-        img.src = dataUrl;
-        img.style.cssText = 'max-width:100%;height:auto;';
-        cloneCanvas.parentNode.replaceChild(img, cloneCanvas);
+        img.src = original.toDataURL('image/png');
+        img.style.cssText = 'display:block;width:100%;height:auto;';
+        const parent = cloneCanvas.parentNode;
+        parent.replaceChild(img, cloneCanvas);
+        parent.style.height = 'auto';
       } catch (e) {}
-    }
+    });
 
     const wrapper = document.createElement('div');
     wrapper.style.cssText = 'position:fixed;left:-9999px;top:0;width:1100px;background:#fff;padding:20px;z-index:-1;';
@@ -1967,11 +1976,14 @@ async function exportAnalysisAsImage() {
 
     await new Promise(resolve => setTimeout(resolve, 200));
 
+    // windowWidth 고정: 모바일에서도 클론이 데스크톱 미디어쿼리 기준으로 렌더링되도록 함
     const canvas = await html2canvas(clone, {
       scale: 2,
       useCORS: true,
       backgroundColor: '#ffffff',
-      logging: false
+      logging: false,
+      windowWidth: 1400,
+      windowHeight: 1000
     });
 
     wrapper.remove();
@@ -2133,15 +2145,19 @@ async function exportProvisionalAsImage() {
     const exportActions = clone.querySelector('.export-actions');
     if (exportActions) exportActions.remove();
 
-    // 차트 캔버스를 이미지로 교체
+    // 차트 캔버스를 원본 비트맵 이미지로 교체 (클론된 캔버스는 비어 있음)
+    // 모바일 비트맵은 세로로 긴 비율이라 고정 높이(.chart-container)를 그대로 두면
+    // 이미지가 넘쳐 아래 분석 텍스트와 겹치므로 height를 푼다
     const originalCanvas = document.getElementById('provisionalChart');
     const cloneCanvas = clone.querySelector('#provisionalChart');
     if (originalCanvas && cloneCanvas) {
       try {
         const img = document.createElement('img');
         img.src = originalCanvas.toDataURL('image/png');
-        img.style.cssText = 'max-width:100%;height:auto;';
-        cloneCanvas.parentNode.replaceChild(img, cloneCanvas);
+        img.style.cssText = 'display:block;width:100%;height:auto;';
+        const parent = cloneCanvas.parentNode;
+        parent.replaceChild(img, cloneCanvas);
+        parent.style.height = 'auto';
       } catch (e) {}
     }
 
@@ -2152,11 +2168,14 @@ async function exportProvisionalAsImage() {
 
     await new Promise(resolve => setTimeout(resolve, 200));
 
+    // windowWidth 고정: 모바일에서도 클론이 데스크톱 미디어쿼리 기준으로 렌더링되도록 함
     const canvas = await html2canvas(clone, {
       scale: 2,
       useCORS: true,
       backgroundColor: '#ffffff',
-      logging: false
+      logging: false,
+      windowWidth: 1400,
+      windowHeight: 1000
     });
 
     wrapper.remove();

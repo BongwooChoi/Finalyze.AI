@@ -6,6 +6,11 @@ let incomeStatementChart = null;
 let currentYear = null;
 let previousYear = null;
 let isFinancialCompany = false; // 금융회사 여부
+let restoredAnalysisUrl = false;
+let activePage = null;
+let activePageSearch = window.location.search;
+const pageScrollPositions = { analysis: 0, about: 0 };
+const analysisPageTitle = document.title;
 
 // 차트 공통 색상 (계정과목별로 모든 차트에서 동일한 색 사용, CVD 검증 통과 팔레트)
 const CHART_COLORS = {
@@ -111,12 +116,48 @@ document.addEventListener('DOMContentLoaded', () => {
   const trendTab = document.getElementById('trend-tab');
   if (trendTab) trendTab.addEventListener('shown.bs.tab', loadTrendChart);
 
-  // URL 파라미터로부터 상태 복원 (딥링크)
-  restoreStateFromUrl();
+  // 소개 화면과 분석 화면은 DOM을 유지해 선택한 기업·공시를 보존합니다.
+  renderPageFromUrl();
+  window.addEventListener('hashchange', () => renderPageFromUrl());
 
-  // 뒤로가기/앞으로가기 시 해당 상태로 다시 로드
-  window.addEventListener('popstate', () => location.reload());
+  // 기업·공시가 바뀐 기록은 기존 복원 경로를 사용합니다.
+  window.addEventListener('popstate', () => {
+    if (window.location.search !== activePageSearch) {
+      location.reload();
+    } else {
+      renderPageFromUrl();
+    }
+  });
 });
+
+function renderPageFromUrl() {
+  const page = ['#about', '#aboutPage'].includes(window.location.hash) ? 'about' : 'analysis';
+  if (page === activePage) return;
+
+  const previousPage = activePage;
+  if (previousPage) pageScrollPositions[previousPage] = window.scrollY;
+  activePage = page;
+  const isAbout = page === 'about';
+  const analysisPage = document.getElementById('analysisPage');
+  const aboutPage = document.getElementById('aboutPage');
+  analysisPage.hidden = isAbout;
+  aboutPage.hidden = !isAbout;
+  document.title = isAbout ? '시스템 소개 | Finalyze.AI' : analysisPageTitle;
+  document.getElementById('skipLink').href = isAbout ? '#aboutPage' : '#analysisPage';
+  document.querySelectorAll('[data-page]').forEach(link => {
+    if (link.dataset.page === page) link.setAttribute('aria-current', 'page');
+    else link.removeAttribute('aria-current');
+  });
+
+  if (previousPage) {
+    (isAbout ? aboutPage : analysisPage).focus({ preventScroll: true });
+    window.scrollTo({ top: pageScrollPositions[page], behavior: 'instant' });
+  }
+  if (!isAbout && !restoredAnalysisUrl) {
+    restoredAnalysisUrl = true;
+    restoreStateFromUrl();
+  }
+}
 
 // 토스트 메시지 표시
 function showToast(message, type = 'info') {
@@ -178,7 +219,8 @@ function updateUrlState(rceptNo, { push = false } = {}) {
   params.set('corp', selectedCompany.corp_code);
   params.set('name', selectedCompany.corp_name);
   if (rceptNo) params.set('rcept', rceptNo);
-  const url = `${window.location.pathname}?${params.toString()}`;
+  const url = `${window.location.pathname}?${params.toString()}${window.location.hash}`;
+  activePageSearch = `?${params.toString()}`;
   if (push) {
     history.pushState({}, '', url);
   } else {

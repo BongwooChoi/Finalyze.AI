@@ -1,0 +1,24 @@
+{
+  "authentication": "existing Codex ChatGPT OAuth",
+  "endpoint_origin": "https://chatgpt.com",
+  "requested_image_model": "gpt-image-2.5-sunburst",
+  "returned_image_model": null,
+  "size_requested": "2304x1536",
+  "returned_image_attributes": {
+    "size": "1536x1024",
+    "quality": "medium",
+    "background": "opaque",
+    "output_format": "png"
+  },
+  "image_id": "ig_0db54051e42d535f016ae7c29f60f087d0a3fe104aebf39938",
+  "image_bytes": 1459928,
+  "actual_dimensions": [
+    1536,
+    1024
+  ],
+  "sha256": "d81988b049b06099e441c9bbe61103c648e40f64dad806dd16948a64acf7d4f3",
+  "public_asset": "public/images/finalyze-system-v1.png",
+  "prompt_file": "finalyze-system-prompt-v1.txt",
+  "model_verification": "Requested model accepted; backend did not return the resolved image model identity",
+  "review": "Korean labels and all five components visually reviewed; API and SQLite connections match deployed app behavior"
+}

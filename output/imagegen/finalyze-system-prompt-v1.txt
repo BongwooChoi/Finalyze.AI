@@ -1,0 +1,14 @@
+Use case: infographic-diagram
+Asset type: a finished Korean system architecture infographic for the Finalyze.AI introduction page. Landscape 3:2, large legible Korean typography, carefully proofread labels.
+Primary request: Explain how a user searches a Korean listed company, loads public DART financial disclosures, and receives financial charts and AI analysis. Show the actual architecture below precisely.
+Style: refined editorial fintech infographic, white and very pale blue background, navy headings, royal blue #2563eb and teal #06b6d4 accents, fine clean arrows and rounded panels. Restrained dimensional illustrations of a browser, cloud server, database and documents. Large type and generous whitespace. No decorative tiny writing, no code snippets, no invented metrics, no watermark.
+Main title (verbatim): "Finalyze.AI 시스템 구성"
+Subtitle (verbatim): "공시 데이터에서 재무 인사이트까지"
+Composition: five clearly separated components. Browser on the left, a larger Vercel application server in the center, OPEN DART and OpenAI as two separate external service panels stacked on the right. A small SQLite database panel below and connected ONLY to the center server. Browser and server have a two-way connection; server and each external service have a two-way connection. Do not connect browser directly to DART, OpenAI, or SQLite. Do not connect DART directly to OpenAI. Do not connect SQLite to external APIs.
+Left panel text (verbatim): "사용자 화면", "기업 검색 · 공시 선택", "재무 차트 · AI 분석", "PDF · 이미지 저장", "HTML / CSS / JavaScript"
+Center panel text (verbatim): "Vercel · Express 서버", "공시 조회 · 주요 계정 정리", "재무비율 계산", "AI 분석 요청 · 결과 전달"
+Right top panel text (verbatim): "OPEN DART", "재무제표 · 공시 목록", "잠정실적 공시 원문"
+Right bottom panel text (verbatim): "OpenAI GPT", "재무데이터 · 공시 텍스트 분석", "구조화된 JSON 응답"
+Bottom database panel text (verbatim): "SQLite · dart.db", "회사명 · 종목코드 검색", "회사 목록 읽기 전용"
+One concise footer note (verbatim): "재무·공시 데이터는 요청 시 OPEN DART에서 조회합니다."
+Accuracy constraints: SQLite is for company lookup only in the deployed application, never a store for live financial data. Financial ratios are calculated by the Express server, while GPT produces narrative analysis. Show exactly these five components. All arrows must have clear visible endpoints, no ambiguous crossing lines. Do not put gpt-image-2.5 on the diagram: it is the tool creating this image, not a runtime component of this app.

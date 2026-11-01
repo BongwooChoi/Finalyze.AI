@@ -45,7 +45,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Noto+Sans+KR:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/style.css?v=3.1">
+  <link rel="stylesheet" href="css/style.css?v=3.2">
   <link rel="manifest" href="/manifest.json">
   <meta name="theme-color" content="#2563eb">
 
@@ -78,6 +78,18 @@
   </script>
 </head>
 <body>
+  <a class="skip-link" href="#analysisPage" id="skipLink">본문으로 이동</a>
+  <header class="site-header">
+    <nav class="container site-nav" aria-label="주요 메뉴">
+      <a class="site-brand" href="#analysis" aria-label="Finalyze.AI 재무분석 홈">Finalyze<span>.AI</span></a>
+      <div class="site-nav-links">
+        <a href="#analysis" data-page="analysis" aria-current="page">재무분석</a>
+        <a href="#about" data-page="about">시스템 소개</a>
+      </div>
+    </nav>
+  </header>
+
+  <main id="analysisPage" tabindex="-1">
   <!-- 히어로 섹션 -->
   <section class="hero-section">
     <div class="hero-bg-shapes">
@@ -362,6 +374,113 @@
     </div>
   </div>
   
+  </main>
+
+  <main id="aboutPage" class="about-page" tabindex="-1" hidden>
+    <div class="container">
+      <section class="about-hero" aria-labelledby="aboutTitle">
+        <div>
+          <p class="about-eyebrow">ABOUT FINALYZE.AI</p>
+          <h1 id="aboutTitle">공시 속 숫자를,<br><span>기업의 이야기로.</span></h1>
+          <p class="about-lead">Finalyze.AI는 DART 공시 데이터를 차트로 정리하고,<br class="d-none d-lg-inline"> AI의 설명을 더해 기업의 재무를 읽는 데 도움을 주는 플랫폼입니다.</p>
+          <a class="about-cta" href="#analysis">기업 분석 시작하기 <i class="bi bi-arrow-up-right" aria-hidden="true"></i></a>
+        </div>
+        <dl class="about-at-a-glance">
+          <div><dt><span>4</span>종 보고서</dt><dd>사업 · 반기 · 1분기 · 3분기</dd></div>
+          <div><dt><span>5</span>개년 추이</dt><dd>최근 연간 매출과 이익의 흐름</dd></div>
+          <div><dt><span>AI</span>분석 설명</dt><dd>재무 수치와 잠정실적을 읽기 쉽게</dd></div>
+        </dl>
+      </section>
+
+      <section class="about-panel about-architecture" aria-labelledby="architectureTitle">
+        <div class="about-panel-heading">
+          <div>
+            <p class="about-eyebrow">SYSTEM ARCHITECTURE</p>
+            <h2 id="architectureTitle">Finalyze.AI 시스템 구성</h2>
+            <p>공시를 가져오고, 숫자를 정리하고, 분석을 전달하는 연결 구조입니다.</p>
+          </div>
+          <a class="about-text-link" href="/images/finalyze-system-v1.png" target="_blank" rel="noopener noreferrer">원본 이미지 열기 <i class="bi bi-arrow-up-right" aria-hidden="true"></i><span class="visually-hidden"> (새 창)</span></a>
+        </div>
+        <figure class="about-system-figure">
+          <a href="/images/finalyze-system-v1.png" target="_blank" rel="noopener noreferrer" aria-label="Finalyze.AI 시스템 구성도 원본 이미지 열기 (새 창)">
+            <img src="/images/finalyze-system-v1.png" width="1536" height="1024" alt="사용자 화면과 Vercel의 Express 서버가 연결되고, 서버는 OPEN DART에서 공시를 조회하고 OpenAI GPT에 분석을 요청합니다. SQLite는 회사 검색에 사용합니다." decoding="async">
+          </a>
+          <figcaption>작은 화면에서는 이미지를 눌러 원본을 확대해 보세요.</figcaption>
+        </figure>
+        <dl class="about-system-notes">
+          <div><dt><i class="bi bi-file-earmark-text" aria-hidden="true"></i> 공시 데이터</dt><dd>재무제표·공시 목록·잠정실적 원문은 요청할 때 OPEN DART에서 조회합니다.</dd></div>
+          <div><dt><i class="bi bi-calculator" aria-hidden="true"></i> 계산과 해석</dt><dd>서버가 재무비율을 계산하고, OpenAI GPT가 수치와 공시 텍스트를 바탕으로 설명합니다.</dd></div>
+          <div><dt><i class="bi bi-database" aria-hidden="true"></i> 회사 검색</dt><dd>SQLite의 회사 목록을 읽어 회사명과 종목코드를 찾습니다.</dd></div>
+        </dl>
+      </section>
+
+      <section class="about-section" aria-labelledby="processTitle">
+        <div class="about-section-heading">
+          <p class="about-eyebrow">FROM DISCLOSURE TO INSIGHT</p>
+          <h2 id="processTitle">분석은 이렇게 진행됩니다</h2>
+          <p>기업을 찾는 순간부터 결과를 저장하기까지, 네 단계로 이어집니다.</p>
+        </div>
+        <ol class="about-steps">
+          <li><span class="about-step-number">01 / SEARCH</span><i class="bi bi-search" aria-hidden="true"></i><h3>기업을 찾습니다</h3><p>회사명을 검색하고 기업을 선택하면 최근 5년의 공시 목록을 확인할 수 있습니다.</p></li>
+          <li><span class="about-step-number">02 / SELECT</span><i class="bi bi-file-earmark-check" aria-hidden="true"></i><h3>공시를 선택합니다</h3><p>정기보고서나 잠정실적의 분석 버튼을 눌러 관심 있는 기간의 실적을 불러옵니다.</p></li>
+          <li><span class="about-step-number">03 / ANALYZE</span><i class="bi bi-bar-chart-line" aria-hidden="true"></i><h3>차트와 설명을 읽습니다</h3><p>주요 수치와 변화를 시각화하고, AI가 공시 데이터에 기반한 분석을 덧붙입니다.</p></li>
+          <li><span class="about-step-number">04 / EXPORT</span><i class="bi bi-download" aria-hidden="true"></i><h3>결과를 저장합니다</h3><p>분석을 PDF나 이미지로 저장하거나, 기업·공시 선택이 담긴 주소를 공유할 수 있습니다.</p></li>
+        </ol>
+      </section>
+
+      <section class="about-section" aria-labelledby="featuresTitle">
+        <div class="about-section-heading">
+          <p class="about-eyebrow">TWO WAYS TO READ A COMPANY</p>
+          <h2 id="featuresTitle">정기보고서부터 잠정실적까지</h2>
+          <p>공시의 종류에 맞춰 서로 다른 정보를 보여드립니다.</p>
+        </div>
+        <div class="about-feature-grid">
+          <article class="about-panel about-feature">
+            <div class="about-feature-icon"><i class="bi bi-pie-chart" aria-hidden="true"></i></div>
+            <h3>정기보고서 재무분석</h3>
+            <p>기업의 재무 상태와 실적 변화를 여러 각도에서 살펴봅니다.</p>
+            <ul>
+              <li>자산·부채·자본 구성과 당기·전기 비교</li>
+              <li>매출액·영업이익·순이익 및 주요 재무비율</li>
+              <li>최근 5개년 사업보고서 기준 실적 추이</li>
+              <li>재무 건전성과 실적 변화에 대한 AI 설명</li>
+            </ul>
+          </article>
+          <article class="about-panel about-feature">
+            <div class="about-feature-icon about-feature-icon-teal"><i class="bi bi-lightning-charge" aria-hidden="true"></i></div>
+            <h3>잠정실적 공시 분석</h3>
+            <p>정기보고서 발표 전, 공시된 실적의 핵심을 먼저 확인합니다.</p>
+            <ul>
+              <li>잠정실적 공시 원문에서 핵심 내용 추출</li>
+              <li>공시에 포함된 실적 수치와 비교 차트</li>
+              <li>원문에 제시된 변화와 특징을 AI가 요약</li>
+              <li>공시 원문 링크로 발표 내용을 직접 확인</li>
+            </ul>
+          </article>
+        </div>
+      </section>
+
+      <section class="about-panel about-principles" aria-labelledby="principlesTitle">
+        <div class="about-section-heading">
+          <p class="about-eyebrow">HOW TO READ THE RESULTS</p>
+          <h2 id="principlesTitle">분석 결과를 읽을 때 알아둘 점</h2>
+          <p>데이터의 범위와 분석 기준을 함께 확인해 주세요.</p>
+        </div>
+        <div class="about-principle-grid">
+          <article><span>01</span><h3>연결재무제표를 우선합니다</h3><p>연결재무제표가 있으면 먼저 사용하고, 없으면 개별재무제표를 사용합니다. 비교할 때 보고서의 기준과 기간을 확인해 주세요.</p></article>
+          <article><span>02</span><h3>주요 계정으로 분석합니다</h3><p>DART 주요계정 API에서 제공하는 항목을 활용합니다. 세부 계정이 필요한 일부 지표는 제공하지 않으며, 금융회사는 별도의 계정과 분석 기준을 적용합니다.</p></article>
+          <article><span>03</span><h3>잠정실적은 달라질 수 있습니다</h3><p>잠정실적은 이후 확정된 재무제표와 차이가 날 수 있습니다. 공시 시점과 정정 여부는 DART 원문에서 확인할 수 있습니다.</p></article>
+          <article><span>04</span><h3>AI 설명은 원문과 함께 읽습니다</h3><p>AI의 해석에는 오류가 있을 수 있습니다. 주요 수치는 공시 원문과 대조하고, 투자 판단에는 추가적인 정보를 함께 검토해 주세요.</p></article>
+        </div>
+      </section>
+
+      <section class="about-bottom-cta" aria-labelledby="startTitle">
+        <div><p class="about-eyebrow">START WITH A COMPANY</p><h2 id="startTitle">궁금한 기업의 숫자를 읽어보세요.</h2><p>기업 검색에서 첫 번째 분석을 시작할 수 있습니다.</p></div>
+        <a class="about-cta" href="#analysis">재무분석으로 이동 <i class="bi bi-arrow-right" aria-hidden="true"></i></a>
+      </section>
+    </div>
+  </main>
+
   <footer class="site-footer">
     <div class="container">
       <div class="footer-content">
@@ -370,6 +489,7 @@
           <p class="footer-desc">OPEN DART API를 활용한 AI 재무분석 플랫폼</p>
         </div>
         <div class="footer-links">
+          <a href="#about">시스템 소개</a>
           <span><i class="bi bi-database me-1"></i>DART 공시 데이터</span>
           <span><i class="bi bi-cpu me-1"></i>OpenAI GPT 분석</span>
           <span><i class="bi bi-shield-check me-1"></i>실시간 조회</span>
@@ -405,7 +525,7 @@
   <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
-  <script src="js/main.js?v=3.3"></script>
+  <script src="js/main.js?v=3.4"></script>
   <noscript>
     <div style="padding:2rem;text-align:center;font-family:sans-serif;">
       <h2>Finalyze.AI</h2>
@@ -418,4 +538,4 @@
   </script>
   <script defer src="/_vercel/insights/script.js"></script>
 </body>
-</html> 
+</html>

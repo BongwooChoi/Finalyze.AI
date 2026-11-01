@@ -1,9 +1,10 @@
-const CACHE_NAME = 'financial-app-cache-v19';
+const CACHE_NAME = 'financial-app-cache-v20';
 const urlsToCache = [
   '/',
   '/index.html',
   '/css/style.css',
   '/js/main.js',
+  '/images/finalyze-system-v1.png',
   '/manifest.json',
   '/icons/icon-192x192.png',
   '/icons/icon-512x512.png',
@@ -61,4 +62,4 @@ self.addEventListener('activate', event => {
       );
     }).then(() => self.clients.claim())
   );
-}); 
+});

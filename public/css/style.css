@@ -150,11 +150,11 @@ body {
 
 .about-cta:hover { background: var(--primary-dark); color: #fff; }
 .about-at-a-glance { margin: 0; }
-.about-at-a-glance > div { padding: 1.2rem 0; border-bottom: 1px solid #d7e3f1; }
+.about-at-a-glance > div { position: relative; display: grid; grid-template-columns: 3.2rem minmax(0, 1fr); column-gap: 1rem; row-gap: 0.4rem; padding: 1.2rem 0; border-bottom: 1px solid #d7e3f1; }
 .about-at-a-glance > div:last-child { border: 0; }
-.about-at-a-glance dt { display: flex; align-items: baseline; gap: 1.2rem; font-size: 0.9rem; font-weight: 600; }
-.about-at-a-glance dt span { min-width: 3.2rem; color: var(--primary-dark); font-family: 'Inter', sans-serif; font-size: 2.2rem; font-weight: 700; }
-.about-at-a-glance dd { color: #52647d; font-size: 0.8rem; margin: 0.3rem 0 0 4.4rem; }
+.about-at-a-glance dt { grid-column: 2; font-size: 0.9rem; font-weight: 600; line-height: 1.5; }
+.about-at-a-glance dt span { position: absolute; top: 50%; left: 0; transform: translateY(-50%); width: 3.2rem; color: var(--primary-dark); font-family: 'Inter', sans-serif; font-size: 2.2rem; font-weight: 700; line-height: 1; }
+.about-at-a-glance dd { grid-column: 2; color: #52647d; font-size: 0.8rem; line-height: 1.7; margin: 0; }
 .about-panel { padding: 2rem; background: #fff; border: 1px solid var(--border-color); border-radius: var(--radius-lg); }
 .about-panel-heading { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; margin-bottom: 1.5rem; }
 .about-page h2 { color: var(--text-primary); font-size: 1.55rem; font-weight: 700; letter-spacing: -0.04em; line-height: 1.5; margin-bottom: 0.6rem; }

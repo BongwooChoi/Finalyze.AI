@@ -8,7 +8,7 @@ require('dotenv').config({ override: true });
 // 환경 변수 설정
 const config = {
   OPEN_DART_API_KEY: process.env.OPEN_DART_API_KEY,
-  GEMINI_API_KEY: process.env.GEMINI_API_KEY || 'your_gemini_api_key_here' // Gemini API 키 추가
+  OPENAI_API_KEY: process.env.OPENAI_API_KEY
 };
 
 // 환경 변수가 설정되어 있는지 확인
@@ -16,12 +16,12 @@ if (!config.OPEN_DART_API_KEY) {
   console.warn('경고: OPEN_DART_API_KEY가 설정되지 않았습니다.');
 }
 
-if (!config.GEMINI_API_KEY) {
-  console.warn('경고: GEMINI_API_KEY가 설정되지 않았습니다.');
+if (!config.OPENAI_API_KEY) {
+  console.warn('경고: OPENAI_API_KEY가 설정되지 않았습니다.');
 }
 
 console.log('환경변수 로드 상태:');
 console.log('OPEN_DART_API_KEY:', config.OPEN_DART_API_KEY ? '설정됨' : '설정되지 않음');
-console.log('GEMINI_API_KEY:', config.GEMINI_API_KEY ? '설정됨' : '설정되지 않음');
+console.log('OPENAI_API_KEY:', config.OPENAI_API_KEY ? '설정됨' : '설정되지 않음');
 
 module.exports = config; 

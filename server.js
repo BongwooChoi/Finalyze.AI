@@ -630,8 +630,8 @@ app.post('/api/ai-financial-analysis', async (req, res) => {
     // 재무 데이터 분석 프롬프트 구성
     const prompt = createFinancialAnalysisPrompt(companyName, year, previousYear, balanceSheet, incomeStatement, ratio, isFinancialComp);
     
-    // Gemini API 호출
-    const analysis = await callGeminiAPI(prompt);
+    // OpenAI API 호출
+    const analysis = await callOpenAIAPI(prompt);
     
     res.json({
       status: 'success',
@@ -646,12 +646,15 @@ app.post('/api/ai-financial-analysis', async (req, res) => {
   }
 });
 
-// Gemini API 호출 함수 (429 Rate Limit 대응을 위한 자동 재시도 로직 포함)
-async function callGeminiAPI(prompt) {
-  const apiKey = config.GEMINI_API_KEY;
-  
+// OpenAI 모델
+const OPENAI_MODEL = 'gpt-6-luna';
+
+// OpenAI API 호출 함수 (429 Rate Limit 대응을 위한 자동 재시도 로직 포함)
+async function callOpenAIAPI(prompt) {
+  const apiKey = config.OPENAI_API_KEY;
+
   if (!apiKey) {
-    throw new Error('Gemini API 키가 설정되지 않았습니다. config.js 파일에 GEMINI_API_KEY를 설정해주세요.');
+    throw new Error('OpenAI API 키가 설정되지 않았습니다. .env 파일에 OPENAI_API_KEY를 설정해주세요.');
   }
 
   const maxRetries = 3;
@@ -660,51 +663,52 @@ async function callGeminiAPI(prompt) {
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
       const response = await axios.post(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key=${apiKey}`,
+        'https://api.openai.com/v1/chat/completions',
         {
-          contents: [
+          model: OPENAI_MODEL,
+          messages: [
             {
-              parts: [
-                {
-                  text: prompt
-                }
-              ]
+              role: 'user',
+              content: prompt
             }
           ],
-          generationConfig: {
-            temperature: 0.2,
-            topK: 40,
-            topP: 0.95,
-            maxOutputTokens: 8192
+          reasoning_effort: 'none', // 리즈닝 비활성화
+          max_completion_tokens: 8192
+        },
+        {
+          headers: {
+            'Authorization': `Bearer ${apiKey}`,
+            'Content-Type': 'application/json'
           }
         }
       );
 
       // 응답에서 텍스트 추출
-      if (response.data.candidates && response.data.candidates.length > 0 && 
-          response.data.candidates[0].content && response.data.candidates[0].content.parts && 
-          response.data.candidates[0].content.parts.length > 0) {
-        return response.data.candidates[0].content.parts[0].text;
+      const choice = response.data.choices && response.data.choices[0];
+      const content = choice && choice.message && choice.message.content;
+      if (content) {
+        return content;
       } else {
-        console.error('유효하지 않은 Gemini API 응답:', JSON.stringify(response.data));
+        console.error('유효하지 않은 OpenAI API 응답:', JSON.stringify(response.data));
         throw new Error('AI 응답 형식이 유효하지 않습니다.');
       }
     } catch (error) {
       const isRateLimit = error.response && error.response.status === 429;
-      
+
       if (isRateLimit && attempt < maxRetries) {
-        console.warn(`Gemini API 429 (Rate Limit) 감지. ${delay}ms 후 재시도합니다... (시도 ${attempt}/${maxRetries})`);
+        console.warn(`OpenAI API 429 (Rate Limit) 감지. ${delay}ms 후 재시도합니다... (시도 ${attempt}/${maxRetries})`);
         await new Promise(resolve => setTimeout(resolve, delay));
         delay *= 2; // 지수 백오프
         continue;
       }
 
-      console.error(`Gemini API 호출 중 오류 발생 (시도 ${attempt}/${maxRetries}):`, error);
+      // error 객체 전체를 로그로 남기면 요청 헤더의 API 키까지 출력되므로 message만 기록
+      console.error(`OpenAI API 호출 중 오류 발생 (시도 ${attempt}/${maxRetries}):`, error.message);
       if (attempt === maxRetries) {
         if (error.response) {
-          console.error('API 오류 응답:', error.response.data);
+          console.error('API 오류 응답:', JSON.stringify(error.response.data));
         }
-        throw new Error(`Gemini API 호출 실패: ${error.message}`);
+        throw new Error(`OpenAI API 호출 실패: ${error.message}`);
       }
     }
   }
@@ -953,7 +957,7 @@ app.get('/api/provisional-analysis', async (req, res) => {
     console.log(`잠정실적 분석 요청: ${corp_name || ''} ${report_nm || ''} (rcept_no: ${rcept_no}, 본문 ${documentText.length}자)`);
 
     const prompt = createProvisionalAnalysisPrompt(corp_name || '해당 회사', report_nm || '잠정실적 공시', documentText);
-    let analysis = await callGeminiAPI(prompt);
+    let analysis = await callOpenAIAPI(prompt);
 
     // 응답 마지막의 CHART_DATA JSON 분리 (없거나 파싱 실패해도 분석 텍스트는 그대로 반환)
     let chartData = null;

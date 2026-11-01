@@ -797,7 +797,11 @@ function displayIncomeStatementChart(analysis) {
                 text: '이익률 (%)'
             },
             ticks: {
-              callback: function(value) { return value + '%'; }
+              // value를 그대로 쓰면 이익률 범위가 좁을 때(눈금 간격 0.2 등) 5.800000000000001%처럼
+              // 부동소수점 오차가 노출되므로, 눈금 간격에 맞춰 자릿수를 정하는 Chart.js 기본 포맷터를 거친다
+              callback: function(value, index, ticks) {
+                return Chart.Ticks.formatters.numeric.call(this, value, index, ticks) + '%';
+              }
             }
           }
         }

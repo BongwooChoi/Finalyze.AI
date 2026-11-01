@@ -797,6 +797,124 @@ body.app-mode .features-section {
   margin-bottom: 5px;
 }
 
+/* 종합 평가 배지 + 한 줄 요약 */
+.ai-analysis .ai-verdict {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 14px 18px;
+  margin-bottom: 18px;
+  border: 1px solid;
+  border-radius: var(--radius-md);
+}
+
+.ai-analysis .ai-verdict-positive { background: #ecfdf5; border-color: #a7f3d0; }
+.ai-analysis .ai-verdict-mixed { background: #fffbeb; border-color: #fde68a; }
+.ai-analysis .ai-verdict-negative { background: #fef2f2; border-color: #fecaca; }
+
+.ai-analysis .ai-verdict-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 12px;
+  border-radius: 999px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.ai-analysis .ai-verdict-positive .ai-verdict-badge { background: #047857; }
+.ai-analysis .ai-verdict-mixed .ai-verdict-badge { background: #b45309; }
+.ai-analysis .ai-verdict-negative .ai-verdict-badge { background: #b91c1c; }
+
+.ai-analysis .ai-verdict-summary {
+  margin: 0;
+  font-size: 1.02rem;
+  font-weight: 500;
+  line-height: 1.7;
+}
+
+/* 분석 섹션 카드: 컨테이너 폭에 따라 열 수 자동 결정
+   (재무분석 카드처럼 좁은 곳은 1열, 잠정실적 카드처럼 넓은 곳은 2~3열) */
+.ai-analysis .ai-sections {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 14px;
+}
+
+.ai-analysis .ai-section {
+  padding: 14px 16px;
+  background: var(--bg-light);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+}
+
+.ai-analysis .ai-section-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 8px;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.ai-analysis .ai-section-title .bi {
+  color: var(--primary);
+  font-size: 1.05rem;
+}
+
+.ai-analysis .ai-points {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.ai-analysis .ai-point {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-bottom: 8px;
+  font-size: 0.93rem;
+  line-height: 1.65;
+}
+
+.ai-analysis .ai-point:last-child {
+  margin-bottom: 0;
+}
+
+.ai-analysis .ai-point-icon {
+  flex-shrink: 0;
+  margin-top: 0.3em;
+  font-size: 0.8rem;
+  line-height: 1;
+}
+
+.ai-analysis .ai-point-positive .ai-point-icon { color: #047857; }
+.ai-analysis .ai-point-negative .ai-point-icon { color: #b91c1c; }
+.ai-analysis .ai-point-neutral .ai-point-icon { color: var(--text-muted); }
+
+.ai-analysis .ai-point strong {
+  font-weight: 700;
+}
+
+.ai-analysis .ai-footnote {
+  margin: 14px 0 0;
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+}
+
+@media (max-width: 768px) {
+  .ai-analysis .ai-sections {
+    grid-template-columns: 1fr;
+  }
+
+  .ai-analysis .ai-verdict {
+    padding: 12px 14px;
+  }
+}
+
 /* =============================================
    Balance Sheet Visualization
    ============================================= */

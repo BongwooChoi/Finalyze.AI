@@ -52,7 +52,9 @@ node setupDatabase.js            # dart.db에 companies 테이블 적재 + 인�
 - **금액 파싱**: DART 금액은 쉼표 포함 문자열이다 → `parseInt(String(v).replace(/,/g, ''), 10)`.
 - **연결/개별 우선순위**: 연결재무제표(`fs_div === 'CFS'`) 우선, 없으면 개별(`OFS`) fallback.
 - **날짜는 KST 기준**: Vercel 서버는 UTC로 돌기 때문에 공시 날짜 계산 시 UTC+9 보정을 해야 당일 공시가 잘리지 않는다 (`/api/disclosure-list` 참고).
-- **OpenAI 호출**: 모델은 `gpt-6-luna`(`OPENAI_MODEL` 상수). Chat Completions API를 `reasoning_effort: 'none'`(리즈닝 비활성화)으로 호출하며, 429 발생 시 지수 백오프로 최대 3회 재시도(`callOpenAIAPI`). 에러 로그에는 axios `error` 객체 전체가 아닌 `error.message`만 남긴다(요청 헤더의 API 키 노출 방지). AI 응답은 Markdown이 아닌 HTML 조각(`<p>`, `<span class="positive|negative|neutral">`, `<strong>`)으로 받도록 프롬프트에서 강제하며, 잠정실적 분석은 응답 마지막 줄의 `CHART_DATA:{...}` JSON을 분리해 차트 데이터로 쓴다.
+- **OpenAI 호출**: 모델은 `gpt-6-luna`(`OPENAI_MODEL` 상수). Chat Completions API를 `reasoning_effort: 'none'`(리즈닝 비활성화)으로 호출하며, 429 발생 시 지수 백오프로 최대 3회 재시도(`callOpenAIAPI`). 에러 로그에는 axios `error` 객체 전체가 아닌 `error.message`만 남긴다(요청 헤더의 API 키 노출 방지).
+- **AI 응답은 structured outputs(JSON)**: `response_format: json_schema`(strict)로 `FINANCIAL_ANALYSIS_SCHEMA` / `PROVISIONAL_ANALYSIS_SCHEMA`에 맞는 JSON(`sections[{category,title,points[{tone,text}]}]`, `rating: positive|mixed|negative`, `summary`)을 받는다. 잠정실적은 차트용 `chartData`도 같은 JSON에 포함된다. `title`은 서버가 직접 붙인다. 강조는 `**굵게**`만 허용하며, 프런트 `renderAiAnalysisHtml()`이 이스케이프 후 `<strong>`으로 바꿔 평가 배지 + 섹션 카드 + ▲▼ 항목으로 렌더링한다(모델 출력 HTML을 그대로 넣지 않음). 섹션 category를 추가하면 프런트 `AI_SECTION_ICONS`에도 아이콘을 추가한다. PDF 내보내기는 `data-export` 속성이 달린 블록만 추출한다(`extractAiAnalysisText`).
+- **잠정실적은 정기공시보다 항목이 적다**: 섹션 1~3개, 항목 1~2개로 프롬프트를 따로 두고, 공시에 없는 내용(변동 요인 등)은 섹션을 만들지 않게 한다. "잠정치라 확정 실적과 다를 수 있다"는 안내는 AI가 아니라 프런트가 고정 문구로 표시한다.
 
 ## 프런트엔드 캐시 무효화 (필수)
 

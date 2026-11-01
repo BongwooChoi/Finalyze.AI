@@ -438,6 +438,105 @@ function displayFinancialAnalysis(analysis) {
   }
 }
 
+// =============================================
+// AI 분석 결과 렌더링 (서버 structured outputs JSON → 평가 배지 + 섹션 카드)
+// =============================================
+const AI_SECTION_ICONS = {
+  profitability: 'bi-graph-up-arrow',
+  growth: 'bi-rocket-takeoff',
+  stability: 'bi-shield-check',
+  liquidity: 'bi-droplet-half',
+  efficiency: 'bi-speedometer2',
+  results: 'bi-bar-chart-line',
+  comparison: 'bi-arrow-left-right',
+  drivers: 'bi-lightbulb'
+};
+
+const AI_RATING_META = {
+  financial: { label: '종합 평가', positive: '양호', mixed: '주의', negative: '위험' },
+  provisional: { label: '실적 평가', positive: '호조', mixed: '혼조', negative: '부진' }
+};
+
+const AI_RATING_ICONS = {
+  positive: 'bi-check-circle-fill',
+  mixed: 'bi-exclamation-triangle-fill',
+  negative: 'bi-exclamation-octagon-fill'
+};
+
+// 항목별 톤 표시 (prefix는 PDF 텍스트용. NanumGothic에 있는 기호만 사용)
+const AI_TONE_META = {
+  positive: { icon: 'bi-caret-up-fill', label: '긍정', prefix: '▲ ' },
+  negative: { icon: 'bi-caret-down-fill', label: '부정', prefix: '▼ ' },
+  neutral: { icon: 'bi-dash-lg', label: '중립', prefix: '- ' }
+};
+
+function escapeHtml(value) {
+  return String(value == null ? '' : value).replace(/[&<>"']/g, ch => (
+    { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]
+  ));
+}
+
+// AI 텍스트는 이스케이프한 뒤 **굵게** 표기만 <strong>으로 변환한다 (모델 출력 HTML을 그대로 넣지 않음)
+function formatAiText(text) {
+  return escapeHtml(text).replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+}
+
+function stripAiMarkup(text) {
+  return String(text == null ? '' : text).replace(/\*\*/g, '');
+}
+
+// type: 'financial'(정기공시 재무분석) | 'provisional'(잠정실적 분석)
+function renderAiAnalysisHtml(result, type) {
+  if (!result || !Array.isArray(result.sections)) {
+    throw new Error('AI 분석 결과 형식이 올바르지 않습니다.');
+  }
+  const ratingMeta = AI_RATING_META[type];
+  const rating = AI_RATING_ICONS[result.rating] ? result.rating : 'mixed';
+  const ratingText = ratingMeta[rating];
+
+  let html = '<div class="ai-analysis">';
+  if (result.title) {
+    html += `<h4 data-export="h4">${escapeHtml(result.title)}</h4>`;
+  }
+
+  const verdictExport = `[${ratingMeta.label}: ${ratingText}] ${stripAiMarkup(result.summary)}`;
+  html += `
+    <div class="ai-verdict ai-verdict-${rating}" data-export="p" data-export-text="${escapeHtml(verdictExport)}">
+      <span class="ai-verdict-badge"><i class="bi ${AI_RATING_ICONS[rating]}" aria-hidden="true"></i>${ratingMeta.label} · ${ratingText}</span>
+      <p class="ai-verdict-summary">${formatAiText(result.summary)}</p>
+    </div>`;
+
+  const sections = result.sections.filter(s => s && Array.isArray(s.points) && s.points.length > 0);
+  if (sections.length > 0) {
+    html += '<div class="ai-sections">';
+    sections.forEach(section => {
+      const icon = AI_SECTION_ICONS[section.category] || 'bi-dot';
+      html += `
+        <section class="ai-section">
+          <h5 class="ai-section-title" data-export="h5"><i class="bi ${icon}" aria-hidden="true"></i>${escapeHtml(section.title)}</h5>
+          <ul class="ai-points">`;
+      section.points.forEach(point => {
+        const tone = AI_TONE_META[point.tone] ? point.tone : 'neutral';
+        const toneMeta = AI_TONE_META[tone];
+        html += `
+            <li class="ai-point ai-point-${tone}" data-export="li" data-export-prefix="${toneMeta.prefix}">
+              <i class="bi ${toneMeta.icon} ai-point-icon" role="img" aria-label="${toneMeta.label}"></i>
+              <span>${formatAiText(point.text)}</span>
+            </li>`;
+      });
+      html += '</ul></section>';
+    });
+    html += '</div>';
+  }
+
+  if (type === 'provisional') {
+    html += '<p class="ai-footnote" data-export="p">※ 잠정실적은 외부감사인의 검토가 끝나지 않은 수치로, 확정 실적과 다를 수 있습니다.</p>';
+  }
+
+  html += '</div>';
+  return html;
+}
+
 // AI 기반 재무분석 가져오기
 async function fetchAIFinancialAnalysis(analysis) {
   console.log('--- fetchAIFinancialAnalysis called ---');
@@ -476,38 +575,8 @@ async function fetchAIFinancialAnalysis(analysis) {
       aiAnalysisLoading.style.display = 'none';
       aiAnalysisContent.style.display = 'block';
       
-      // AI 분석 결과 표시 - 마크다운 코드 블록 제거 및 HTML 변환
-      let analysisText = data.analysis;
-      
-      // ```html 및 ``` 제거
-      analysisText = analysisText.replace(/^```html\\s*\\n?/, '').replace(/\\n?```$/, '').trim();
-      
-      // 제목 처리 (첫 번째 줄)
-      const lines = analysisText.split('\\n');
-      let title = '';
-      let contentText = analysisText;
-      
-      if (lines.length > 0) {
-        title = lines[0];
-        contentText = lines.slice(1).join('\\n');
-      }
-      
-      // 문단 나누기
-      const paragraphs = contentText.split('\\n\\n').filter(p => p.trim() !== '');
-      
-      // 결과 HTML 생성
-      let htmlContent = `<h4 class="mb-3">${title}</h4>`;
-      
-      paragraphs.forEach(para => {
-        // HTML 태그가 포함된 문단은 그대로 사용, 아닌 경우 <p> 추가
-        if (para.startsWith('<') && para.endsWith('>')) {
-          htmlContent += para;
-        } else {
-          htmlContent += `<p>${para}</p>`;
-        }
-      });
-      
-      aiAnalysisContent.innerHTML = `<div class="ai-analysis">${htmlContent}</div>`;
+      // AI 분석 결과(JSON) 렌더링
+      aiAnalysisContent.innerHTML = renderAiAnalysisHtml(data.result, 'financial');
       console.log('AI Analysis Content displayed.');
     } else {
       throw new Error(data.message || 'AI 분석 결과를 가져오지 못했습니다.');
@@ -1344,21 +1413,8 @@ async function handleProvisionalSelect(rceptNo, reportNm, btnElement) {
       throw new Error(data.message || '잠정실적 분석에 실패했습니다.');
     }
 
-    // 마크다운 코드 블록 제거 및 제목/문단 처리
-    let analysisText = data.analysis.replace(/^```html\s*\n?/, '').replace(/\n?```$/, '').trim();
-    const lines = analysisText.split('\n');
-    const analysisTitle = lines.length > 0 ? lines[0] : '';
-    const contentText = lines.slice(1).join('\n');
-    let htmlContent = `<h4 class="mb-3">${analysisTitle}</h4>`;
-    contentText.split('\n\n').filter(p => p.trim() !== '').forEach(para => {
-      if (para.startsWith('<') && para.endsWith('>')) {
-        htmlContent += para;
-      } else {
-        htmlContent += `<p>${para}</p>`;
-      }
-    });
-
-    content.innerHTML = `<div class="ai-analysis">${htmlContent}</div>`;
+    // AI 분석 결과(JSON) 렌더링
+    content.innerHTML = renderAiAnalysisHtml(data.result, 'provisional');
     content.style.display = 'block';
     renderProvisionalChart(data.chartData);
     updateAnalysisGuide(reportNm, 'provisionalCard');
@@ -1684,6 +1740,19 @@ function extractAiAnalysisText(containerId = 'aiAnalysisContent') {
   if (!aiAnalysis) return null;
 
   const blocks = [];
+
+  // 구조화 렌더링(renderAiAnalysisHtml)은 내보낼 블록에 data-export를 달아 둔다
+  const exportNodes = aiAnalysis.querySelectorAll('[data-export]');
+  if (exportNodes.length > 0) {
+    exportNodes.forEach(node => {
+      const text = (node.dataset.exportText || node.innerText).replace(/\s+/g, ' ').trim();
+      if (text) {
+        blocks.push({ tag: node.dataset.export, text: (node.dataset.exportPrefix || '') + text });
+      }
+    });
+    return blocks;
+  }
+
   aiAnalysis.childNodes.forEach(node => {
     if (node.nodeType === Node.ELEMENT_NODE) {
       const text = node.innerText.replace(/\s+/g, ' ').trim();

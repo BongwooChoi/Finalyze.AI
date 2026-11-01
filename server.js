@@ -630,12 +630,13 @@ app.post('/api/ai-financial-analysis', async (req, res) => {
     // 재무 데이터 분석 프롬프트 구성
     const prompt = createFinancialAnalysisPrompt(companyName, year, previousYear, balanceSheet, incomeStatement, ratio, isFinancialComp);
     
-    // OpenAI API 호출
-    const analysis = await callOpenAIAPI(prompt);
-    
+    // OpenAI API 호출 (structured outputs)
+    const result = parseAnalysisJson(await callOpenAIAPI(prompt, FINANCIAL_ANALYSIS_SCHEMA));
+    result.title = `${companyName} ${year}년 재무 분석`;
+
     res.json({
       status: 'success',
-      analysis: analysis
+      result
     });
   } catch (error) {
     console.error('AI 재무분석 중 오류 발생:', error);
@@ -649,8 +650,118 @@ app.post('/api/ai-financial-analysis', async (req, res) => {
 // OpenAI 모델
 const OPENAI_MODEL = 'gpt-6-luna';
 
+// AI 분석 응답 공통 스키마 조각 (structured outputs, strict 모드)
+// 프런트(renderAiAnalysisHtml)가 rating 배지 + 섹션 카드 + 항목별 ▲▼ 표시로 렌더링한다
+function buildAnalysisSectionSchema(categories) {
+  return {
+    type: 'array',
+    items: {
+      type: 'object',
+      additionalProperties: false,
+      required: ['category', 'title', 'points'],
+      properties: {
+        category: { type: 'string', enum: categories },
+        title: { type: 'string' },
+        points: {
+          type: 'array',
+          items: {
+            type: 'object',
+            additionalProperties: false,
+            required: ['tone', 'text'],
+            properties: {
+              tone: { type: 'string', enum: ['positive', 'negative', 'neutral'] },
+              text: { type: 'string' }
+            }
+          }
+        }
+      }
+    }
+  };
+}
+
+const RATING_SCHEMA = { type: 'string', enum: ['positive', 'mixed', 'negative'] };
+
+// 정기공시 재무분석 응답 스키마 (섹션을 먼저 쓰고 결론을 나중에 쓰도록 속성 순서를 둔다)
+const FINANCIAL_ANALYSIS_SCHEMA = {
+  name: 'financial_analysis',
+  schema: {
+    type: 'object',
+    additionalProperties: false,
+    required: ['sections', 'rating', 'summary'],
+    properties: {
+      sections: buildAnalysisSectionSchema(['profitability', 'growth', 'stability', 'liquidity', 'efficiency']),
+      rating: RATING_SCHEMA,
+      summary: { type: 'string' }
+    }
+  }
+};
+
+// 잠정실적 분석 응답 스키마 (정기공시보다 항목이 적으므로 섹션 종류도 적다)
+const NULLABLE_NUMBER = { type: ['number', 'null'] };
+const PROVISIONAL_ANALYSIS_SCHEMA = {
+  name: 'provisional_analysis',
+  schema: {
+    type: 'object',
+    additionalProperties: false,
+    required: ['chartData', 'sections', 'rating', 'summary'],
+    properties: {
+      chartData: {
+        type: 'object',
+        additionalProperties: false,
+        required: ['unit', 'labels', 'metrics'],
+        properties: {
+          unit: { type: 'string' },
+          labels: {
+            type: 'object',
+            additionalProperties: false,
+            required: ['current', 'previous', 'yearAgo'],
+            properties: {
+              current: { type: 'string' },
+              previous: { type: 'string' },
+              yearAgo: { type: 'string' }
+            }
+          },
+          metrics: {
+            type: 'array',
+            items: {
+              type: 'object',
+              additionalProperties: false,
+              required: ['name', 'current', 'previous', 'yearAgo'],
+              properties: {
+                name: { type: 'string' },
+                current: NULLABLE_NUMBER,
+                previous: NULLABLE_NUMBER,
+                yearAgo: NULLABLE_NUMBER
+              }
+            }
+          }
+        }
+      },
+      sections: buildAnalysisSectionSchema(['results', 'comparison', 'drivers']),
+      rating: RATING_SCHEMA,
+      summary: { type: 'string' }
+    }
+  }
+};
+
+// structured outputs 응답(JSON 문자열)을 파싱하고 최소 형식을 검증
+function parseAnalysisJson(raw) {
+  let parsed;
+  try {
+    parsed = JSON.parse(raw);
+  } catch (e) {
+    console.error('AI 응답 JSON 파싱 실패:', e.message, raw.slice(0, 500));
+    throw new Error('AI 응답(JSON)을 해석하지 못했습니다.');
+  }
+  if (!parsed || !Array.isArray(parsed.sections) || typeof parsed.summary !== 'string') {
+    throw new Error('AI 응답 형식이 올바르지 않습니다.');
+  }
+  return parsed;
+}
+
 // OpenAI API 호출 함수 (429 Rate Limit 대응을 위한 자동 재시도 로직 포함)
-async function callOpenAIAPI(prompt) {
+// jsonSchema({ name, schema })를 넘기면 structured outputs로 JSON 문자열을 받는다
+async function callOpenAIAPI(prompt, jsonSchema) {
   const apiKey = config.OPENAI_API_KEY;
 
   if (!apiKey) {
@@ -673,7 +784,13 @@ async function callOpenAIAPI(prompt) {
             }
           ],
           reasoning_effort: 'none', // 리즈닝 비활성화
-          max_completion_tokens: 8192
+          max_completion_tokens: 8192,
+          ...(jsonSchema && {
+            response_format: {
+              type: 'json_schema',
+              json_schema: { name: jsonSchema.name, strict: true, schema: jsonSchema.schema }
+            }
+          })
         },
         {
           headers: {
@@ -686,6 +803,9 @@ async function callOpenAIAPI(prompt) {
       // 응답에서 텍스트 추출
       const choice = response.data.choices && response.data.choices[0];
       const content = choice && choice.message && choice.message.content;
+      if (choice && choice.message && choice.message.refusal) {
+        throw new Error(`AI가 응답을 거부했습니다: ${choice.message.refusal}`);
+      }
       if (content) {
         return content;
       } else {
@@ -712,6 +832,23 @@ async function callOpenAIAPI(prompt) {
       }
     }
   }
+}
+
+// 정기공시 재무분석 출력 지침 (FINANCIAL_ANALYSIS_SCHEMA와 짝을 이룬다)
+function buildFinancialOutputGuide(isFinancial) {
+  const categoryGuide = isFinancial
+    ? 'profitability(수익성), stability(건전성·자본적정성), growth(성장성), efficiency(효율성)'
+    : 'profitability(수익성), growth(성장성), stability(안정성), liquidity(유동성), efficiency(효율성)';
+  return `
+출력 형식 (지정된 JSON 스키마를 따르세요):
+- sections: 3~4개. category는 ${categoryGuide} 중에서 서로 겹치지 않게 고르고, title에는 섹션 이름(예: "수익성")을 한국어로 적으세요.
+- 각 섹션의 points: 2~3개. 각 point는 수치 근거를 담은 한두 문장으로 쓰고, 전년 대비 변화와 그 의미를 포함하세요.
+- 각 point의 tone: 회사에 긍정적인 내용이면 "positive", 부정적이면 "negative", 어느 쪽도 아니면 "neutral".
+- rating: 전반적인 재무 상태가 양호하면 "positive", 긍정과 우려가 섞여 있으면 "mixed", 위험 신호가 뚜렷하면 "negative".
+- summary: 전체 분석의 핵심 결론을 1~2문장으로 쓰세요.
+- 제공된 데이터로 판단할 수 없는 부분은 꼭 필요할 때 한 번만 언급하고, 자료가 없다는 말을 반복하지 마세요.
+- 중요한 수치나 용어는 **별표 두 개**로 감싸 강조하세요. 그 외 HTML 태그나 Markdown 문법은 쓰지 마세요.
+`;
 }
 
 // 재무분석 프롬프트 생성 함수
@@ -777,16 +914,7 @@ ${JSON.stringify(financialData, null, 2)}
 4. 전년 대비 주요 변화점과 그 의미를 금융업 관점에서 설명해주세요.
 5. 회사의 재무 상태에 대한 전반적인 평가와 간단한 요약을 제공해주세요.
 
-형식 지침:
-- **Markdown 코드 블록(\`\`\`)을 사용하지 마세요.**
-- 문단은 <p> 태그로 감싸주세요. 예: <p>분석 내용입니다.</p>
-- 긍정적인 내용은 <span class="positive">내용</span> 형식으로 표시해주세요.
-- 부정적인 내용은 <span class="negative">내용</span> 형식으로 표시해주세요.
-- 중립적인 내용은 <span class="neutral">내용</span> 형식으로 표시해주세요.
-- 중요한 수치나 용어는 <strong>내용</strong> 형식으로 강조해주세요.
-- 제목으로 "${companyName} ${year}년 재무 분석"을 첫 줄에 추가해주세요.
-- 전체 분석은 3-4개 문단으로 간결하게 작성해주세요.
-`;
+${buildFinancialOutputGuide(isFinancialCompany)}`;
   }
 
   // 일반 기업용 프롬프트
@@ -803,16 +931,7 @@ ${JSON.stringify(financialData, null, 2)}
 4. 전년 대비 주요 변화점과 그 의미를 설명해주세요.
 5. 회사의 재무 상태에 대한 전반적인 평가와 간단한 요약을 제공해주세요.
 
-형식 지침:
-- **Markdown 코드 블록(\`\`\`)을 사용하지 마세요.**
-- 문단은 <p> 태그로 감싸주세요. 예: <p>분석 내용입니다.</p>
-- 긍정적인 내용은 <span class="positive">내용</span> 형식으로 표시해주세요.
-- 부정적인 내용은 <span class="negative">내용</span> 형식으로 표시해주세요.
-- 중립적인 내용은 <span class="neutral">내용</span> 형식으로 표시해주세요.
-- 중요한 수치나 용어는 <strong>내용</strong> 형식으로 강조해주세요.
-- 제목으로 "${companyName} ${year}년 재무 분석"을 첫 줄에 추가해주세요.
-- 전체 분석은 3-4개 문단으로 간결하게 작성해주세요.
-`;
+${buildFinancialOutputGuide(isFinancialCompany)}`;
 }
 
 // DART 공시목록 프록시 API
@@ -911,20 +1030,21 @@ ${documentText}
 1. 매출액, 영업이익, 당기순이익 등 잠정실적 수치를 정리하고 의미를 설명해주세요.
 2. 전년 동기 대비, 직전 분기 대비 증감률이 있다면 해석해주세요.
 3. 공시에 포함된 실적 변동 요인이나 회사 측 설명이 있다면 요약해주세요.
-4. 전반적인 실적 평가와 간단한 요약을 제공해주세요. 잠정실적이므로 확정 실적과 다를 수 있다는 점을 언급해주세요.
+4. 공시 원문에 있는 정보만 사용하고, 원문에 없는 내용을 추측해 채우지 마세요. 잠정실적 공시는 항목이 적으므로 짧게 작성해도 됩니다.
 
-형식 지침:
-- **Markdown 코드 블록(\`\`\`)을 사용하지 마세요.**
-- 문단은 <p> 태그로 감싸주세요. 예: <p>분석 내용입니다.</p>
-- 긍정적인 내용은 <span class="positive">내용</span> 형식으로 표시해주세요.
-- 부정적인 내용은 <span class="negative">내용</span> 형식으로 표시해주세요.
-- 중립적인 내용은 <span class="neutral">내용</span> 형식으로 표시해주세요.
-- 중요한 수치나 용어는 <strong>내용</strong> 형식으로 강조해주세요.
-- 제목으로 "${companyName} 잠정실적 분석"을 첫 줄에 추가해주세요.
-- 전체 분석은 3-4개 문단으로 간결하게 작성해주세요.
-- 분석 본문이 끝난 뒤 맨 마지막 줄에, 차트 생성용 데이터를 아래 형식의 JSON 한 줄로 추가해주세요. 이 줄은 태그로 감싸지 말고 설명도 붙이지 마세요:
-CHART_DATA:{"unit":"원문에 표기된 금액 단위(예: 조원, 억원, 백만원)","labels":{"current":"당기 라벨(예: 26.1Q)","previous":"전기 라벨","yearAgo":"전년동기 라벨"},"metrics":[{"name":"매출액","current":숫자,"previous":숫자,"yearAgo":숫자},{"name":"영업이익","current":숫자,"previous":숫자,"yearAgo":숫자},{"name":"당기순이익","current":숫자,"previous":숫자,"yearAgo":숫자}]}
-- CHART_DATA의 수치는 원문에 표기된 단위 그대로, 천 단위 쉼표 없이 적어주세요. 원문에 없는 수치는 null로 표기해주세요.
+출력 형식 (지정된 JSON 스키마를 따르세요):
+- chartData: 차트용 데이터.
+  - unit: 원문에 표기된 금액 단위(예: 조원, 억원, 백만원).
+  - labels: 당기(current)·전기(previous)·전년동기(yearAgo) 라벨(예: "26.3Q").
+  - metrics: 매출액, 영업이익, 당기순이익 순서로 3개. 수치는 원문 단위 그대로의 숫자(천 단위 쉼표 없이)로 쓰고, 원문에 없는 수치는 null로 두세요.
+- sections: 1~3개. category는 results(잠정실적 수치), comparison(전년 동기·직전 분기 대비 증감), drivers(실적 변동 요인·회사 측 설명) 중에서 서로 겹치지 않게 고르고, title에는 섹션 이름(예: "실적 요약")을 한국어로 적으세요.
+- drivers 섹션은 공시 원문에 회사가 밝힌 실적 변동 요인이 실제로 있을 때만 만드세요. "설명이 없다"는 내용만 담긴 섹션이나 point는 만들지 마세요.
+- "잠정치이므로 확정 실적과 다를 수 있다"는 안내는 화면에 따로 표시되므로 summary와 points에 쓰지 마세요.
+- 각 섹션의 points: 1~2개. 각 point는 수치 근거를 담은 한두 문장으로 쓰세요.
+- 각 point의 tone: 회사에 긍정적인 내용이면 "positive", 부정적이면 "negative", 어느 쪽도 아니면 "neutral".
+- rating: 실적이 전반적으로 개선됐으면 "positive", 개선과 악화가 섞여 있으면 "mixed", 악화됐으면 "negative".
+- summary: 실적의 핵심 결론을 1~2문장으로 쓰세요.
+- 중요한 수치나 용어는 **별표 두 개**로 감싸 강조하세요. 그 외 HTML 태그나 Markdown 문법은 쓰지 마세요.
 `;
 }
 
@@ -957,21 +1077,11 @@ app.get('/api/provisional-analysis', async (req, res) => {
     console.log(`잠정실적 분석 요청: ${corp_name || ''} ${report_nm || ''} (rcept_no: ${rcept_no}, 본문 ${documentText.length}자)`);
 
     const prompt = createProvisionalAnalysisPrompt(corp_name || '해당 회사', report_nm || '잠정실적 공시', documentText);
-    let analysis = await callOpenAIAPI(prompt);
+    // OpenAI API 호출 (structured outputs, 차트 데이터도 같은 JSON에 포함)
+    const { chartData, ...result } = parseAnalysisJson(await callOpenAIAPI(prompt, PROVISIONAL_ANALYSIS_SCHEMA));
+    result.title = `${corp_name || '해당 회사'} 잠정실적 분석`;
 
-    // 응답 마지막의 CHART_DATA JSON 분리 (없거나 파싱 실패해도 분석 텍스트는 그대로 반환)
-    let chartData = null;
-    const chartMatch = analysis.match(/CHART_DATA\s*:\s*(\{[\s\S]*\})/);
-    if (chartMatch) {
-      try {
-        chartData = JSON.parse(chartMatch[1]);
-      } catch (e) {
-        console.warn('CHART_DATA JSON 파싱 실패:', e.message);
-      }
-      analysis = analysis.replace(/(<p>\s*)?CHART_DATA\s*:\s*\{[\s\S]*\}(\s*<\/p>)?/, '').trim();
-    }
-
-    res.json({ status: 'success', analysis, chartData });
+    res.json({ status: 'success', result, chartData: chartData || null });
   } catch (error) {
     console.error('잠정실적 분석 중 오류 발생:', error);
     res.status(500).json({

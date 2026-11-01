@@ -1091,7 +1091,7 @@ function displayRatioTable(ratio) {
 
   // 테이블에 표시할 비율 항목 (금융회사/일반기업 구분)
   const generalItems = [
-    '유동비율', '당좌비율', '부채비율', '자기자본비율',
+    '유동비율', '부채비율', '자기자본비율',
     '매출액영업이익률', '매출액순이익률', 'ROE', 'ROA'
   ];
   const financialItems = [

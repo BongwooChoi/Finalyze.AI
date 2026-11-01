@@ -50,6 +50,7 @@ node setupDatabase.js            # dart.db에 companies 테이블 적재 + 인�
 - **금융회사 분기**: 회사명 키워드(`은행`, `보험`, `증권` 등)로 `isFinancialCompany`를 판별해 일반 기업과 다른 계정명 세트(`매출액` 대신 `영업수익`)와 별도 AI 프롬프트를 사용한다.
 - **계정명 alias 매칭**: DART 계정명은 회사마다 다르다(예: `당기순이익(손실)`, `영업이익(손실)`). server.js의 `GENERAL_IS_ITEMS`/`FINANCIAL_IS_ITEMS` alias 목록으로 매칭하며, 새 계정 추가 시 이 패턴을 따른다.
 - **금액 파싱**: DART 금액은 쉼표 포함 문자열이다 → `parseInt(String(v).replace(/,/g, ''), 10)`.
+- **주요계정 API의 한계**: `fnlttSinglAcnt.json`은 유동자산·부채총계 같은 주요계정만 주고 재고자산 등 세부 계정은 없다. 그래서 당좌비율처럼 세부 계정이 필요한 지표는 계산하지 않는다(placeholder 0으로 채우면 틀린 값이 노출된다).
 - **연결/개별 우선순위**: 연결재무제표(`fs_div === 'CFS'`) 우선, 없으면 개별(`OFS`) fallback.
 - **날짜는 KST 기준**: Vercel 서버는 UTC로 돌기 때문에 공시 날짜 계산 시 UTC+9 보정을 해야 당일 공시가 잘리지 않는다 (`/api/disclosure-list` 참고).
 - **OpenAI 호출**: 모델은 `gpt-6-luna`(`OPENAI_MODEL` 상수). Chat Completions API를 `reasoning_effort: 'none'`(리즈닝 비활성화)으로 호출하며, 429 발생 시 지수 백오프로 최대 3회 재시도(`callOpenAIAPI`). 에러 로그에는 axios `error` 객체 전체가 아닌 `error.message`만 남긴다(요청 헤더의 API 키 노출 방지).

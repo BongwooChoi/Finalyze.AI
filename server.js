@@ -573,20 +573,8 @@ app.get('/api/financial-analysis', async (req, res) => {
         };
       }
 
-      // 8. 당좌비율 (금융회사 제외)
-      if (!isFinancial && analysis.balanceSheet['유동자산'] && analysis.balanceSheet['유동부채'] &&
-          analysis.balanceSheet['유동부채'].current !== 0) {
-        const inventoryCurrent = 0;
-        const inventoryPrevious = 0;
-
-        analysis.ratio['당좌비율'] = {
-          current: ((analysis.balanceSheet['유동자산'].current - inventoryCurrent) /
-                  analysis.balanceSheet['유동부채'].current * 100).toFixed(2),
-          previous: analysis.balanceSheet['유동부채'].previous !== 0 ?
-            ((analysis.balanceSheet['유동자산'].previous - inventoryPrevious) /
-             analysis.balanceSheet['유동부채'].previous * 100).toFixed(2) : 0
-        };
-      }
+      // 당좌비율은 계산하지 않는다: (유동자산 - 재고자산) / 유동부채인데,
+      // fnlttSinglAcnt(주요계정) 응답에는 재고자산이 없어 유동비율과 같은 값이 나오기 때문
     } catch (ratioError) {
       console.error(`재무분석 API - 재무비율 계산 중 오류 발생:`, ratioError);
     }

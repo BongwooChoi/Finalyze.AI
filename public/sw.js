@@ -1,10 +1,11 @@
-const CACHE_NAME = 'financial-app-cache-v22';
+const CACHE_NAME = 'financial-app-cache-v23';
 const urlsToCache = [
   '/',
   '/index.html',
   '/css/style.css',
   '/js/main.js',
   '/images/finalyze-system-v1.png',
+  '/images/finalyze-mobile-qr.png',
   '/manifest.json',
   '/icons/icon-192x192.png',
   '/icons/icon-512x512.png',

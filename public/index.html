@@ -45,7 +45,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Noto+Sans+KR:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/style.css?v=3.4">
+  <link rel="stylesheet" href="/css/style.css?v=3.5">
   <link rel="manifest" href="/manifest.json">
   <meta name="theme-color" content="#2563eb">
 
@@ -81,10 +81,10 @@
   <a class="skip-link" href="#analysisPage" id="skipLink">본문으로 이동</a>
   <header class="site-header">
     <nav class="container site-nav" aria-label="주요 메뉴">
-      <a class="site-brand" href="#analysis" aria-label="Finalyze.AI 재무분석 홈">Finalyze<span>.AI</span></a>
+      <a class="site-brand" href="/" data-page-link="analysis" aria-label="Finalyze.AI 재무분석 홈">Finalyze<span>.AI</span></a>
       <div class="site-nav-links">
-        <a href="#analysis" data-page="analysis" aria-current="page">재무분석</a>
-        <a href="#about" data-page="about">시스템 소개</a>
+        <a href="/" data-page-link="analysis" data-page="analysis" aria-current="page">재무분석</a>
+        <a href="/about" data-page-link="about" data-page="about">시스템 소개</a>
       </div>
     </nav>
   </header>
@@ -383,7 +383,7 @@
           <p class="about-eyebrow">ABOUT FINALYZE.AI</p>
           <h1 id="aboutTitle">공시 속 숫자를,<br><span>기업의 이야기로.</span></h1>
           <p class="about-lead">Finalyze.AI는 DART 공시 데이터를 차트로 정리하고,<br class="d-none d-lg-inline"> AI의 설명을 더해 기업의 재무를 읽는 데 도움을 주는 플랫폼입니다.</p>
-          <a class="about-cta" href="#analysis">기업 분석 시작하기 <i class="bi bi-arrow-up-right" aria-hidden="true"></i></a>
+          <a class="about-cta" href="/" data-page-link="analysis">기업 분석 시작하기 <i class="bi bi-arrow-up-right" aria-hidden="true"></i></a>
         </div>
         <dl class="about-at-a-glance">
           <div><dt><span>4+</span>정기보고서·잠정실적</dt><dd>정기보고서 4종 + 잠정실적 공시</dd></div>
@@ -391,6 +391,13 @@
           <div><dt><span>AI</span>분석 설명</dt><dd>재무 수치와 잠정실적을 읽기 쉽게</dd></div>
         </dl>
       </section>
+
+      <nav class="about-content-nav" aria-label="소개 페이지 목차">
+        <a href="#how-to-use">사용법</a>
+        <a href="#analysis-method">분석 기준</a>
+        <a href="#faq">자주 묻는 질문</a>
+        <a href="#data-sources">데이터 출처</a>
+      </nav>
 
       <section class="about-panel about-mobile" aria-labelledby="mobileTitle">
         <div>
@@ -427,14 +434,14 @@
         </dl>
       </section>
 
-      <section class="about-section" aria-labelledby="processTitle">
+      <section class="about-section" id="how-to-use" aria-labelledby="processTitle">
         <div class="about-section-heading">
           <p class="about-eyebrow">FROM DISCLOSURE TO INSIGHT</p>
-          <h2 id="processTitle">분석은 이렇게 진행됩니다</h2>
+          <h2 id="processTitle">Finalyze.AI 사용법</h2>
           <p>기업을 찾는 순간부터 결과를 저장하기까지, 네 단계로 이어집니다.</p>
         </div>
         <ol class="about-steps">
-          <li><span class="about-step-number">01 / SEARCH</span><i class="bi bi-search" aria-hidden="true"></i><h3>기업을 찾습니다</h3><p>회사명을 검색하고 기업을 선택하면 최근 5년의 공시 목록을 확인할 수 있습니다.</p></li>
+          <li><span class="about-step-number">01 / SEARCH</span><i class="bi bi-search" aria-hidden="true"></i><h3>기업을 찾습니다</h3><p>회사명을 2글자 이상 입력하고 기업을 선택하면 최근 3개년의 정기보고서·잠정실적 공시 목록을 확인할 수 있습니다.</p></li>
           <li><span class="about-step-number">02 / SELECT</span><i class="bi bi-file-earmark-check" aria-hidden="true"></i><h3>공시를 선택합니다</h3><p>정기보고서나 잠정실적의 분석 버튼을 눌러 관심 있는 기간의 실적을 불러옵니다.</p></li>
           <li><span class="about-step-number">03 / ANALYZE</span><i class="bi bi-bar-chart-line" aria-hidden="true"></i><h3>차트와 설명을 읽습니다</h3><p>주요 수치와 변화를 시각화하고, AI가 공시 데이터에 기반한 분석을 덧붙입니다.</p></li>
           <li><span class="about-step-number">04 / EXPORT</span><i class="bi bi-download" aria-hidden="true"></i><h3>결과를 저장합니다</h3><p>분석을 PDF나 이미지로 저장하거나, 기업·공시 선택이 담긴 주소를 공유할 수 있습니다.</p></li>
@@ -473,23 +480,73 @@
         </div>
       </section>
 
-      <section class="about-panel about-principles" aria-labelledby="principlesTitle">
+      <section class="about-panel about-principles" id="analysis-method" aria-labelledby="principlesTitle">
         <div class="about-section-heading">
           <p class="about-eyebrow">HOW TO READ THE RESULTS</p>
-          <h2 id="principlesTitle">분석 결과를 읽을 때 알아둘 점</h2>
+          <h2 id="principlesTitle">데이터와 분석 기준</h2>
           <p>데이터의 범위와 분석 기준을 함께 확인해 주세요.</p>
         </div>
         <div class="about-principle-grid">
-          <article><span>01</span><h3>연결재무제표를 우선합니다</h3><p>연결재무제표가 있으면 먼저 사용하고, 없으면 개별재무제표를 사용합니다. 비교할 때 보고서의 기준과 기간을 확인해 주세요.</p></article>
+          <article><span>01</span><h3>재무제표의 범위를 확인합니다</h3><p>연간 추이는 연결재무제표를 우선하고, 없으면 개별재무제표를 사용합니다. 공시 원문에서 연결·개별 구분과 비교 기간을 함께 확인해 주세요.</p></article>
           <article><span>02</span><h3>주요 계정으로 분석합니다</h3><p>DART 주요계정 API에서 제공하는 항목을 활용합니다. 세부 계정이 필요한 일부 지표는 제공하지 않으며, 금융회사는 별도의 계정과 분석 기준을 적용합니다.</p></article>
           <article><span>03</span><h3>잠정실적은 달라질 수 있습니다</h3><p>잠정실적은 이후 확정된 재무제표와 차이가 날 수 있습니다. 공시 시점과 정정 여부는 DART 원문에서 확인할 수 있습니다.</p></article>
           <article><span>04</span><h3>AI 설명은 원문과 함께 읽습니다</h3><p>AI의 해석에는 오류가 있을 수 있습니다. 주요 수치는 공시 원문과 대조하고, 투자 판단에는 추가적인 정보를 함께 검토해 주세요.</p></article>
         </div>
+        <div class="about-ratio-method">
+          <h3>주요 재무비율은 어떻게 계산하나요?</h3>
+          <p>서버가 DART 주요계정 수치로 계산합니다. 회사별 제공 계정과 분모의 값에 따라 표시되는 지표가 달라질 수 있습니다.</p>
+          <div class="table-responsive">
+            <table class="table about-ratio-table">
+              <caption>Finalyze.AI의 주요 재무비율 계산식</caption>
+              <thead><tr><th scope="col">지표</th><th scope="col">계산식</th></tr></thead>
+              <tbody>
+                <tr><th scope="row">유동비율</th><td>유동자산 ÷ 유동부채 × 100</td></tr>
+                <tr><th scope="row">부채비율</th><td>부채총계 ÷ 자본총계 × 100</td></tr>
+                <tr><th scope="row">자기자본비율</th><td>자본총계 ÷ 자산총계 × 100</td></tr>
+                <tr><th scope="row">영업이익률</th><td>영업이익 ÷ 매출액 × 100</td></tr>
+                <tr><th scope="row">순이익률</th><td>당기순이익 ÷ 매출액 × 100</td></tr>
+                <tr><th scope="row">ROE</th><td>당기순이익 ÷ 자본총계 × 100</td></tr>
+                <tr><th scope="row">ROA</th><td>당기순이익 ÷ 자산총계 × 100</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p>금융회사의 이익률은 매출액 대신 영업수익을 기준으로 하며, 유동비율은 제공하지 않습니다. ROE·ROA는 해당 보고기간의 순이익과 재무상태표의 기말 자본·자산으로 계산하며, 분기·반기 수치를 연환산하지 않습니다. 평균 자본·평균 자산을 쓰는 다른 서비스와 값이 다를 수 있습니다.</p>
+        </div>
+      </section>
+
+      <section class="about-panel about-faq" id="faq" aria-labelledby="faqTitle">
+        <div class="about-section-heading">
+          <p class="about-eyebrow">FREQUENTLY ASKED QUESTIONS</p>
+          <h2 id="faqTitle">자주 묻는 질문</h2>
+          <p>서비스의 지원 범위와 결과를 확인하는 방법을 정리했습니다.</p>
+        </div>
+        <details open><summary>Finalyze.AI는 어떤 서비스인가요?</summary><p>Finalyze.AI는 금융감독원 OPEN DART 데이터를 이용해 한국 기업의 재무제표를 차트와 표로 보여주고, OpenAI GPT로 분석 설명을 제공하는 무료 웹 서비스입니다. 기업 검색, 정기보고서·잠정실적 분석, 연간 추이 확인, PDF·이미지 저장을 지원합니다.</p></details>
+        <details><summary>어떤 보고서와 공시를 분석할 수 있나요?</summary><p>사업보고서·반기보고서·1분기보고서·3분기보고서의 정기보고서 4종과 잠정실적 공시를 분석합니다. 정기보고서는 주요 재무계정과 비율을 분석하고, 잠정실적은 공시 원문에 포함된 실적 수치와 설명을 요약합니다.</p></details>
+        <details><summary>재무비율도 AI가 계산하나요?</summary><p>재무비율은 서버가 DART 주요계정의 수치로 계산합니다. AI는 재무데이터와 잠정실적 공시 텍스트를 바탕으로 설명을 작성합니다. 숫자의 계산과 AI의 서술 해석은 구분해 확인해 주세요.</p></details>
+        <details><summary>공시 목록의 기간과 5개년 추이는 어떻게 다른가요?</summary><p>기업을 선택하면 공시 목록은 현재 연도를 포함한 최근 3개년의 정기보고서·잠정실적을 보여줍니다. 연간 추이 탭은 최근 5개년 사업보고서 데이터를 별도로 조회합니다. 아직 사업보고서가 발표되지 않았거나 DART에 데이터가 없는 연도는 실적을 확인할 수 없을 수 있습니다.</p></details>
+        <details><summary>특정 기업이나 재무 항목이 표시되지 않는 이유는 무엇인가요?</summary><p>회사 검색 결과와 DART 재무데이터 제공 범위는 다를 수 있습니다. 해당 기간에 보고서가 없거나 주요계정 API가 항목을 제공하지 않으면 일부 분석이 제한됩니다. 재고자산처럼 주요계정에 없는 세부 항목이 필요한 당좌비율도 제공하지 않습니다.</p></details>
+        <details><summary>잠정실적과 나중에 발표된 재무제표가 다를 수 있나요?</summary><p>네. 잠정실적은 이후 확정된 재무제표와 차이가 날 수 있고, 정정 공시가 발표될 수도 있습니다. 공시 목록의 원문 링크로 발표 시점과 정정 여부를 확인해 주세요. AI 설명에도 오류가 있을 수 있어 원문과 함께 읽는 것이 좋습니다.</p></details>
+        <details><summary>분석 결과를 저장하거나 공유할 수 있나요?</summary><p>정기보고서와 잠정실적 분석 화면의 PDF 내보내기 또는 이미지 저장 버튼을 이용할 수 있습니다. 기업·공시를 선택한 뒤 브라우저 주소를 복사하면 해당 선택 상태를 공유할 수 있습니다. 공유 주소를 다시 열 때는 데이터를 새로 조회하므로 같은 시점의 결과가 그대로 보관되는 것은 아닙니다.</p></details>
+        <details><summary>모바일에서도 사용할 수 있나요?</summary><p>스마트폰 브라우저에서 Finalyze.AI에 접속하면 사용할 수 있습니다. 이 페이지의 QR코드를 스캔하거나 접속 링크를 누르세요. 지원되는 브라우저에서는 홈 화면에 추가해 앱처럼 이용할 수도 있습니다.</p></details>
+      </section>
+
+      <section class="about-panel about-sources" id="data-sources" aria-labelledby="sourcesTitle">
+        <div class="about-section-heading">
+          <p class="about-eyebrow">DATA SOURCES</p>
+          <h2 id="sourcesTitle">데이터 출처와 업데이트</h2>
+          <p>재무제표와 공시는 조회 시 OPEN DART에서 가져옵니다. 공시 원문과 제공 시점을 함께 확인해 주세요.</p>
+        </div>
+        <ul>
+          <li><a href="https://opendart.fss.or.kr/" target="_blank" rel="noopener noreferrer">금융감독원 OPEN DART<span class="visually-hidden"> (새 창)</span></a> — 주요 재무계정, 공시 목록, 공시 원문 데이터의 출처</li>
+          <li><a href="https://dart.fss.or.kr/" target="_blank" rel="noopener noreferrer">금융감독원 DART 전자공시시스템<span class="visually-hidden"> (새 창)</span></a> — 회사가 제출한 공시 원문과 정정 내역 확인</li>
+        </ul>
+        <p>회사명·종목코드 검색에는 서비스에 포함된 회사 목록을 사용합니다. 정정 공시나 자료 제공 시점에 따라 조회 결과가 달라질 수 있습니다. Finalyze.AI의 AI 설명은 금융감독원이 작성하거나 검증한 분석이 아닙니다.</p>
+        <p class="about-updated">문서 확인일: <time datetime="2026-11-03">2026년 11월 3일</time></p>
       </section>
 
       <section class="about-bottom-cta" aria-labelledby="startTitle">
         <div><p class="about-eyebrow">START WITH A COMPANY</p><h2 id="startTitle">궁금한 기업의 숫자를 읽어보세요.</h2><p>기업 검색에서 첫 번째 분석을 시작할 수 있습니다.</p></div>
-        <a class="about-cta" href="#analysis">재무분석으로 이동 <i class="bi bi-arrow-right" aria-hidden="true"></i></a>
+        <a class="about-cta" href="/" data-page-link="analysis">재무분석으로 이동 <i class="bi bi-arrow-right" aria-hidden="true"></i></a>
       </section>
     </div>
   </main>
@@ -502,7 +559,7 @@
           <p class="footer-desc">OPEN DART API를 활용한 AI 재무분석 플랫폼</p>
         </div>
         <div class="footer-links">
-          <a href="#about">시스템 소개</a>
+          <a href="/about" data-page-link="about">시스템 소개</a>
           <span><i class="bi bi-database me-1"></i>DART 공시 데이터</span>
           <span><i class="bi bi-cpu me-1"></i>OpenAI GPT 분석</span>
           <span><i class="bi bi-shield-check me-1"></i>실시간 조회</span>
@@ -538,7 +595,8 @@
   <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
-  <script src="js/main.js?v=3.4"></script>
+  <script src="/js/site-pages.js?v=1.0"></script>
+  <script src="/js/main.js?v=3.5"></script>
   <noscript>
     <div style="padding:2rem;text-align:center;font-family:sans-serif;">
       <h2>Finalyze.AI</h2>

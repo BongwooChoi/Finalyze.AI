@@ -1,9 +1,10 @@
-const CACHE_NAME = 'financial-app-cache-v23';
+const CACHE_NAME = 'financial-app-cache-v24';
 const urlsToCache = [
   '/',
-  '/index.html',
+  '/about',
   '/css/style.css',
   '/js/main.js',
+  '/js/site-pages.js',
   '/images/finalyze-system-v1.png',
   '/images/finalyze-mobile-qr.png',
   '/manifest.json',
@@ -32,7 +33,7 @@ self.addEventListener('fetch', event => {
 
   const url = new URL(event.request.url);
   const isAppShell = url.origin === location.origin &&
-    (url.pathname === '/' || url.pathname.endsWith('.html') ||
+    (url.pathname === '/' || url.pathname === '/about' || url.pathname.endsWith('.html') ||
      url.pathname.endsWith('.css') || url.pathname.endsWith('.js'));
 
   if (isAppShell) {

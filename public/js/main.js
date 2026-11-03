@@ -10,7 +10,6 @@ let restoredAnalysisUrl = false;
 let activePage = null;
 let activePageSearch = window.location.search;
 const pageScrollPositions = { analysis: 0, about: 0 };
-const analysisPageTitle = document.title;
 
 // 차트 공통 색상 (계정과목별로 모든 차트에서 동일한 색 사용, CVD 검증 통과 팔레트)
 const CHART_COLORS = {
@@ -116,7 +115,18 @@ document.addEventListener('DOMContentLoaded', () => {
   const trendTab = document.getElementById('trend-tab');
   if (trendTab) trendTab.addEventListener('shown.bs.tab', loadTrendChart);
 
-  // 소개 화면과 분석 화면은 DOM을 유지해 선택한 기업·공시를 보존합니다.
+  // 일반 링크는 별도 공개 URL로 연결하고, 앱 안에서는 DOM과 선택 상태를 유지합니다.
+  document.querySelectorAll('[data-page-link]').forEach(link => {
+    link.addEventListener('click', event => {
+      if (event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
+      event.preventDefault();
+      const page = link.dataset.pageLink;
+      if (page === activePage) return;
+      history.pushState({}, '', `${SITE_PAGES[page].path}${window.location.search}`);
+      renderPageFromUrl();
+    });
+  });
+
   renderPageFromUrl();
   window.addEventListener('hashchange', () => renderPageFromUrl());
 
@@ -131,7 +141,13 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 function renderPageFromUrl() {
-  const page = ['#about', '#aboutPage'].includes(window.location.hash) ? 'about' : 'analysis';
+  // 기존에 공유된 해시 URL도 새 공개 URL로 연결합니다.
+  if (window.location.pathname === '/' && ['#about', '#aboutPage'].includes(window.location.hash)) {
+    history.replaceState({}, '', `/about${window.location.search}`);
+  } else if (window.location.hash === '#analysis') {
+    history.replaceState({}, '', `/${window.location.search}`);
+  }
+  const page = window.location.pathname.replace(/\/$/, '') === '/about' ? 'about' : 'analysis';
   if (page === activePage) return;
 
   const previousPage = activePage;
@@ -142,7 +158,16 @@ function renderPageFromUrl() {
   const aboutPage = document.getElementById('aboutPage');
   analysisPage.hidden = isAbout;
   aboutPage.hidden = !isAbout;
-  document.title = isAbout ? '시스템 소개 | Finalyze.AI' : analysisPageTitle;
+  const metadata = SITE_PAGES[page];
+  document.title = metadata.title;
+  document.querySelector('meta[name="description"]').content = metadata.description;
+  document.querySelector('link[rel="canonical"]').href = metadata.url;
+  document.querySelector('meta[property="og:title"]').content = metadata.title;
+  document.querySelector('meta[property="og:description"]').content = metadata.description;
+  document.querySelector('meta[property="og:url"]').content = metadata.url;
+  document.querySelector('meta[name="twitter:title"]').content = metadata.title;
+  document.querySelector('meta[name="twitter:description"]').content = metadata.description;
+  document.querySelector('script[type="application/ld+json"]').textContent = JSON.stringify(getPageStructuredData(page));
   document.getElementById('skipLink').href = isAbout ? '#aboutPage' : '#analysisPage';
   document.querySelectorAll('[data-page]').forEach(link => {
     if (link.dataset.page === page) link.setAttribute('aria-current', 'page');

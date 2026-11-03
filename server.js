@@ -5,12 +5,23 @@ const axios = require('axios');
 const AdmZip = require('adm-zip');
 const dotenv = require('dotenv');
 const config = require('./config');
+const { renderPage } = require('./sitePages');
 
 // 환경변수 로드
 dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+// 공개 페이지는 JavaScript 실행 전에도 본문과 고유 메타데이터를 제공합니다.
+app.get('/', (req, res) => res.type('html').send(renderPage('analysis')));
+app.get('/about', (req, res) => {
+  if (req.path.endsWith('/')) {
+    return res.redirect(301, `/about${req.originalUrl.slice(req.path.length)}`);
+  }
+  res.type('html').send(renderPage('about'));
+});
+app.get('/index.html', (req, res) => res.redirect(301, `/${req.originalUrl.slice(req.path.length)}`));
 
 // 정적 파일 제공
 app.use(express.static(path.join(__dirname, 'public')));
@@ -53,11 +64,6 @@ const FINANCIAL_IS_ITEMS = [
   // 당기순이익
   { name: '당기순이익', aliases: ['당기순이익', '당기순손익', '분기순이익', '반기순이익'] }
 ];
-
-// 메인 페이지
-app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
-});
 
 // 회사명으로 검색하는 API
 app.get('/api/companies/search', async (req, res) => {
@@ -1088,4 +1094,4 @@ if (process.env.NODE_ENV !== 'production') {
 }
 
 // Vercel에서 사용할 수 있도록 Express 앱 인스턴스를 내보냅니다.
-module.exports = app; 
+module.exports = app;

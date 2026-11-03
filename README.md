@@ -77,4 +77,13 @@ node searchCorpCode.js -c "005930"
 
 ```
 npm start
-``` 
+```
+
+## 공개 페이지와 검색엔진 확인
+
+- `/`는 기업 검색·분석 화면, `/about`은 소개·사용법·분석 기준·FAQ입니다.
+- `sitePages.js`가 공통 HTML에서 각 경로의 본문 표시 상태와 고유 메타데이터를 렌더링합니다. 공통 메타데이터는 `public/js/site-pages.js`에서 관리합니다.
+- 기존 `/#about` 주소는 브라우저에서 `/about`으로 연결됩니다. 앱 안에서 이동할 때는 선택한 기업·공시를 유지합니다.
+- 공개 URL 목록은 `public/sitemap.xml`에서 관리합니다. `lastmod`와 소개 문서 확인일은 실제 공개 내용이 변경된 날짜를 사용합니다.
+- `npm run check:public-pages`로 HTTP 응답, 초기 HTML의 본문·메타데이터, 리디렉션과 사이트맵을 검사합니다. 외부 DART·OpenAI 호출은 하지 않습니다.
+- Search Console 소유권 확인용 `public/google6cac55f830514a99.html`은 배포 후에도 유지해야 합니다. 실제 색인 여부·사이트맵 제출 상태는 Search Console과 Bing Webmaster Tools에서 별도로 확인합니다.

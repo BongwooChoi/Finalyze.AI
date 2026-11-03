@@ -10,9 +10,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ```
 npm start                        # 로컬 서버 실행 (기본 포트 3000)
+npm run check:public-pages        # 공개 페이지·메타데이터·리디렉션·사이트맵 HTTP 검사
 ```
 
-테스트·린트는 없다 (`npm test`는 의도적으로 실패하는 placeholder).
+`npm test`는 의도적으로 실패하는 placeholder다. 공개 페이지 검사는 `npm run check:public-pages`를 사용하며, 별도 린트는 없다.
 
 로컬 DB(dart.db) 최초 구축 또는 회사 목록 갱신 시 (순서대로 실행):
 
@@ -31,7 +32,7 @@ node setupDatabase.js            # dart.db에 companies 테이블 적재 + 인�
 - **server.js** — 모든 Express 라우트, AI 프롬프트 생성·OpenAI API 호출, DART 공시 원문(zip/XML) 파싱까지 담당하는 단일 파일. 로컬(`NODE_ENV !== 'production'`)에서만 `app.listen()`하고, Vercel에서는 `module.exports = app`을 서버리스 핸들러로 사용한다. vercel.json이 모든 경로를 server.js로 라우팅한다.
 - **financialService.js** — DART API 호출(`fnlttSinglAcnt.json`)과 dart.db(SQLite) 조회. `REPORT_CODE` 매핑(사업보고서 11011, 반기 11012, 1분기 11013, 3분기 11014)이 여기 있다.
 - **dart.db** — SQLite. `companies`(회사 검색용), `financial_statements` 테이블. **git에 커밋되어 있어 Vercel에서도 회사명/종목코드 검색에 사용된다(읽기 전용)**. 재무제표 데이터 자체는 Vercel 파일시스템이 쓰기 불가이므로 항상 DART API를 실시간 호출한다.
-- **public/** — 프레임워크·번들러 없는 SPA. `index.html` 하나에 `js/main.js`(전체 프런트 로직), `css/style.css`. Bootstrap 5, Chart.js, html2canvas, jsPDF는 CDN 로드. URL 파라미터 기반 딥링크 복원(`restoreStateFromUrl`) 지원.
+- **public/** — 프레임워크·번들러 없는 SPA. `index.html` 하나에 `js/main.js`(전체 프런트 로직), `css/style.css`. `/`와 `/about`은 `sitePages.js`가 본문 표시 상태와 경로별 메타데이터를 서버 렌더링한다. 서버와 브라우저가 `public/js/site-pages.js`의 설정을 공유한다. Bootstrap 5, Chart.js, html2canvas, jsPDF는 CDN 로드. URL 파라미터 기반 딥링크 복원(`restoreStateFromUrl`) 지원.
 
 ### API 엔드포인트 (프런트에서 실제 사용)
 

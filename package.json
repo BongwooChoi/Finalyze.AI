@@ -5,6 +5,7 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
+    "check:public-pages": "node --test tests/public-pages.test.js",
     "download-corp-code": "node downloadCorpCode.js",
     "parse-corp-code": "node parseCorpCode.js",
     "parse-corp-code-simple": "node parseCorpCodeSimple.js",

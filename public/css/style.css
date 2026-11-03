@@ -155,6 +155,10 @@ body {
 .about-at-a-glance dt { grid-column: 2; font-size: 0.9rem; font-weight: 600; line-height: 1.5; }
 .about-at-a-glance dt span { position: absolute; top: 50%; left: 0; transform: translateY(-50%); width: 3.2rem; color: var(--primary-dark); font-family: 'Inter', sans-serif; font-size: 2.2rem; font-weight: 700; line-height: 1; }
 .about-at-a-glance dd { grid-column: 2; color: #52647d; font-size: 0.8rem; line-height: 1.7; margin: 0; }
+.about-content-nav { display: flex; flex-wrap: wrap; gap: 0.75rem 1.5rem; margin: 0 0 2rem; }
+.about-content-nav a { color: var(--primary-dark); font-size: 0.85rem; font-weight: 600; text-decoration: none; }
+.about-content-nav a:hover { text-decoration: underline; }
+.about-page section[id] { scroll-margin-top: 1.5rem; }
 .about-panel { padding: 2rem; background: #fff; border: 1px solid var(--border-color); border-radius: var(--radius-lg); }
 .about-panel-heading { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; margin-bottom: 1.5rem; }
 .about-page h2 { color: var(--text-primary); font-size: 1.55rem; font-weight: 700; letter-spacing: -0.04em; line-height: 1.5; margin-bottom: 0.6rem; }
@@ -194,6 +198,24 @@ body {
 .about-feature li::before { content: ''; position: absolute; top: 0.65rem; left: 0; width: 5px; height: 5px; border-radius: 50%; background: var(--primary); }
 .about-principle-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 2rem 3rem; }
 .about-principle-grid article > span { display: block; color: var(--primary-dark); font-family: 'Inter', sans-serif; font-size: 0.75rem; font-weight: 600; margin-bottom: 0.6rem; }
+.about-ratio-method { margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid var(--border-color); }
+.about-ratio-method p,
+.about-faq p,
+.about-sources p,
+.about-sources li { color: var(--text-secondary); font-size: 0.85rem; line-height: 1.95; }
+.about-ratio-table { font-size: 0.85rem; margin: 1rem 0; }
+.about-ratio-table th { white-space: nowrap; }
+.about-ratio-table caption { font-size: 0.75rem; }
+.about-faq,
+.about-sources { margin-top: 2rem; }
+.about-faq details { padding: 1rem 0; border-top: 1px solid var(--border-color); }
+.about-faq summary { cursor: pointer; font-size: 0.95rem; font-weight: 600; line-height: 1.8; }
+.about-faq summary:focus-visible { outline: 3px solid var(--primary); outline-offset: 4px; }
+.about-faq details p { margin: 0.75rem 0 0; }
+.about-sources ul { padding-left: 1.25rem; }
+.about-sources li + li { margin-top: 0.6rem; }
+.about-sources a { color: var(--primary-dark); }
+.about-sources .about-updated { font-size: 0.75rem; margin-bottom: 0; }
 .about-bottom-cta { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1.5rem; padding: 3.5rem 0 2.5rem; }
 .about-bottom-cta h2 { font-size: 1.4rem; }
 .about-bottom-cta p:last-child { color: var(--text-secondary); font-size: 0.9rem; margin: 0; }

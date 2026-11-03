@@ -6,6 +6,7 @@ const AdmZip = require('adm-zip');
 const dotenv = require('dotenv');
 const config = require('./config');
 const { renderPage } = require('./sitePages');
+const { createRecentDisclosureService } = require('./recentDisclosures');
 
 // 환경변수 로드
 dotenv.config();
@@ -29,6 +30,38 @@ app.use(express.json());
 
 // 데이터베이스 연결
 const db = financialService.connectDB();
+
+const recentDisclosures = createRecentDisclosureService({
+  fetchList: async params => {
+    const { data } = await axios.get('https://opendart.fss.or.kr/api/list.json', {
+      params: { ...params, crtfc_key: config.OPEN_DART_API_KEY }, timeout: 12000
+    });
+    return data;
+  },
+  fetchDocumentText: async rceptNo => {
+    const { data } = await axios.get('https://opendart.fss.or.kr/api/document.xml', {
+      params: { crtfc_key: config.OPEN_DART_API_KEY, rcept_no: rceptNo },
+      responseType: 'arraybuffer', timeout: 12000
+    });
+    return extractDocumentText(data);
+  }
+});
+
+app.get('/api/recent-disclosures', async (req, res) => {
+  try {
+    if (!config.OPEN_DART_API_KEY) throw new Error('DART 인증키가 설정되지 않았습니다.');
+    const result = await recentDisclosures.getRecentDisclosures();
+    // CDN과 실행 중인 서버가 같은 목록을 공유합니다. 오래된 응답은 정상 갱신으로 캐시하지 않습니다.
+    const cacheSeconds = Math.max(0, Math.ceil((Date.parse(result.updatedAt) + 300000 - Date.now()) / 1000));
+    res.set('Cache-Control', result.stale ? 'no-store' : `public, max-age=0, s-maxage=${cacheSeconds}`);
+    res.json(result);
+  } catch (error) {
+    console.warn('최신 공시 조회 실패:', error.code || '조회 불가');
+    res.set('Cache-Control', 'no-store').status(503).json({
+      status: 'error', message: '최신 공시를 불러오지 못했습니다. 잠시 후 다시 확인해주세요.'
+    });
+  }
+});
 
 // REPORT_CODE 상수 가져오기 (클라이언트에서 보고서 이름을 표시하기 위함)
 const REPORT_CODE_MAP = financialService.REPORT_CODE;

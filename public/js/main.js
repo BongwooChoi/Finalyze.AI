@@ -68,6 +68,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // PWA 설치 팝업
   initPwaInstallBanner();
+
+  initRecentDisclosures();
   
   // 검색 버튼 클릭 이벤트
   searchBtn.addEventListener('click', () => searchCompany());
@@ -181,6 +183,107 @@ function renderPageFromUrl() {
   if (!isAbout && !restoredAnalysisUrl) {
     restoredAnalysisUrl = true;
     restoreStateFromUrl();
+  }
+  if (!isAbout) loadRecentDisclosures();
+}
+
+let recentDisclosuresLoading = false;
+let recentDisclosuresLastRequest = 0;
+let recentDisclosureOpening = false;
+
+function initRecentDisclosures() {
+  document.getElementById('recentDisclosuresRefresh').addEventListener('click', () => loadRecentDisclosures(true));
+  setInterval(() => loadRecentDisclosures(), 5 * 60 * 1000);
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) loadRecentDisclosures();
+  });
+}
+
+async function loadRecentDisclosures(force = false) {
+  if (activePage !== 'analysis' || selectedCompany || document.hidden ||
+      new URLSearchParams(location.search).has('corp') || recentDisclosuresLoading) return;
+  if (!force && Date.now() - recentDisclosuresLastRequest < 5 * 60 * 1000) return;
+  const list = document.getElementById('recentDisclosuresList');
+  const status = document.getElementById('recentDisclosuresStatus');
+  const refresh = document.getElementById('recentDisclosuresRefresh');
+  recentDisclosuresLoading = true;
+  refresh.disabled = true;
+  list.setAttribute('aria-busy', 'true');
+  try {
+    const response = await fetch('/api/recent-disclosures', { signal: AbortSignal.timeout(45000) });
+    const result = await response.json();
+    if (!response.ok || result.status !== 'success' || !Array.isArray(result.data)) throw new Error('공시 조회 실패');
+    const fragment = document.createDocumentFragment();
+    result.data.forEach(item => {
+      const li = document.createElement('li');
+      const link = document.createElement('a');
+      link.className = 'recent-disclosure';
+      const params = new URLSearchParams({ corp: item.corp_code, name: item.corp_name, rcept: item.rcept_no });
+      link.href = `/?${params.toString()}`;
+      link.setAttribute('aria-label', `${item.corp_name} ${item.type}${item.corrected ? ' 정정' : ''} 분석 보기`);
+      link.title = item.report_nm;
+      const identity = document.createElement('span');
+      identity.className = 'recent-disclosure-identity';
+      const company = document.createElement('strong');
+      company.textContent = item.corp_name;
+      const details = document.createElement('span');
+      details.className = 'recent-disclosure-details';
+      const badge = document.createElement('span');
+      badge.className = `recent-disclosure-badge${item.type === '잠정실적' ? ' recent-badge-provisional' : ''}`;
+      badge.textContent = `${item.type}${item.corrected ? ' · 정정' : ''}`;
+      const date = document.createElement('time');
+      const isoDate = item.rcept_dt.replace(/^(\d{4})(\d{2})(\d{2})$/, '$1-$2-$3');
+      date.dateTime = isoDate;
+      date.textContent = isoDate.replace(/-/g, '.');
+      details.append(badge, date);
+      identity.append(company, details);
+      const action = document.createElement('span');
+      action.className = 'recent-disclosure-action';
+      action.textContent = '분석 보기 →';
+      link.append(identity, action);
+      link.addEventListener('click', event => openRecentDisclosure(event, item));
+      li.append(link);
+      fragment.append(li);
+    });
+    list.replaceChildren(fragment);
+    document.getElementById('recentDisclosuresScope').textContent = `최근 ${result.lookbackDays}일 · 기업별 최신 공시`;
+    const checked = new Intl.DateTimeFormat('ko-KR', {
+      timeZone: 'Asia/Seoul', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false
+    }).format(new Date(result.updatedAt));
+    status.textContent = result.data.length === 0 ? '최근 실적 공시가 없습니다. 기업 검색으로 이전 보고서를 살펴보세요.' :
+      `${result.stale ? '갱신이 지연되고 있습니다. 마지막 확인' : '마지막 확인'} ${checked} (한국 시간)`;
+    recentDisclosuresLastRequest = Date.now();
+  } catch (error) {
+    status.textContent = list.childElementCount ? '새 공시를 확인하지 못했습니다. 이전 목록을 표시합니다.' :
+      '최신 공시를 불러오지 못했습니다. 새로고침하거나 기업을 검색해주세요.';
+  } finally {
+    recentDisclosuresLoading = false;
+    refresh.disabled = false;
+    list.setAttribute('aria-busy', 'false');
+  }
+}
+
+async function openRecentDisclosure(event, item) {
+  if (event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
+  event.preventDefault();
+  if (recentDisclosureOpening) return;
+  recentDisclosureOpening = true;
+  const link = event.currentTarget;
+  link.setAttribute('aria-disabled', 'true');
+  try {
+    const response = await fetch(`/api/companies/stock/${encodeURIComponent(item.stock_code)}`);
+    const result = await response.json();
+    if (!response.ok || result.status !== 'success' || result.data.corp_code !== item.corp_code) throw new Error('기업 조회 실패');
+    companySearchInput.value = result.data.corp_name;
+    await selectCompany(result.data);
+    if (selectedCompany.corp_code !== item.corp_code) return;
+    const button = document.querySelector(`.disclosure-item[data-rcept_no="${item.rcept_no}"] .btn-analyze`);
+    handleDisclosureSelect(item.rcept_no, item.report_nm, button);
+  } catch (error) {
+    showToast('공시를 열지 못했습니다. 기업을 검색하거나 잠시 후 다시 시도해주세요.', 'error');
+  } finally {
+    recentDisclosureOpening = false;
+    link.removeAttribute('aria-disabled');
   }
 }
 

@@ -28,6 +28,8 @@ test('홈은 분석 화면과 루트 canonical을 초기 HTML에 제공한다', 
   assert.match(mainTag(html, 'aboutPage'), /\bhidden\b/);
   assert.match(html, /<link rel="canonical" href="https:\/\/finalyze-ai\.vercel\.app\/">/);
   assert.match(html, /href="\/about"/);
+  assert.match(html, /id="recentDisclosuresTitle"/);
+  assert.match(html, /주요 기업의 최신 실적 공시/);
   const schema = JSON.parse(html.match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/)[1]);
   assert.equal(schema['@type'], 'WebApplication');
 });
@@ -92,4 +94,36 @@ test('Google 소유권 확인 파일은 로그인·리디렉션 없이 원문을
   const response = await fetch(`${baseUrl}/google6cac55f830514a99.html`, { redirect: 'manual' });
   assert.equal(response.status, 200);
   assert.equal((await response.text()).trim(), 'google-site-verification: google6cac55f830514a99.html');
+});
+
+test('최신 공시 API는 외부 오류의 상세 내용을 공개하거나 캐시하지 않는다', async t => {
+  const axios = require('axios');
+  t.mock.method(axios, 'get', async () => { throw new Error('private-upstream-error'); });
+  const response = await fetch(`${baseUrl}/api/recent-disclosures`);
+  assert.equal(response.status, 503);
+  assert.equal(response.headers.get('cache-control'), 'no-store');
+  const body = await response.text();
+  assert.doesNotMatch(body, /private-upstream-error/);
+  assert.equal(JSON.parse(body).status, 'error');
+});
+
+test('최신 공시 API는 기업별 목록과 갱신 시각을 공유 캐시로 제공한다', async t => {
+  const axios = require('axios');
+  const stocks = ['005930', '000660', '005380', '000270', '035420', '035720', '373220', '051910'];
+  t.mock.method(axios, 'get', async (url, { params }) => ({ data: params.pblntf_ty === 'A' ? {
+    status: '000', total_page: 1, list: stocks.map((stock, index) => ({
+      corp_code: String(index + 1).padStart(8, '0'), corp_name: `기업${index}`, stock_code: stock,
+      corp_cls: 'Y', report_nm: '분기보고서 (2026.09)', rcept_no: `20261103${String(index).padStart(6, '0')}`,
+      rcept_dt: '20261103', rm: ''
+    }))
+  } : { status: '013' } }));
+  const response = await fetch(`${baseUrl}/api/recent-disclosures`);
+  assert.equal(response.status, 200);
+  const cacheSeconds = Number(response.headers.get('cache-control').match(/s-maxage=(\d+)/)[1]);
+  assert.ok(cacheSeconds > 0 && cacheSeconds <= 300);
+  const body = await response.json();
+  assert.equal(body.data.length, 8);
+  assert.equal(body.companyCount, 60);
+  assert.equal(body.stale, false);
+  assert.ok(Number.isFinite(Date.parse(body.updatedAt)));
 });

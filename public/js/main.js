@@ -192,8 +192,8 @@ let recentDisclosuresLastRequest = 0;
 let recentDisclosureOpening = false;
 
 function initRecentDisclosures() {
-  document.getElementById('recentDisclosuresRefresh').addEventListener('click', () => loadRecentDisclosures(true));
-  setInterval(() => loadRecentDisclosures(), 5 * 60 * 1000);
+  document.getElementById('recentDisclosuresRetry').addEventListener('click', () => loadRecentDisclosures(true));
+  setInterval(() => loadRecentDisclosures(true), 5 * 60 * 1000);
   document.addEventListener('visibilitychange', () => {
     if (!document.hidden) loadRecentDisclosures();
   });
@@ -205,9 +205,14 @@ async function loadRecentDisclosures(force = false) {
   if (!force && Date.now() - recentDisclosuresLastRequest < 5 * 60 * 1000) return;
   const list = document.getElementById('recentDisclosuresList');
   const status = document.getElementById('recentDisclosuresStatus');
-  const refresh = document.getElementById('recentDisclosuresRefresh');
+  const retry = document.getElementById('recentDisclosuresRetry');
   recentDisclosuresLoading = true;
-  refresh.disabled = true;
+  retry.disabled = true;
+  retry.setAttribute('aria-busy', 'true');
+  if (!retry.hidden) {
+    retry.querySelector('span').textContent = '확인 중…';
+    status.textContent = '최신 공시를 다시 확인하고 있습니다.';
+  }
   list.setAttribute('aria-busy', 'true');
   try {
     const response = await fetch('/api/recent-disclosures', { signal: AbortSignal.timeout(45000) });
@@ -252,13 +257,17 @@ async function loadRecentDisclosures(force = false) {
     }).format(new Date(result.updatedAt));
     status.textContent = result.data.length === 0 ? '최근 실적 공시가 없습니다. 기업 검색으로 이전 보고서를 살펴보세요.' :
       `${result.stale ? '갱신이 지연되고 있습니다. 마지막 확인' : '마지막 확인'} ${checked} (한국 시간)`;
+    retry.hidden = !result.stale;
     recentDisclosuresLastRequest = Date.now();
   } catch (error) {
+    retry.hidden = false;
     status.textContent = list.childElementCount ? '새 공시를 확인하지 못했습니다. 이전 목록을 표시합니다.' :
-      '최신 공시를 불러오지 못했습니다. 새로고침하거나 기업을 검색해주세요.';
+      '최신 공시를 불러오지 못했습니다. 다시 시도하거나 기업을 검색해주세요.';
   } finally {
     recentDisclosuresLoading = false;
-    refresh.disabled = false;
+    retry.disabled = false;
+    retry.setAttribute('aria-busy', 'false');
+    retry.querySelector('span').textContent = '다시 시도';
     list.setAttribute('aria-busy', 'false');
   }
 }

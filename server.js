@@ -7,6 +7,8 @@ const dotenv = require('dotenv');
 const config = require('./config');
 const { renderPage } = require('./sitePages');
 const { createRecentDisclosureService } = require('./recentDisclosures');
+const dartClient = require('./dartClient');
+const { getSharedStore } = require('./sharedStore');
 
 // 환경변수 로드
 dotenv.config();
@@ -32,14 +34,16 @@ app.use(express.json());
 const db = financialService.connectDB();
 
 const recentDisclosures = createRecentDisclosureService({
+  sharedStore: getSharedStore,
+  namespace: `${dartClient.namespace}:recent:v3:5`,
   fetchList: async params => {
-    const { data } = await axios.get('https://opendart.fss.or.kr/api/list.json', {
+    const { data } = await dartClient.get('https://opendart.fss.or.kr/api/list.json', {
       params: { ...params, crtfc_key: config.OPEN_DART_API_KEY }, timeout: 12000
     });
     return data;
   },
   fetchDocumentText: async rceptNo => {
-    const { data } = await axios.get('https://opendart.fss.or.kr/api/document.xml', {
+    const { data } = await dartClient.get('https://opendart.fss.or.kr/api/document.xml', {
       params: { crtfc_key: config.OPEN_DART_API_KEY, rcept_no: rceptNo },
       responseType: 'arraybuffer', timeout: 12000
     });
@@ -342,7 +346,7 @@ app.get('/api/financial-trend', async (req, res) => {
 
     const responses = await Promise.all(years.map(year => {
       const url = `https://opendart.fss.or.kr/api/fnlttSinglAcnt.json?crtfc_key=${config.OPEN_DART_API_KEY}&corp_code=${corp_code}&bsns_year=${year}&reprt_code=11011`;
-      return axios.get(url).then(r => r.data).catch(() => null);
+      return dartClient.get(url).then(r => r.data).catch(() => null);
     }));
 
     // 계정명이 회사마다 조금씩 다름 (예: 당기순이익(손실), 영업이익(손실))
@@ -987,8 +991,8 @@ app.get('/api/disclosure-list', async (req, res) => {
     // 정기공시(A)와 거래소공시(I, 잠정실적 등 공정공시 포함)를 함께 조회
     const baseUrl = `https://opendart.fss.or.kr/api/list.json?crtfc_key=${config.OPEN_DART_API_KEY}&corp_code=${corp_code}&bgn_de=${bgn_de}&end_de=${end_de}&page_count=100`;
     const [periodicRes, exchangeRes] = await Promise.all([
-      axios.get(`${baseUrl}&pblntf_ty=A`),
-      axios.get(`${baseUrl}&pblntf_ty=I`)
+      dartClient.get(`${baseUrl}&pblntf_ty=A`),
+      dartClient.get(`${baseUrl}&pblntf_ty=I`)
     ]);
 
     const merged = [];
@@ -1090,7 +1094,7 @@ app.get('/api/provisional-analysis', async (req, res) => {
 
     // 공시서류 원본파일 다운로드
     const url = `https://opendart.fss.or.kr/api/document.xml?crtfc_key=${config.OPEN_DART_API_KEY}&rcept_no=${rcept_no}`;
-    const response = await axios.get(url, { responseType: 'arraybuffer' });
+    const response = await dartClient.get(url, { responseType: 'arraybuffer' });
 
     // 오류 시 zip 대신 XML 오류 메시지가 반환됨
     const contentType = response.headers['content-type'] || '';

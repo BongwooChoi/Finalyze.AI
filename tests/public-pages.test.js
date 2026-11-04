@@ -108,6 +108,9 @@ test('최신 공시 API는 외부 오류의 상세 내용을 공개하거나 캐
 });
 
 test('최신 공시 API는 기업별 목록과 갱신 시각을 공유 캐시로 제공한다', async t => {
+  // 직전 테스트의 공유 실패 캐시는 1분 동안 다른 서버의 재수집도 막습니다.
+  const recoveredTime = Date.now() + 61000;
+  t.mock.method(Date, 'now', () => recoveredTime);
   const axios = require('axios');
   const stocks = ['005930', '000660', '005380', '000270', '035420', '035720', '373220', '051910'];
   t.mock.method(axios, 'get', async (url, { params }) => ({ data: params.pblntf_ty === 'A' ? {
@@ -122,7 +125,7 @@ test('최신 공시 API는 기업별 목록과 갱신 시각을 공유 캐시로
   const cacheSeconds = Number(response.headers.get('cache-control').match(/s-maxage=(\d+)/)[1]);
   assert.ok(cacheSeconds > 0 && cacheSeconds <= 300);
   const body = await response.json();
-  assert.equal(body.data.length, 8);
+  assert.equal(body.data.length, 5);
   assert.equal(body.companyCount, 60);
   assert.equal(body.stale, false);
   assert.ok(Number.isFinite(Date.parse(body.updatedAt)));

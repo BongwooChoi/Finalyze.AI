@@ -1,7 +1,7 @@
-const axios = require('axios');
 const fs = require('fs');
 const path = require('path');
 const config = require('./config');
+const dartClient = require('./dartClient');
 const sqlite3 = require('sqlite3').verbose();
 
 // 데이터베이스 파일 경로
@@ -67,7 +67,7 @@ async function fetchFinancialStatements(corpCode, bsnsYear, reprtCode) {
     
     console.log(`DART API 요청 파라미터: corpCode=${corpCode}, bsnsYear=${bsnsYear}, reprtCode=${reprtCode}`);
     
-    const response = await axios.get(url, {
+    const response = await dartClient.get(url, {
       params: {
         crtfc_key: apiKey,
         corp_code: corpCode,
@@ -296,4 +296,4 @@ module.exports = {
   searchCompanyByStockCode,
   REPORT_CODE,
   FS_DIV
-}; 
+};

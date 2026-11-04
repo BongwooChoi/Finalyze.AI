@@ -12,6 +12,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 npm start                        # 로컬 서버 실행 (기본 포트 3000)
 npm run check:public-pages        # 공개 페이지·메타데이터·리디렉션·사이트맵 HTTP 검사
 npm run check:recent-disclosures  # 최신 실적 공시 선정·페이지 처리·캐시 검사
+npm run check:dart-client         # DART 공유 캐시·호출 속도·하루 한도·차단 응답 검사
 ```
 
 `npm test`는 의도적으로 실패하는 placeholder다. 공개 페이지 검사는 `npm run check:public-pages`를 사용하며, 별도 린트는 없다.
@@ -32,6 +33,7 @@ node setupDatabase.js            # dart.db에 companies 테이블 적재 + 인�
 
 - **server.js** — 모든 Express 라우트, AI 프롬프트 생성·OpenAI API 호출, DART 공시 원문(zip/XML) 파싱까지 담당하는 단일 파일. 로컬(`NODE_ENV !== 'production'`)에서만 `app.listen()`하고, Vercel에서는 `module.exports = app`을 서버리스 핸들러로 사용한다. vercel.json이 모든 경로를 server.js로 라우팅한다.
 - **financialService.js** — DART API 호출(`fnlttSinglAcnt.json`)과 dart.db(SQLite) 조회. `REPORT_CODE` 매핑(사업보고서 11011, 반기 11012, 1분기 11013, 3분기 11014)이 여기 있다.
+- **dartClient.js / sharedStore.js** — 웹 서버의 DART GET 요청은 반드시 `dartClient.get()`을 사용한다. Redis 공유 응답·중복 요청 잠금·인증키별 1초 간격/하루 8,000회(KST) 제한을 적용한다. 운영에서 공유 저장소 연결 실패 시 DART 직접 호출로 우회하지 않는다. 로컬에서 Redis 환경 변수가 없으면 메모리 저장소를 사용한다.
 - **dart.db** — SQLite. `companies`(회사 검색용), `financial_statements` 테이블. **git에 커밋되어 있어 Vercel에서도 회사명/종목코드 검색에 사용된다(읽기 전용)**. 재무제표 데이터 자체는 Vercel 파일시스템이 쓰기 불가이므로 항상 DART API를 실시간 호출한다.
 - **public/** — 프레임워크·번들러 없는 SPA. `index.html` 하나에 `js/main.js`(전체 프런트 로직), `css/style.css`. `/`와 `/about`은 `sitePages.js`가 본문 표시 상태와 경로별 메타데이터를 서버 렌더링한다. 서버와 브라우저가 `public/js/site-pages.js`의 설정을 공유한다. Bootstrap 5, Chart.js, html2canvas, jsPDF는 CDN 로드. URL 파라미터 기반 딥링크 복원(`restoreStateFromUrl`) 지원.
 
@@ -43,7 +45,7 @@ node setupDatabase.js            # dart.db에 companies 테이블 적재 + 인�
 - `POST /api/ai-financial-analysis` — 위 분석 결과를 OpenAI GPT로 서술 분석
 - `GET /api/financial-trend` — 최근 5개년 사업보고서를 연도별 병렬 조회해 손익 추이 반환
 - `GET /api/disclosure-list` — 최근 5년 공시목록 프록시 (정기공시 A + 거래소공시 I 병합)
-- `GET /api/recent-disclosures` — 대표기업 60개의 최신 실적 공시 최대 8개. `recentDisclosures.js`에서 선정·수집·5분 메모리 캐시를 관리하며 성공 응답은 CDN에도 5분 캐시한다. 정기공시 A와 공정공시 I002를 페이지 끝까지 조회하고, 30일에 8개 미만이면 90일까지 확장한다. 잠정실적은 원문 표의 실제 재무금액을 확인해 월간 판매대수 발표를 제외한다. 일시적 통신 오류는 한 번 재시도하고 원문 일부 실패는 `partial: true`와 확인된 목록을 반환한다(메모리·CDN 1분 캐시). 실패한 원문은 부적격으로 저장하지 않는다. 로그에는 단계·오류 코드·접수번호·`error.message`를 남기며 axios 객체 전체를 출력하지 않는다. 기업 명단은 분기마다 점검한다.
+- `GET /api/recent-disclosures` — 대표기업 60개의 최신 실적 공시 최대 5개. `recentDisclosures.js`에서 선정·필요한 페이지 조회·Redis 공유 목록/수집 잠금·5분 캐시를 관리한다. 30일에 5개 미만이면 90일까지 확장한다. 잠정실적은 원문 표의 재무금액을 확인해 월간 판매대수 발표를 제외한다. 일시적 통신 오류는 한 번 재시도하고 원문 일부 실패는 `partial: true`와 확인된 목록을 반환한다(1분 캐시). 실패한 원문은 부적격으로 저장하지 않는다. 로그에는 단계·오류 코드·접수번호·`error.message`를 남기며 axios 객체 전체를 출력하지 않는다. 기업 명단은 분기마다 점검한다.
 - `GET /api/provisional-analysis` — 잠정실적 공시 원문(zip)을 내려받아 텍스트 추출 후 OpenAI GPT 분석
 
 **레거시 주의**: `/api/financial-statements`와 `/api/company-report-options`는 프런트에서 사용하지 않는다. 특히 `/api/financial-statements`는 financialService.js에서 export되지 않은 함수(`getFinancialStatements`, `saveFinancialStatementsToDB`)를 참조하므로 호출 시 크래시한다.

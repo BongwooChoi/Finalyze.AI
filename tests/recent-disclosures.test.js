@@ -1,6 +1,7 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { createRecentDisclosureService, hasFinancialResults, reportType } = require('../recentDisclosures');
+const { createMemoryStore } = require('../sharedStore');
 
 const TODAY = Date.parse('2026-11-03T02:00:00Z');
 const STOCKS = ['005930', '000660', '005380', '000270', '035420', '035720', '373220', '051910', '006400'];
@@ -40,7 +41,7 @@ test('빈 재무 양식 뒤 판매대수·날짜를 재무금액으로 오인하
   assert.equal(hasFinancialResults('영업수익 | 당해실적 | 0 |'), true);
 });
 
-test('인지도 목록 밖·비상장·자회사·철회·정정 전 공시를 제외하고 기업별 최신 8개를 고른다', async () => {
+test('인지도 목록 밖·비상장·자회사·철회·정정 전 공시를 제외하고 기업별 최신 5개를 고른다', async () => {
   const rows = STOCKS.map((_, index) => row(index));
   rows.push(row(0, { rcept_no: '20261103000999', report_nm: '연결재무제표기준영업(잠정)실적(공정공시)(자회사의 주요경영사항)' }));
   rows.push(row(1, { rcept_no: '20261103000998', report_nm: '사업보고서 (2025.12)', rm: '정' }));
@@ -48,8 +49,8 @@ test('인지도 목록 밖·비상장·자회사·철회·정정 전 공시를 �
   rows.push(row(20, { stock_code: '999999' }));
   rows.push(row(21, { stock_code: '005930', corp_cls: 'E' }));
   const result = await service(rows).getRecentDisclosures();
-  assert.equal(result.data.length, 8);
-  assert.equal(new Set(result.data.map(item => item.corp_code)).size, 8);
+  assert.equal(result.data.length, 5);
+  assert.equal(new Set(result.data.map(item => item.corp_code)).size, 5);
   assert.ok(result.data.every(item => !['20261103000999', '20261103000998', '20261103000997'].includes(item.rcept_no)));
   assert.equal(result.lookbackDays, 30);
   assert.equal(result.companyCount, 60);
@@ -72,7 +73,7 @@ test('월간 판매실적을 건너뛴 후에도 다른 기업의 더 최근 공
     calls.push(receipt); return '매출액 | 당해실적 | - | 판매대수 | 123 |';
   } }).getRecentDisclosures();
   assert.ok(calls.length > 0);
-  assert.equal(result.data.length, 8);
+  assert.equal(result.data.length, 5);
   assert.ok(result.data.every(item => item.rcept_dt === '20261102'));
 });
 
@@ -88,7 +89,7 @@ test('100건을 넘는 공시의 다음 페이지와 KST 날짜 범위를 확인
   assert.ok(calls.every(params => params.last_reprt_at === 'Y'));
 });
 
-test('30일에 8개 미만이면 이전 60일만 추가 조회한다', async () => {
+test('30일에 5개 미만이면 이전 60일만 추가 조회한다', async () => {
   const calls = [];
   const rows = [row(0), row(1, { rcept_dt: '20260901', rcept_no: '20260901000001' }),
     row(2, { rcept_dt: '20260801', rcept_no: '20260801000001' })];
@@ -132,7 +133,7 @@ test('첫 수집이 실패하면 빈 정상 목록으로 캐시하지 않고 다
   const instance = service([], { fetchList: params => fail ? Promise.resolve({ status: '020' }) : fetch(params) });
   await assert.rejects(instance.getRecentDisclosures());
   fail = false;
-  assert.equal((await instance.getRecentDisclosures()).data.length, 8);
+  assert.equal((await instance.getRecentDisclosures()).data.length, 5);
 });
 
 test('일시적인 공시 목록 통신 오류를 한 번 재시도한다', async () => {
@@ -143,7 +144,7 @@ test('일시적인 공시 목록 통신 오류를 한 번 재시도한다', asyn
     return fetch(params);
   } });
   const result = await instance.getRecentDisclosures();
-  assert.equal(result.data.length, 8);
+  assert.equal(result.data.length, 5);
   assert.equal(failures, 2);
   assert.equal(result.partial, false);
 });
@@ -161,7 +162,7 @@ test('원문 한 건이 실패해도 확인된 다른 기업을 표시하고 실
     }
   });
   const partial = await instance.getRecentDisclosures();
-  assert.equal(partial.data.length, 8);
+  assert.equal(partial.data.length, 5);
   assert.equal(partial.partial, true);
   assert.equal(partial.refreshSeconds, 60);
   assert.ok(partial.data.every(item => item.rcept_no !== failedReceipt));
@@ -178,4 +179,40 @@ test('원문을 전부 확인하지 못하면 빈 정상 목록을 반환하지 
   const reports = [row(0, { report_nm: '연결재무제표기준영업(잠정)실적(공정공시)' })];
   const instance = service(reports, { fetchDocumentText: async () => { throw new Error('Invalid ZIP'); } });
   await assert.rejects(instance.getRecentDisclosures());
+});
+
+test('최신 5개보다 오래된 나머지 페이지는 조회하지 않는다', async () => {
+  const calls = [];
+  const rows = [...STOCKS.slice(0, 5).map((_, index) => row(index)),
+    ...Array.from({ length: 195 }, (_, index) => row(index + 20, { stock_code: '999999', rcept_dt: '20261101' }))];
+  const result = await service(rows, { fetchList: listFetcher(rows, calls) }).getRecentDisclosures();
+  assert.equal(result.data.length, 5);
+  assert.ok(calls.every(params => params.page_no === 1));
+});
+
+test('새 서버 인스턴스도 공유 목록을 재사용한다', async () => {
+  const sharedStore = createMemoryStore({ now: () => TODAY });
+  await service(STOCKS.map((_, index) => row(index)), { sharedStore }).getRecentDisclosures();
+  const result = await service([], { sharedStore, fetchList: async () => { throw Error('중복 수집'); } }).getRecentDisclosures();
+  assert.equal(result.data.length, 5);
+});
+
+test('여러 서버가 동시에 초기 목록을 요청해도 한 서버만 수집한다', async () => {
+  const sharedStore = createMemoryStore({ now: () => TODAY });
+  let calls = 0;
+  const fetch = listFetcher(STOCKS.map((_, index) => row(index)));
+  const fetchList = async params => { calls++; await new Promise(resolve => setTimeout(resolve, 10)); return fetch(params); };
+  const options = { sharedStore, fetchList, pause: () => new Promise(resolve => setTimeout(resolve, 1)) };
+  const [one, two] = await Promise.all([service([], options).getRecentDisclosures(), service([], options).getRecentDisclosures()]);
+  assert.deepEqual(one.data, two.data);
+  assert.equal(calls, 2);
+});
+
+test('최초 수집이 실패하면 다른 서버도 1분 동안 중복 수집하지 않는다', async () => {
+  const sharedStore = createMemoryStore({ now: () => TODAY });
+  let calls = 0;
+  const options = { sharedStore, fetchList: async () => { calls++; throw new Error('DART offline'); } };
+  await assert.rejects(service([], options).getRecentDisclosures());
+  await assert.rejects(service([], options).getRecentDisclosures());
+  assert.equal(calls, 2);
 });

@@ -14,7 +14,8 @@ const FEATURED_STOCK_CODES = new Set([
 ]);
 const REFRESH_MS = 5 * 60 * 1000;
 const MAX_STALE_MS = 24 * 60 * 60 * 1000;
-const DISPLAY_LIMIT = 8;
+const { randomUUID } = require('node:crypto');
+const DISPLAY_LIMIT = 5;
 
 function dateAtKst(timestamp, daysAgo = 0) {
   return new Date(timestamp + 9 * 3600000 - daysAgo * 86400000)
@@ -53,8 +54,9 @@ function compareReports(a, b) {
     b.rcept_no.localeCompare(a.rcept_no);
 }
 
-function createRecentDisclosureService({ fetchList, fetchDocumentText, now = Date.now,
-  pause = ms => new Promise(resolve => setTimeout(resolve, ms)), onDocumentError = () => {} }) {
+function createRecentDisclosureService({ fetchList, fetchDocumentText, now = () => Date.now(),
+  pause = ms => new Promise(resolve => setTimeout(resolve, ms)), onDocumentError = () => {},
+  sharedStore, namespace = 'finalyze:recent:v3:5' }) {
   let cached = null;
   let inFlight = null;
   let retryAfter = 0;
@@ -88,19 +90,26 @@ function createRecentDisclosureService({ fetchList, fetchDocumentText, now = Dat
     return data;
   }
 
-  async function fetchWindow(timestamp, firstDayAgo, lastDayAgo) {
+  async function fetchWindow(timestamp, firstDayAgo, lastDayAgo, failedDocuments, previousRows = []) {
     const dates = { bgn_de: dateAtKst(timestamp, lastDayAgo), end_de: dateAtKst(timestamp, firstDayAgo) };
     const sources = [{ ...dates, pblntf_ty: 'A' }, { ...dates, pblntf_detail_ty: 'I002' }];
     const firstPages = await Promise.all(sources.map(params => fetchPage({ ...params, page_no: 1 })));
     const rows = firstPages.flatMap(data => data.list);
-    const remaining = [];
-    firstPages.forEach((data, index) => {
-      for (let page = 2; page <= Number(data.total_page); page++) remaining.push({ ...sources[index], page_no: page });
-    });
-    // 보고서 제출일에 100건을 넘더라도 다음 페이지를 빠짐없이 조회합니다.
-    for (let i = 0; i < remaining.length; i += 4) {
-      const pages = await Promise.all(remaining.slice(i, i + 4).map(fetchPage));
-      rows.push(...pages.flatMap(data => data.list));
+    const states = firstPages.map((data, index) => ({ params: sources[index], page: 1,
+      total: Number(data.total_page), oldest: data.list.at(-1)?.rcept_dt }));
+    while (true) {
+      const selected = await selectReports([...previousRows, ...rows], failedDocuments);
+      const cutoff = selected.length >= DISPLAY_LIMIT ? selected[DISPLAY_LIMIT - 1].rcept_dt : null;
+      // 5개를 확보하고 나머지 페이지가 모두 더 오래되면 조회를 마칩니다.
+      // 같은 날짜의 연결·정정 공시는 다음 페이지까지 확인합니다.
+      const pending = states.filter(state => state.page < state.total && (!cutoff || state.oldest >= cutoff));
+      if (!pending.length) break;
+      const pages = await Promise.all(pending.map(state => fetchPage({ ...state.params, page_no: state.page + 1 })));
+      pages.forEach((data, index) => {
+        pending[index].page++;
+        pending[index].oldest = data.list.at(-1)?.rcept_dt;
+        rows.push(...data.list);
+      });
     }
     return rows;
   }
@@ -165,11 +174,11 @@ function createRecentDisclosureService({ fetchList, fetchDocumentText, now = Dat
 
   async function refresh(timestamp) {
     const failedDocuments = new Set();
-    const rows = await fetchWindow(timestamp, 0, 29);
+    const rows = await fetchWindow(timestamp, 0, 29, failedDocuments);
     let data = await selectReports(rows, failedDocuments);
     let lookbackDays = 30;
     if (data.length < DISPLAY_LIMIT) {
-      rows.push(...await fetchWindow(timestamp, 30, 89));
+      rows.push(...await fetchWindow(timestamp, 30, 89, failedDocuments, rows));
       data = await selectReports(rows, failedDocuments);
       lookbackDays = 90;
     }
@@ -183,6 +192,39 @@ function createRecentDisclosureService({ fetchList, fetchDocumentText, now = Dat
     return cached;
   }
 
+  async function refreshShared(timestamp) {
+    if (!sharedStore) return refresh(timestamp);
+    const storage = typeof sharedStore === 'function' ? sharedStore() : sharedStore;
+    const snapshotKey = `${namespace}:snapshot`;
+    function adopt(value) {
+      if (value && Array.isArray(value.data) && value.data.length <= DISPLAY_LIMIT) cached = value;
+      return cached && timestamp - Date.parse(cached.updatedAt) < cached.refreshSeconds * 1000;
+    }
+    if (adopt(await storage.get(snapshotKey))) return cached;
+    if (await storage.get(`${namespace}:retry`)) throw new Error('공시 목록을 잠시 후 다시 확인해주세요.');
+    const token = randomUUID();
+    const lockKey = `${namespace}:lock`;
+    if (!await storage.lock(lockKey, token, 120)) {
+      if (cached && timestamp - Date.parse(cached.updatedAt) < MAX_STALE_MS) return { ...cached, stale: true };
+      for (let attempt = 0; attempt < 40; attempt++) {
+        await pause(500);
+        if (adopt(await storage.get(snapshotKey))) return cached;
+      }
+      throw new Error('공시 목록을 갱신하고 있습니다. 잠시 후 다시 확인해주세요.');
+    }
+    try {
+      if (adopt(await storage.get(snapshotKey))) return cached;
+      const result = await refresh(timestamp);
+      await storage.set(snapshotKey, result, MAX_STALE_MS / 1000);
+      return result;
+    } catch (error) {
+      await storage.set(`${namespace}:retry`, true, 60).catch(() => {});
+      throw error;
+    } finally {
+      await storage.unlock(lockKey, token).catch(() => {});
+    }
+  }
+
   return {
     async getRecentDisclosures() {
       const timestamp = now();
@@ -190,7 +232,7 @@ function createRecentDisclosureService({ fetchList, fetchDocumentText, now = Dat
       if (cached && age < cached.refreshSeconds * 1000) return cached;
       if (timestamp < retryAfter && age < MAX_STALE_MS) return { ...cached, stale: true };
       if (!inFlight) {
-        inFlight = refresh(timestamp).catch(error => {
+        inFlight = refreshShared(timestamp).catch(error => {
           retryAfter = now() + 60 * 1000;
           if (cached && now() - Date.parse(cached.updatedAt) < MAX_STALE_MS) return { ...cached, stale: true };
           throw error;

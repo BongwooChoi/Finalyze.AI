@@ -225,7 +225,7 @@ async function loadRecentDisclosures(force = false) {
       link.className = 'recent-disclosure';
       const params = new URLSearchParams({ corp: item.corp_code, name: item.corp_name, rcept: item.rcept_no });
       link.href = `/?${params.toString()}`;
-      link.setAttribute('aria-label', `${item.corp_name} ${item.type}${item.corrected ? ' 정정' : ''} 분석 보기`);
+      link.setAttribute('aria-label', `${item.corp_name} ${item.type}${item.corrected ? ' 정정' : ''} 공시 보기`);
       link.title = item.report_nm;
       const identity = document.createElement('span');
       identity.className = 'recent-disclosure-identity';
@@ -244,7 +244,7 @@ async function loadRecentDisclosures(force = false) {
       identity.append(company, details);
       const action = document.createElement('span');
       action.className = 'recent-disclosure-action';
-      action.textContent = '분석 보기 →';
+      action.textContent = '공시 보기 →';
       link.append(identity, action);
       link.addEventListener('click', event => openRecentDisclosure(event, item));
       li.append(link);
@@ -288,8 +288,8 @@ async function openRecentDisclosure(event, item) {
     companySearchInput.value = result.data.corp_name;
     await selectCompany(result.data);
     if (selectedCompany.corp_code !== item.corp_code) return;
-    const button = document.querySelector(`.disclosure-item[data-rcept_no="${item.rcept_no}"] .btn-analyze`);
-    handleDisclosureSelect(item.rcept_no, item.report_nm, button);
+    updateUrlState(item.rcept_no);
+    focusDisclosure(item.rcept_no);
   } catch (error) {
     showToast('공시를 열지 못했습니다. 기업을 검색하거나 잠시 후 다시 시도해주세요.', 'error');
   } finally {
@@ -343,12 +343,18 @@ async function restoreStateFromUrl() {
   companySearchInput.value = company.corp_name;
   await selectCompany(company, { skipHistory: true });
 
-  // 공시 항목까지 지정된 경우 해당 분석 자동 실행
+  // 공시 항목만 복원합니다. 분석 요청은 사용자가 '분석하기'를 눌렀을 때만 실행합니다.
   const rcept = params.get('rcept');
-  if (rcept) {
-    const btn = document.querySelector(`.disclosure-item[data-rcept_no="${rcept}"] .btn-analyze`);
-    if (btn) btn.click();
-  }
+  if (rcept) focusDisclosure(rcept);
+}
+
+function focusDisclosure(rceptNo) {
+  const items = [...document.querySelectorAll('.disclosure-item')];
+  const item = items.find(element => element.dataset.rcept_no === rceptNo);
+  if (!item) return;
+  items.forEach(element => element.classList.toggle('disclosure-active', element === item));
+  item.querySelector('.btn-analyze')?.focus({ preventScroll: true });
+  item.scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
 
 // 현재 선택 상태를 URL에 반영

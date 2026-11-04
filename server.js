@@ -46,7 +46,7 @@ const recentDisclosures = createRecentDisclosureService({
     return extractDocumentText(data);
   },
   onDocumentError: (rceptNo, error) => console.warn('최신 공시 원문 확인 실패:', {
-    rceptNo, code: error.code || 'DOCUMENT_UNAVAILABLE', httpStatus: error.response?.status
+    rceptNo, code: error.code || 'DOCUMENT_UNAVAILABLE', httpStatus: error.response?.status, message: error.message
   })
 });
 
@@ -60,7 +60,7 @@ app.get('/api/recent-disclosures', async (req, res) => {
     res.json(result);
   } catch (error) {
     console.warn('최신 공시 조회 실패:', {
-      stage: error.stage, code: error.code, httpStatus: error.response?.status, dartStatus: error.dartStatus
+      stage: error.stage, code: error.code, httpStatus: error.response?.status, dartStatus: error.dartStatus, message: error.message
     });
     res.set('Cache-Control', 'no-store').status(503).json({
       status: 'error', message: '최신 공시를 불러오지 못했습니다. 잠시 후 다시 확인해주세요.'

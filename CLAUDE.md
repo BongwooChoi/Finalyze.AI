@@ -43,7 +43,7 @@ node setupDatabase.js            # dart.db에 companies 테이블 적재 + 인�
 - `POST /api/ai-financial-analysis` — 위 분석 결과를 OpenAI GPT로 서술 분석
 - `GET /api/financial-trend` — 최근 5개년 사업보고서를 연도별 병렬 조회해 손익 추이 반환
 - `GET /api/disclosure-list` — 최근 5년 공시목록 프록시 (정기공시 A + 거래소공시 I 병합)
-- `GET /api/recent-disclosures` — 대표기업 60개의 최신 실적 공시 최대 8개. `recentDisclosures.js`에서 선정·수집·5분 메모리 캐시를 관리하며 성공 응답은 CDN에도 5분 캐시한다. 정기공시 A와 공정공시 I002를 페이지 끝까지 조회하고, 30일에 8개 미만이면 90일까지 확장한다. 잠정실적은 원문 표의 실제 재무금액을 확인해 월간 판매대수 발표를 제외한다. 일시적 통신 오류는 한 번 재시도하고 원문 일부 실패는 `partial: true`와 확인된 목록을 반환한다(메모리·CDN 1분 캐시). 실패한 원문은 부적격으로 저장하지 않는다. 로그에는 단계·오류 코드·접수번호만 남기며 axios 객체 전체를 출력하지 않는다. 기업 명단은 분기마다 점검한다.
+- `GET /api/recent-disclosures` — 대표기업 60개의 최신 실적 공시 최대 8개. `recentDisclosures.js`에서 선정·수집·5분 메모리 캐시를 관리하며 성공 응답은 CDN에도 5분 캐시한다. 정기공시 A와 공정공시 I002를 페이지 끝까지 조회하고, 30일에 8개 미만이면 90일까지 확장한다. 잠정실적은 원문 표의 실제 재무금액을 확인해 월간 판매대수 발표를 제외한다. 일시적 통신 오류는 한 번 재시도하고 원문 일부 실패는 `partial: true`와 확인된 목록을 반환한다(메모리·CDN 1분 캐시). 실패한 원문은 부적격으로 저장하지 않는다. 로그에는 단계·오류 코드·접수번호·`error.message`를 남기며 axios 객체 전체를 출력하지 않는다. 기업 명단은 분기마다 점검한다.
 - `GET /api/provisional-analysis` — 잠정실적 공시 원문(zip)을 내려받아 텍스트 추출 후 OpenAI GPT 분석
 
 **레거시 주의**: `/api/financial-statements`와 `/api/company-report-options`는 프런트에서 사용하지 않는다. 특히 `/api/financial-statements`는 financialService.js에서 export되지 않은 함수(`getFinancialStatements`, `saveFinancialStatementsToDB`)를 참조하므로 호출 시 크래시한다.

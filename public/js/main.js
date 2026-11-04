@@ -255,9 +255,11 @@ async function loadRecentDisclosures(force = false) {
     const checked = new Intl.DateTimeFormat('ko-KR', {
       timeZone: 'Asia/Seoul', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false
     }).format(new Date(result.updatedAt));
-    status.textContent = result.data.length === 0 ? '최근 실적 공시가 없습니다. 기업 검색으로 이전 보고서를 살펴보세요.' :
-      `${result.stale ? '갱신이 지연되고 있습니다. 마지막 확인' : '마지막 확인'} ${checked} (한국 시간)`;
-    retry.hidden = !result.stale;
+    status.textContent = result.stale ? `갱신이 지연되고 있습니다. 마지막 확인 ${checked} (한국 시간)` :
+      result.partial ? `일부 공시를 확인하지 못해 확인된 목록을 표시합니다. 마지막 확인 ${checked} (한국 시간)` :
+      result.data.length === 0 ? '최근 실적 공시가 없습니다. 기업 검색으로 이전 보고서를 살펴보세요.' :
+      `마지막 확인 ${checked} (한국 시간)`;
+    retry.hidden = !result.stale && !result.partial;
     recentDisclosuresLastRequest = Date.now();
   } catch (error) {
     retry.hidden = false;

@@ -134,3 +134,48 @@ test('첫 수집이 실패하면 빈 정상 목록으로 캐시하지 않고 다
   fail = false;
   assert.equal((await instance.getRecentDisclosures()).data.length, 8);
 });
+
+test('일시적인 공시 목록 통신 오류를 한 번 재시도한다', async () => {
+  let failures = 0;
+  const fetch = listFetcher(STOCKS.map((_, index) => row(index)));
+  const instance = service([], { pause: async () => {}, fetchList: params => {
+    if (params.pblntf_ty === 'A' && failures++ === 0) throw Object.assign(new Error('socket reset'), { code: 'ECONNRESET' });
+    return fetch(params);
+  } });
+  const result = await instance.getRecentDisclosures();
+  assert.equal(result.data.length, 8);
+  assert.equal(failures, 2);
+  assert.equal(result.partial, false);
+});
+
+test('원문 한 건이 실패해도 확인된 다른 기업을 표시하고 실패한 원문은 다시 확인한다', async () => {
+  let timestamp = TODAY;
+  let fail = true;
+  const reports = STOCKS.map((_, index) => row(index, { report_nm: '연결재무제표기준영업(잠정)실적(공정공시)' }));
+  const failedReceipt = reports[8].rcept_no;
+  const events = [];
+  const instance = service(reports, { now: () => timestamp, pause: async () => {},
+    onDocumentError: receipt => events.push(receipt), fetchDocumentText: async receipt => {
+      if (fail && receipt === failedReceipt) throw Object.assign(new Error('socket reset'), { code: 'ECONNRESET' });
+      return '매출액 | 당해실적 | 1,234 |';
+    }
+  });
+  const partial = await instance.getRecentDisclosures();
+  assert.equal(partial.data.length, 8);
+  assert.equal(partial.partial, true);
+  assert.equal(partial.refreshSeconds, 60);
+  assert.ok(partial.data.every(item => item.rcept_no !== failedReceipt));
+  assert.deepEqual(events, [failedReceipt]);
+  fail = false;
+  timestamp += 61000;
+  const recovered = await instance.getRecentDisclosures();
+  assert.equal(recovered.partial, false);
+  assert.equal(recovered.refreshSeconds, 300);
+  assert.ok(recovered.data.some(item => item.rcept_no === failedReceipt));
+});
+
+test('원문을 전부 확인하지 못하면 빈 정상 목록을 반환하지 않는다', async () => {
+  const reports = [row(0, { report_nm: '연결재무제표기준영업(잠정)실적(공정공시)' })];
+  const instance = service(reports, { fetchDocumentText: async () => { throw new Error('Invalid ZIP'); } });
+  await assert.rejects(instance.getRecentDisclosures());
+});

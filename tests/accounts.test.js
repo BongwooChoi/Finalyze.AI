@@ -21,6 +21,10 @@ async function fixture(t,options = {}) {
     findCompany:async id => id===COMPANY.corp_code ? COMPANY : null,
     verifyIdentity:async token => { if(!identities.has(token)) throw new Error('forged'); return identities.get(token); } });
   const app = express(); app.use(express.json()); app.use('/api',accounts.router);
+  let analysisCalls=0;
+  const analysis=(req,res)=>{analysisCalls++;res.json({status:'success'});};
+  app.post('/api/ai-financial-analysis',accounts.requireAnalysis,analysis);
+  app.get('/api/provisional-analysis',accounts.requireAnalysis,analysis);
   const server = await new Promise(resolve => { const instance=app.listen(0,'127.0.0.1',() => resolve(instance)); });
   const base = `http://127.0.0.1:${server.address().port}/api`;
   t.after(async () => { await new Promise(resolve => server.close(resolve)); await store.close(); });
@@ -43,8 +47,29 @@ async function fixture(t,options = {}) {
     async function mutate(route,method,body) { return request(route,method,body,{'X-CSRF-Token':(await status()).csrfToken}); }
     return {request,status,login,mutate,jar};
   }
-  return {store,client,identities,accounts,now,advance:ms=>{time+=ms;}};
+  return {store,client,identities,accounts,now,advance:ms=>{time+=ms;},analysisCalls:()=>analysisCalls};
 }
+
+test('both AI routes require a live member session and CSRF before the paid handler runs',async t=>{
+  const f=await fixture(t),a=f.client();
+  for(const [path,method] of [['/ai-financial-analysis','POST'],['/provisional-analysis','GET']]) {
+    const r=await a.request(path,method,method==='POST'?{}:undefined);
+    assert.equal(r.status,401);assert.equal((await r.json()).code,'LOGIN_REQUIRED');
+    assert.equal(r.headers.get('cache-control'),'no-store');
+  }
+  assert.equal(f.analysisCalls(),0); await a.login();
+  assert.equal((await a.request('/ai-financial-analysis','POST',{})).status,403);
+  assert.equal((await a.request('/provisional-analysis')).status,403);
+  const csrf=(await a.status()).csrfToken;
+  assert.equal((await a.request('/ai-financial-analysis','POST',{}, {'Origin':'https://evil.example','X-CSRF-Token':csrf})).status,403);
+  assert.equal(f.analysisCalls(),0);
+  assert.equal((await a.mutate('/ai-financial-analysis','POST',{})).status,200);
+  assert.equal((await a.request('/provisional-analysis','GET',undefined,{'Origin':'','X-CSRF-Token':csrf})).status,200);
+  assert.equal(f.analysisCalls(),2);
+  f.advance(8*86400000);
+  assert.equal((await a.request('/provisional-analysis','GET',undefined,{'X-CSRF-Token':csrf})).status,401);
+  assert.equal(f.analysisCalls(),2);
+});
 
 test('Google profile and email are discarded; sessions only persist token hashes',async t => {
   const f=await fixture(t), a=f.client();

@@ -53,6 +53,19 @@ function createAccountRouter({ store, findCompany, config = accountConfig(), now
     if (!equal(req.get('x-csrf-token'),csrfFor(value.token))) throw httpError(403,'요청을 확인하지 못했습니다. 화면을 새로고침해주세요.');
     return value;
   }
+  function requireAnalysis(req,res,next) {
+    res.set('Cache-Control','no-store'); res.vary('Cookie');
+    (async () => {
+      const value = await session(req);
+      // GET requests also need the session-bound token: links and cross-site navigation cannot spend AI credits.
+      if(req.method !== 'GET' || req.get('origin')) requireOrigin(req);
+      if(!equal(req.get('x-csrf-token'),csrfFor(value.token))) throw httpError(403,'분석 요청을 확인하지 못했습니다. 화면을 새로고침해주세요.');
+    })().then(() => next()).catch(error => {
+      if(!error.status) console.warn('AI 이용 권한 확인 실패:',{code:'ACCOUNT_UNAVAILABLE'});
+      res.status(error.status || 503).json({status:'error',code:error.status===401 ? 'LOGIN_REQUIRED' : 'ANALYSIS_ACCESS_DENIED',
+        message:error.status===401 ? 'AI 재무분석은 로그인 후 이용할 수 있습니다.' : error.status ? error.message : '로그인 상태를 확인하지 못했습니다. 잠시 후 다시 시도해주세요.'});
+    });
+  }
   router.get('/account', wrap(async (req,res) => {
     const base = { enabled: config.enabled, clientId: config.clientId, mailAvailable: config.mailAvailable,
       pushAvailable: Boolean(config.pushPublic && config.pushPrivate), pushPublicKey: config.pushPublic };
@@ -185,6 +198,6 @@ function createAccountRouter({ store, findCompany, config = accountConfig(), now
     if (!error.status) console.warn('계정 처리 실패:', { code:'ACCOUNT_UNAVAILABLE', route:req.route?.path });
     res.status(status).json({ status:'error',message:error.status ? error.message : '계정 정보를 처리하지 못했습니다. 잠시 후 다시 시도해주세요.' });
   });
-  return { router,unsubscribeToken,config };
+  return { router,unsubscribeToken,config,requireAnalysis };
 }
 module.exports = { createAccountRouter,accountConfig };

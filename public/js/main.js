@@ -10,6 +10,9 @@ let restoredAnalysisUrl = false;
 let activePage = null;
 let activePageSearch = window.location.search;
 const pageScrollPositions = { analysis: 0, about: 0 };
+let activeAiAnalysis = null;
+let aiRequestVersion = 0;
+let aiRequestController = null;
 
 // 차트 공통 색상 (계정과목별로 모든 차트에서 동일한 색 사용, CVD 검증 통과 팔레트)
 const CHART_COLORS = {
@@ -460,6 +463,7 @@ function displaySearchResults(companies) {
 
 // 회사 선택 함수
 async function selectCompany(company, { skipHistory = false } = {}) {
+  resetAiAnalysis();
   selectedCompany = company;
   window.FinalyzeAccount?.setCompany(company);
 
@@ -519,6 +523,9 @@ async function fetchFinancialAnalysis() {
     return;
   }
   
+  resetAiAnalysis();
+  document.getElementById('provisionalCard').style.display = 'none';
+  const selectionVersion = aiRequestVersion;
   const year = yearSelect.value;
   const reportCode = reportTypeSelect.value;
   
@@ -554,6 +561,7 @@ async function fetchFinancialAnalysis() {
     console.log('재무분석 API 요청:', `/api/financial-analysis?corp_code=${selectedCompany.corp_code}&bsns_year=${year}&reprt_code=${reportCode}`);
     
     const response = await fetch(`/api/financial-analysis?corp_code=${selectedCompany.corp_code}&bsns_year=${year}&reprt_code=${reportCode}`);
+    if(selectionVersion !== aiRequestVersion) return;
     
     // 응답 상태 확인
     if (!response.ok) {
@@ -573,6 +581,7 @@ async function fetchFinancialAnalysis() {
     }
     
     const data = await response.json();
+    if(selectionVersion !== aiRequestVersion) return;
     console.log('재무분석 API 응답:', data);
     
     if (data.status === 'success') {
@@ -588,6 +597,7 @@ async function fetchFinancialAnalysis() {
     }
   } catch (error) {
     // 네트워크/기타 오류 처리 (loadingIndicator 숨김)
+    if(selectionVersion !== aiRequestVersion) return;
     console.error('재무분석 데이터 조회 중 오류 발생:', error);
     loadingIndicator.style.display = 'none';
     overviewError.style.display = 'block';
@@ -738,15 +748,123 @@ function renderAiAnalysisHtml(result, type) {
   return html;
 }
 
-// AI 기반 재무분석 가져오기
-async function fetchAIFinancialAnalysis(analysis) {
-  console.log('--- fetchAIFinancialAnalysis called ---');
+function resetAiAnalysis() {
+  aiRequestVersion++;
+  aiRequestController?.abort();
+  activeAiAnalysis = null;
+  for(const id of ['aiAnalysisAccess','provisionalAccess']) document.getElementById(id).hidden = true;
+  aiAnalysisContent.replaceChildren();
+  document.getElementById('provisionalContent').replaceChildren();
+}
+
+function aiPanel(context) {
+  return context.kind === 'financial' ? {loading:aiAnalysisLoading,error:aiAnalysisError,content:aiAnalysisContent,
+    access:document.getElementById('aiAnalysisAccess')} : {
+    loading:document.getElementById('provisionalLoading'),error:document.getElementById('provisionalError'),
+    content:document.getElementById('provisionalContent'),access:document.getElementById('provisionalAccess')};
+}
+
+function showAiAccess(context, member) {
+  if(context !== activeAiAnalysis) return;
+  const panel = aiPanel(context);
+  context.status = member ? 'ready' : 'locked';
+  panel.loading.style.display = 'none'; panel.error.style.display = 'none';
+  panel.content.style.display = 'none'; panel.content.replaceChildren();
+  if(context.kind === 'provisional') {
+    const guide = document.getElementById('analysisGuide');
+    if(guide) guide.style.display = 'none';
+    document.getElementById('provisionalChartWrap').style.display = 'none';
+    document.getElementById('provisionalPdfBtn').disabled = true;
+    document.getElementById('provisionalImageBtn').disabled = true;
+  }
+  panel.access.hidden = false;
+  panel.access.innerHTML = `<div class="ai-access-preview" aria-hidden="true"><div><span>수익성 분석</span><i></i><i></i></div><div><span>재무 건전성</span><i></i><i></i></div><div><span>실적 변화</span><i></i></div></div>
+    <div class="ai-access-invite"><span class="ai-access-badge">${member ? '회원 AI 분석' : '무료 회원 혜택'}</span>
+    <span class="ai-access-icon" aria-hidden="true"><i class="bi ${member ? 'bi-stars' : 'bi-lock'}"></i></span>
+    <h4>${member ? '선택한 공시의 AI 분석을 시작해보세요' : 'AI 재무분석은 로그인 후 이용할 수 있어요'}</h4>
+    <p>${member ? '분석 시작 버튼을 누르면 AI가 공시를 읽고 주요 변화를 설명합니다.' : context.kind === 'provisional' ?
+      '잠정실적의 AI 요약과 비교 차트를 확인해보세요. 공시 원문은 로그인 없이 열 수 있습니다.' :
+      '재무제표와 차트는 로그인 없이 확인할 수 있습니다. 로그인하면 수익성·재무 건전성에 대한 AI 설명도 읽을 수 있어요.'}</p>
+    <button type="button" class="ai-access-button" data-ai-action="${member ? 'analyze' : 'login'}"><i class="bi ${member ? 'bi-stars' : 'bi-box-arrow-in-right'}" aria-hidden="true"></i> ${member ? 'AI 분석 시작하기' : 'Google로 로그인하고 AI 분석 보기'} <span aria-hidden="true">→</span></button>
+    ${member ? '' : '<small>이름·프로필 사진은 저장하지 않습니다.</small>'}</div>`;
+  if(context.kind === 'provisional') {
+    const link = document.createElement('a');
+    link.href = `https://dart.fss.or.kr/dsaf001/main.do?rcpNo=${encodeURIComponent(context.receipt)}`;
+    link.target = '_blank'; link.rel = 'noopener noreferrer'; link.className = 'ai-access-source'; link.textContent = 'DART 원문 보기 ↗';
+    panel.access.querySelector('.ai-access-invite').append(link);
+  }
+}
+
+async function requestAiAnalysis(context) {
+  if(context !== activeAiAnalysis || ['checking','loading'].includes(context.status)) return;
+  const version = ++aiRequestVersion;
+  aiRequestController?.abort();
+  const controller = aiRequestController = new AbortController();
+  const panel = aiPanel(context);
+  const current = () => context === activeAiAnalysis && version === aiRequestVersion;
+  context.status = 'checking';
+  panel.loading.style.display = 'none'; panel.error.style.display = 'none'; panel.content.style.display = 'none';
+  panel.access.hidden = false;
+  panel.access.innerHTML = '<p class="ai-access-check" role="status"><span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>로그인 상태를 확인하고 있습니다.</p>';
   try {
-    aiAnalysisLoading.style.display = 'block';
-    aiAnalysisError.style.display = 'none';
-    aiAnalysisContent.style.display = 'none';
-    
-    const financialData = {
+    const access = await window.FinalyzeAccount?.analysisAccess() || {authenticated:false};
+    if(!current()) return;
+    if(!access.authenticated) { showAiAccess(context,false); return; }
+    context.status = 'loading';
+    panel.access.hidden = true; panel.loading.style.display = 'block';
+    if(context.kind === 'provisional') showAnalysisGuide(context.reportName,'provisionalCard');
+    const params = context.kind === 'provisional' ? new URLSearchParams({rcept_no:context.receipt,corp_name:context.companyName,report_nm:context.reportName}) : null;
+    const response = await fetch(context.kind === 'financial' ? '/api/ai-financial-analysis' : `/api/provisional-analysis?${params}`, {
+      method:context.kind === 'financial' ? 'POST' : 'GET', signal:controller.signal,
+      headers:{'X-CSRF-Token':access.csrfToken,...(context.kind === 'financial' ? {'Content-Type':'application/json'} : {})},
+      ...(context.kind === 'financial' ? {body:JSON.stringify(context.financialData)} : {})
+    });
+    const data = await response.json();
+    if(!current()) return;
+    if(response.status === 401) { showAiAccess(context,false); return; }
+    if(!response.ok || data.status !== 'success') throw new Error(data.message || 'AI 분석을 불러오지 못했습니다.');
+    panel.content.innerHTML = renderAiAnalysisHtml(data.result,context.kind);
+    panel.content.style.display = 'block'; context.status = 'complete';
+    if(context.kind === 'provisional') {
+      renderProvisionalChart(data.chartData);
+      document.getElementById('provisionalPdfBtn').disabled = false;
+      document.getElementById('provisionalImageBtn').disabled = false;
+      updateAnalysisGuide(context.reportName,'provisionalCard');
+    }
+  } catch(error) {
+    if(!current() || error.name === 'AbortError') return;
+    context.status = 'error'; panel.access.hidden = true;
+    panel.error.style.display = 'block'; panel.error.textContent = error.message || 'AI 분석을 불러오지 못했습니다.';
+    if(context.kind === 'provisional') failAnalysisGuide(context.reportName);
+  } finally {
+    if(current()) {
+      panel.loading.style.display = 'none';
+      if(context.button) {
+        context.button.disabled = false;
+        context.button.innerHTML = context.status === 'complete' ? '<i class="bi bi-check-circle me-1"></i>분석 완료' : '<i class="bi bi-bar-chart-line me-1"></i>분석하기';
+      }
+    }
+  }
+}
+
+document.addEventListener('click',event => {
+  const button = event.target.closest('[data-ai-action]');
+  const context = activeAiAnalysis;
+  if(!button || !context || button.closest('.ai-access-gate') !== aiPanel(context).access) return;
+  if(button.dataset.aiAction === 'analyze') requestAiAnalysis(context);
+  else window.FinalyzeAccount?.openAnalysisLogin().catch(() => showToast('로그인을 불러오지 못했습니다. 다시 시도해주세요.','error'));
+});
+document.addEventListener('account:changed',event => {
+  if(!activeAiAnalysis) return;
+  if(!event.detail.authenticated) {
+    aiRequestVersion++; aiRequestController?.abort(); showAiAccess(activeAiAnalysis,false);
+    if(activeAiAnalysis.button) { activeAiAnalysis.button.disabled = false; activeAiAnalysis.button.innerHTML = '<i class="bi bi-bar-chart-line me-1"></i>분석하기'; }
+  } else if(activeAiAnalysis.status === 'locked') showAiAccess(activeAiAnalysis,true);
+});
+
+// Snapshot the selected report so login and delayed responses keep the correct company and period.
+function fetchAIFinancialAnalysis(analysis) {
+  const context = {kind:'financial',status:'idle',financialData:{
       companyName: selectedCompany.corp_name,
       year: currentYear,
       previousYear: previousYear,
@@ -754,40 +872,9 @@ async function fetchAIFinancialAnalysis(analysis) {
       incomeStatement: analysis.incomeStatement,
       ratio: analysis.ratio,
       isFinancialCompany: isFinancialCompany
-    };
-    
-    const response = await fetch('/api/ai-financial-analysis', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(financialData)
-    });
-    
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`AI 분석 API 오류 (${response.status}): ${errorText || '응답이 없습니다'}`);
-    }
-    
-    const data = await response.json();
-    console.log('AI Analysis API Response Data:', data);
-    
-    if (data.status === 'success') {
-      aiAnalysisLoading.style.display = 'none';
-      aiAnalysisContent.style.display = 'block';
-      
-      // AI 분석 결과(JSON) 렌더링
-      aiAnalysisContent.innerHTML = renderAiAnalysisHtml(data.result, 'financial');
-      console.log('AI Analysis Content displayed.');
-    } else {
-      throw new Error(data.message || 'AI 분석 결과를 가져오지 못했습니다.');
-    }
-  } catch (error) {
-    console.error('Error in fetchAIFinancialAnalysis:', error);
-    aiAnalysisLoading.style.display = 'none';
-    aiAnalysisError.style.display = 'block';
-    aiAnalysisError.textContent = `AI 분석을 가져오는 중 오류가 발생했습니다: ${error.message}`;
-  }
+  }};
+  activeAiAnalysis = context;
+  return requestAiAnalysis(context);
 }
 
 // 손익계산서 차트 표시 함수
@@ -1569,6 +1656,8 @@ function handleDisclosureSelect(rceptNo, reportNm, btnElement) {
 
 // 잠정실적 공시 선택 시 분석 함수
 async function handleProvisionalSelect(rceptNo, reportNm, btnElement) {
+  resetAiAnalysis();
+  analysisCard.style.display = 'none';
   // URL에 선택한 공시 반영
   updateUrlState(rceptNo);
 
@@ -1604,48 +1693,18 @@ async function handleProvisionalSelect(rceptNo, reportNm, btnElement) {
 
   title.textContent = `${corpName} - ${reportNm} 분석`;
   card.style.display = 'block';
-  loading.style.display = 'block';
+  loading.style.display = 'none';
   errorBox.style.display = 'none';
   content.style.display = 'none';
   content.innerHTML = '';
   chartWrap.style.display = 'none';
 
-  try {
-    const params = new URLSearchParams({ rcept_no: rceptNo, corp_name: corpName, report_nm: reportNm });
-    const response = await fetch(`/api/provisional-analysis?${params.toString()}`);
-    const data = await response.json();
-    if (!response.ok || data.status !== 'success') {
-      throw new Error(data.message || '잠정실적 분석에 실패했습니다.');
-    }
-
-    // AI 분석 결과(JSON) 렌더링
-    content.innerHTML = renderAiAnalysisHtml(data.result, 'provisional');
-    content.style.display = 'block';
-    renderProvisionalChart(data.chartData);
-    updateAnalysisGuide(reportNm, 'provisionalCard');
-    card.scrollIntoView({ behavior: 'smooth' });
-    if (btnElement) {
-      btnElement.disabled = false;
-      btnElement.innerHTML = '<i class="bi bi-check-circle me-1"></i>분석 완료';
-      btnElement.classList.add('btn-analyze-done');
-      setTimeout(() => {
-        btnElement.innerHTML = '<i class="bi bi-bar-chart-line me-1"></i>재분석';
-        btnElement.classList.remove('btn-analyze-done');
-      }, 3000);
-    }
-  } catch (error) {
-    console.error('잠정실적 분석 중 오류 발생:', error);
-    errorBox.textContent = error.message || '잠정실적 분석 중 오류가 발생했습니다.';
-    errorBox.style.display = 'block';
-    failAnalysisGuide(reportNm);
-    card.scrollIntoView({ behavior: 'smooth' });
-    if (btnElement) {
-      btnElement.disabled = false;
-      btnElement.innerHTML = '<i class="bi bi-bar-chart-line me-1"></i>분석하기';
-    }
-  } finally {
-    loading.style.display = 'none';
-  }
+  const context = {kind:'provisional',status:'idle',receipt:rceptNo,reportName:reportNm,companyName:corpName,button:btnElement};
+  document.getElementById('provisionalPdfBtn').disabled = true;
+  document.getElementById('provisionalImageBtn').disabled = true;
+  activeAiAnalysis = context;
+  await requestAiAnalysis(context);
+  if(activeAiAnalysis === context) card.scrollIntoView({behavior:'smooth'});
 }
 
 // 잠정실적 비교 차트 렌더링 (당기 vs 전기 vs 전년동기)

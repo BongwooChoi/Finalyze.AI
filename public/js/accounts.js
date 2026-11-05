@@ -5,6 +5,7 @@
   let googleScript;
   let modal;
   let busy = false;
+  let loginForAnalysis = false;
   const byId = id => document.getElementById(id);
   function message(text,error = false) {
     const element = byId('accountMessage');
@@ -93,9 +94,11 @@
       account.pushAvailable ? '허용한 기기에서 관심 기업의 새 실적 공시를 알려드립니다.' : '푸시 알림을 준비하고 있습니다.';
   }
   async function refresh() {
+    const wasAuthenticated = account.authenticated;
     account = await api('/account');
     account.favorites ||= [];
     account.subscriptions ||= [];
+    if(wasAuthenticated !== account.authenticated) document.dispatchEvent(new CustomEvent('account:changed',{detail:{authenticated:account.authenticated}}));
     await render();
   }
   async function perform(action) {
@@ -122,7 +125,7 @@
     const container = byId('googleAccountButton');
     container.replaceChildren(); container.hidden = false;
     if(!account.enabled) { message('로그인 기능을 준비하고 있습니다. 잠시 후 다시 이용해주세요.'); return; }
-    message(emailOptIn ? '메일 알림을 받을 Google 계정을 확인해주세요.' : 'Google 로그인 후 관심 기업을 기기 간에 동기화할 수 있습니다.');
+    message(emailOptIn ? '메일 알림을 받을 Google 계정을 확인해주세요.' : loginForAnalysis ? '선택한 공시의 AI 분석을 위해 Google로 로그인해주세요.' : 'Google 로그인 후 AI 재무분석과 관심 기업 동기화를 이용할 수 있습니다.');
     await loadGoogle();
     const { nonce } = await api('/auth/challenge','POST',{});
     google.accounts.id.initialize({ client_id:account.clientId,nonce,auto_select:false,
@@ -137,12 +140,14 @@
             pendingFavorite = null; await refresh();
           }
           message(emailOptIn ? '이메일 알림을 켰습니다.' : '로그인했습니다. 관심 기업과 알림을 설정해보세요.');
+          if(loginForAnalysis) { loginForAnalysis = false; modal.hide(); }
         } catch(error) { try { await prepareGoogle(emailOptIn); } catch {} message(error.message,true); }
       }
     });
     google.accounts.id.renderButton(container,{ theme:'outline',size:'large',shape:'pill',text:'continue_with',width:280 });
   }
   async function show() {
+    byId('accountModalTitle').textContent = loginForAnalysis ? 'AI 재무분석 시작하기' : '관심 기업 · 공시 알림';
     modal.show();
     message('계정 정보를 확인하고 있습니다.');
     try {
@@ -178,6 +183,7 @@
   }
   document.addEventListener('DOMContentLoaded',() => {
     modal = new bootstrap.Modal(byId('accountModal'));
+    byId('accountModal').addEventListener('hidden.bs.modal',() => { loginForAnalysis = false; });
     byId('accountMenuButton').addEventListener('click',show);
     byId('companyFavoriteButton').addEventListener('click',toggleCompany);
     byId('pushEnableButton').addEventListener('click',enablePush);
@@ -206,5 +212,12 @@
     });
     refresh().catch(() => { byId('accountMenuButton').textContent = '로그인'; });
   });
-  window.FinalyzeAccount = { setCompany(value) { company = value; if(byId('companyFavoriteButton')) renderCompany(); } };
+  window.FinalyzeAccount = {
+    setCompany(value) { company = value; if(byId('companyFavoriteButton')) renderCompany(); },
+    async analysisAccess() { await refresh(); return {authenticated:account.authenticated,csrfToken:account.csrfToken}; },
+    async openAnalysisLogin() {
+      loginForAnalysis = true; await show();
+      if(account.authenticated) { loginForAnalysis = false; modal.hide(); }
+    }
+  };
 })();

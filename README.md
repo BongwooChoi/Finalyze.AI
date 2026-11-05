@@ -95,6 +95,9 @@ npm start
 
 ## Google 로그인 · 관심 기업 · 공시 알림
 
+- 비회원은 기업 검색·공시 조회·정기보고서의 차트·표·비율·연간 추이를 이용합니다. AI 재무분석과 잠정실적의 AI 요약·비교 차트는 로그인한 회원에게 제공합니다. 잠정실적 비교 차트도 LLM 응답에서 추출하므로 비회원에게 생성하지 않으며 DART 원문 링크를 제공합니다.
+- 두 AI API는 `accounts.requireAnalysis`에서 유효한 로그인 세션과 세션별 CSRF 토큰을 확인한 뒤 실행합니다. GET 방식의 잠정실적 API도 CSRF 토큰이 필수입니다. 로그인 유도 미리보기는 장식용이며 실제 AI 분석을 생성하지 않습니다. 로그인만으로 자동 분석하지 않고, 보고 있던 공시의 ‘AI 분석 시작하기’를 눌러 이어갑니다. 이미 로그인한 회원이 공시의 ‘분석하기’를 누르면 기존처럼 시각화와 AI 분석을 함께 요청합니다.
+
 - Google Identity Services의 ID 토큰을 서버에서 서명·대상·유효기간·브라우저 nonce까지 확인합니다. Google `sub`는 서비스 전용 HMAC ID로 바꾸며 이름·사진·원본 토큰은 저장하지 않습니다. 로그인 쿠키는 HttpOnly/Secure/SameSite=Lax, 최대 7일이며 DB에는 세션 토큰 해시만 저장합니다. 변경 API는 출처와 CSRF 토큰을 검사합니다.
 - 기업 검색 결과에서 ☆ 버튼으로 최대 50개 관심 기업을 등록합니다. 상단 ‘관심 기업’에서 다른 기기와 같은 목록을 보며, 기업을 눌러도 AI 분석은 자동 요청하지 않습니다.
 - 계정 데이터는 `DATABASE_URL`(또는 `ACCOUNTS_DATABASE_URL`)의 Neon Postgres에 저장합니다. DART 공유 캐시는 회원 DB로 사용하지 않습니다. 운영 DB는 무료 `finalyze-users`이며 로컬에서 DB URL이 없으면 Git에서 제외된 `.data/accounts.sqlite`를 사용합니다. `npm run setup:accounts`로 스키마를 준비하고 `npm run check:accounts`로 외부 API 없이 계정·알림 동작을 검사합니다.

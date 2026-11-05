@@ -37,7 +37,7 @@ function getPageStructuredData(pageName) {
     name: SITE_PAGES.about.title,
     description: SITE_PAGES.about.description,
     inLanguage: 'ko',
-    dateModified: '2026-11-03',
+    dateModified: '2026-11-06',
     isPartOf: { '@type': 'WebSite', name: 'Finalyze.AI', url: SITE_PAGES.analysis.url },
     hasPart: [
       { '@type': 'WebPageElement', '@id': `${SITE_PAGES.about.url}#how-to-use`, name: 'Finalyze.AI 사용법' },

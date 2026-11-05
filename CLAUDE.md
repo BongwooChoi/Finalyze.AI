@@ -66,6 +66,8 @@ node setupDatabase.js            # dart.db에 companies 테이블 적재 + 인�
 
 ## 계정과 알림
 
+- 정기보고서의 숫자·시각화는 공개합니다. `POST /api/ai-financial-analysis`와 `GET /api/provisional-analysis`는 `accounts.requireAnalysis`에서 회원 세션·CSRF를 확인합니다. 잠정실적은 차트 추출도 LLM을 사용하므로 AI 요약·차트 모두 회원 대상이며 비회원에게 원문 링크를 제공합니다. 프런트의 로그인 미리보기는 AI를 호출하지 않습니다. 로그인 후에는 같은 공시의 ‘AI 분석 시작하기’를 눌러 재개하고, 로그아웃·기업 변경 시 대기 중인 응답을 무시합니다.
+
 - `accountRoutes.js`는 Google ID 토큰·nonce, HttpOnly 세션, 변경 요청의 출처·CSRF를 확인합니다. Google 원본 식별자·이름·사진·로그인 토큰은 저장하지 않습니다. 이메일은 발신 설정과 별도 수신 동의가 있을 때만 암호화해 저장합니다.
 - `accountStore.js`는 운영 Neon Postgres(`DATABASE_URL`), 로컬 `.data/accounts.sqlite`를 사용합니다. `USER_ID_SECRET`·`USER_DATA_KEY`·VAPID 키는 영속 데이터와 연결되어 있으므로 재배포마다 교체하지 않습니다. 무료 캐시 Redis를 계정 저장소로 사용하지 않습니다.
 - `disclosureNotifications.js`는 관심 기업을 합쳐 A/I002 공시를 수집하고, DB 잠금·대기열·기기별 중복 방지·최대 5회 재시도를 관리합니다. DART 호출은 기존 `dartClient.get()`을 사용하고 LLM을 호출하지 않습니다. 신규 관심 기업의 최초 성공 조회는 과거 공시 기준만 설정합니다.

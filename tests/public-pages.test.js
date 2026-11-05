@@ -86,6 +86,18 @@ test('개인정보 안내와 비로그인 계정 응답을 제공하고 알림 �
   assert.equal((await fetch(`${baseUrl}/api/jobs/disclosures`,{method:'POST'})).status,401);
 });
 
+test('운영 AI 경로는 비회원의 직접 요청을 차단하고 숫자 조회 경로는 공개한다',async t=>{
+  const axios=require('axios');
+  t.mock.method(axios,'post',async()=>assert.fail('비회원 요청에서 LLM을 호출했습니다.'));
+  for(const [path,method] of [['/api/ai-financial-analysis','POST'],['/api/provisional-analysis?rcept_no=20261106000001','GET']]) {
+    const r=await fetch(baseUrl+path,{method,headers:{'Content-Type':'application/json'},...(method==='POST'?{body:'{}'}:{})});
+    assert.ok([401,503].includes(r.status));
+    assert.equal(r.headers.get('cache-control'),'no-store');
+    assert.match((await r.json()).code,/LOGIN_REQUIRED|ANALYSIS_ACCESS_DENIED/);
+  }
+  assert.equal((await fetch(`${baseUrl}/api/financial-analysis`)).status,400);
+});
+
 test('사이트맵의 공개 URL은 정상 HTML과 일치하는 canonical을 제공한다', async () => {
   const response = await fetch(`${baseUrl}/sitemap.xml`);
   assert.equal(response.status, 200);

@@ -682,7 +682,7 @@ app.get('/api/financial-analysis', async (req, res) => {
 });
 
 // AI 기반 재무분석 API
-app.post('/api/ai-financial-analysis', async (req, res) => {
+app.post('/api/ai-financial-analysis', accounts.requireAnalysis, async (req, res) => {
   try {
     const { companyName, year, previousYear, balanceSheet, incomeStatement, ratio, isFinancialCompany: isFinancial } = req.body;
 
@@ -1119,7 +1119,7 @@ ${documentText}
 }
 
 // 잠정실적 공시 AI 분석 API
-app.get('/api/provisional-analysis', async (req, res) => {
+app.get('/api/provisional-analysis', accounts.requireAnalysis, async (req, res) => {
   try {
     const { rcept_no, corp_name, report_nm } = req.query;
     if (!rcept_no) {

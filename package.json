@@ -5,7 +5,7 @@
   "main": "server.js",
   "scripts": {
     "setup:accounts": "node scripts/setupAccounts.js",
-    "check:accounts": "node --test tests/accounts.test.js tests/push-worker.test.js",
+    "check:accounts": "node --test tests/accounts.test.js tests/ai-access.test.js tests/push-worker.test.js",
     "start": "node server.js",
     "check:public-pages": "node --test tests/public-pages.test.js",
     "check:recent-disclosures": "node --test tests/recent-disclosures.test.js",

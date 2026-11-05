@@ -1,10 +1,12 @@
-const CACHE_NAME = 'financial-app-cache-v30';
+const CACHE_NAME = 'financial-app-cache-v31';
 const urlsToCache = [
   '/',
   '/about',
+  '/privacy',
   '/css/style.css',
   '/js/main.js',
   '/js/site-pages.js',
+  '/js/accounts.js',
   '/images/finalyze-system-v1.png',
   '/images/finalyze-mobile-qr.png',
   '/manifest.json',
@@ -33,7 +35,7 @@ self.addEventListener('fetch', event => {
 
   const url = new URL(event.request.url);
   const isAppShell = url.origin === location.origin &&
-    (url.pathname === '/' || url.pathname === '/about' || url.pathname.endsWith('.html') ||
+    (url.pathname === '/' || url.pathname === '/about' || url.pathname === '/privacy' || url.pathname.endsWith('.html') ||
      url.pathname.endsWith('.css') || url.pathname.endsWith('.js'));
 
   if (isAppShell) {
@@ -64,4 +66,37 @@ self.addEventListener('activate', event => {
       );
     }).then(() => self.clients.claim())
   );
+});
+
+function notificationUrl(value) {
+  try {
+    const url = new URL(value || '/', self.location.origin);
+    if(url.origin === self.location.origin && url.pathname === '/') return url.href;
+  } catch {}
+  return `${self.location.origin}/`;
+}
+
+self.addEventListener('push', event => {
+  let data = {};
+  try { data = event.data?.json() || {}; } catch {}
+  event.waitUntil(self.registration.showNotification(typeof data.title === 'string' ? data.title.slice(0,120) : 'Finalyze.AI 공시 알림', {
+    body:typeof data.body === 'string' ? data.body.slice(0,500) : '관심 기업의 새 공시를 확인해보세요.',
+    icon:'/icons/icon-192x192.png',badge:'/icons/icon-96x96.png',
+    tag:typeof data.tag === 'string' ? data.tag.slice(0,100) : 'finalyze-disclosure',
+    data:{ url:notificationUrl(data.url) }
+  }));
+});
+
+self.addEventListener('notificationclick', event => {
+  event.notification.close();
+  const url = notificationUrl(event.notification.data?.url);
+  event.waitUntil((async () => {
+    const windows = await self.clients.matchAll({ type:'window',includeUncontrolled:true });
+    for(const client of windows) {
+      if(new URL(client.url).origin === self.location.origin && 'navigate' in client) {
+        try { const target = await client.navigate(url); if(target) return target.focus(); } catch {}
+      }
+    }
+    return self.clients.openWindow(url);
+  })());
 });

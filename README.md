@@ -93,6 +93,18 @@ npm start
 - `npm run check:recent-disclosures`는 실제 외부 API 호출 없이 선정·페이지 처리·KST 날짜·동시 요청·장애 복구를 검사합니다. `npm run check:public-pages`는 HTTP 응답과 공개 페이지를 검사합니다.
 - `npm run check:dart-client`는 공유 응답·동시 요청·호출 속도·하루 한도·차단 응답·인증정보 비노출을 검사합니다.
 
+## Google 로그인 · 관심 기업 · 공시 알림
+
+- Google Identity Services의 ID 토큰을 서버에서 서명·대상·유효기간·브라우저 nonce까지 확인합니다. Google `sub`는 서비스 전용 HMAC ID로 바꾸며 이름·사진·원본 토큰은 저장하지 않습니다. 로그인 쿠키는 HttpOnly/Secure/SameSite=Lax, 최대 7일이며 DB에는 세션 토큰 해시만 저장합니다. 변경 API는 출처와 CSRF 토큰을 검사합니다.
+- 기업 검색 결과에서 ☆ 버튼으로 최대 50개 관심 기업을 등록합니다. 상단 ‘관심 기업’에서 다른 기기와 같은 목록을 보며, 기업을 눌러도 AI 분석은 자동 요청하지 않습니다.
+- 계정 데이터는 `DATABASE_URL`(또는 `ACCOUNTS_DATABASE_URL`)의 Neon Postgres에 저장합니다. DART 공유 캐시는 회원 DB로 사용하지 않습니다. 운영 DB는 무료 `finalyze-users`이며 로컬에서 DB URL이 없으면 Git에서 제외된 `.data/accounts.sqlite`를 사용합니다. `npm run setup:accounts`로 스키마를 준비하고 `npm run check:accounts`로 외부 API 없이 계정·알림 동작을 검사합니다.
+- `.env.example`의 Google client ID, `APP_ORIGIN`, `SESSION_SECRET`, `USER_ID_SECRET`, `USER_DATA_KEY`, VAPID 키와 `CRON_SECRET`이 필요합니다. Google 웹 클라이언트의 JavaScript 원본에 서비스 주소와 로컬 주소를 등록합니다. client secret은 사용하지 않습니다. 세션·식별자·암호화 키는 서로 다른 난수를 사용하며 `USER_DATA_KEY`는 32바이트 base64입니다. **식별자·암호화·VAPID 키를 재배포마다 재생성하지 않습니다.**
+- 푸시는 사용자가 허용한 기기별로 등록하며 최대 5개 기기를 지원합니다. 구독 주소와 암호 키는 AES-256-GCM으로 암호화해 저장합니다. iPhone은 홈 화면에 추가한 웹앱에서 알림을 허용해야 합니다. 로그아웃하면 현재 기기 구독을 해제하고, 계정 삭제는 모든 세션·관심 기업·구독·발송 기록을 삭제합니다. `/privacy`에서 처리 정보를 안내합니다.
+- `vercel.json`의 Vercel Schedules 작업이 약 15분 간격(플랫폼 지연 가능)으로 `POST /api/jobs/disclosures`를 호출합니다. 이 경로는 `Authorization: Bearer CRON_SECRET`을 요구합니다. Schedules는 Beta이며 Hobby의 최소 간격·지터 15분 조건을 사용합니다. Preview에는 운영 계정 키를 연결하지 않습니다.
+- 알림 수집은 모든 구독자의 관심 기업을 합쳐 DART A/I002 목록을 조회하며, 기존 공유 캐시와 호출 한도를 사용합니다. 관심 기업마다 최초 성공 조회는 기존 공시 기준을 설정하고 이후 새로 확인한 정기보고서·잠정실적부터 알립니다. 공시 확인·알림에는 LLM을 호출하지 않습니다.
+- DB 잠금과 발송 대기열로 중복 작업을 막고 사용자·접수번호·채널·기기별 중복 발송을 방지합니다. 전송 실패는 최대 5회 재시도하고, 매번 관심 기업·수신 동의를 다시 확인합니다. 만료된 구독은 삭제합니다. 전송 직후 프로세스가 종료된 예외 상황에서는 같은 푸시가 재전달될 수 있습니다. 공급자에 이미 전달된 알림은 해제 후에도 도착할 수 있습니다.
+- 이메일은 발신 도메인 준비 전까지 비활성입니다. 나중에 도메인을 검증한 Resend의 `RESEND_API_KEY`와 `MAIL_FROM`을 설정하면 Google 계정 이메일의 별도 수신 동의 기능이 열립니다. 동의 전에는 이메일을 저장하지 않습니다. 수신 주소는 암호화하며 해제 시 삭제합니다. 별도 발신 메일함은 필수 요건이 아닙니다.
+
 ## 공개 페이지와 검색엔진 확인
 
 - `/`는 기업 검색·분석 화면, `/about`은 소개·사용법·분석 기준·FAQ입니다.

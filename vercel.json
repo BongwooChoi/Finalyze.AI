@@ -1,5 +1,14 @@
 {
   "version": 2,
+  "schedules": {
+    "disclosure-alerts": {
+      "schedule": "*/15 * * * *",
+      "timezone": "Asia/Seoul",
+      "jitter": 15,
+      "path": "/api/jobs/disclosures",
+      "requestMethod": "POST"
+    }
+  },
   "builds": [
     {
       "src": "server.js",
@@ -12,4 +21,4 @@
       "dest": "/server.js"
     }
   ]
-} 
+}

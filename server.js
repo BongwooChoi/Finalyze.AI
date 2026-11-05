@@ -9,11 +9,16 @@ const { renderPage } = require('./sitePages');
 const { createRecentDisclosureService } = require('./recentDisclosures');
 const dartClient = require('./dartClient');
 const { getSharedStore } = require('./sharedStore');
+const { getAccountStore } = require('./accountStore');
+const { createAccountRouter } = require('./accountRoutes');
+const { createDisclosureFeed,createSenders,createNotificationJob,cronAuthorized } = require('./disclosureNotifications');
+const { sign } = require('./accountSecurity');
 
 // 환경변수 로드
 dotenv.config();
 
 const app = express();
+if(process.env.VERCEL) app.set('trust proxy',1);
 const PORT = process.env.PORT || 3000;
 
 // 공개 페이지는 JavaScript 실행 전에도 본문과 고유 메타데이터를 제공합니다.
@@ -32,6 +37,35 @@ app.use(express.json());
 
 // 데이터베이스 연결
 const db = financialService.connectDB();
+
+const accounts = createAccountRouter({
+  store:getAccountStore,
+  findCompany:corp => new Promise((resolve,reject) => db.get('SELECT * FROM companies WHERE corp_code=? LIMIT 1',[corp],(error,row) => error ? reject(error) : resolve(row))),
+  rateLimit:async req => {
+    const key = `finalyze:login:${sign(req.ip || 'unknown',process.env.SESSION_SECRET)}`;
+    const time = Date.now();
+    const [delay] = await getSharedStore().reserve(key,new Date(time).toISOString().slice(0,10),time,1000,600,0);
+    return delay>=0;
+  }
+});
+app.use('/api',accounts.router);
+app.get('/privacy',(req,res) => res.sendFile(path.join(__dirname,'public','privacy.html')));
+
+const notificationFeed = createDisclosureFeed({
+  fetchList:async params => (await dartClient.get('https://opendart.fss.or.kr/api/list.json',{ params,timeout:12000 })).data,
+  fetchDocumentText:async receipt => extractDocumentText((await dartClient.get('https://opendart.fss.or.kr/api/document.xml',{
+    params:{rcept_no:receipt},responseType:'arraybuffer',timeout:12000
+  })).data)
+});
+const notify = createNotificationJob({ store:getAccountStore,collect:notificationFeed,
+  senders:createSenders({ config:accounts.config,unsubscribeToken:accounts.unsubscribeToken }) });
+app.post('/api/jobs/disclosures',async (req,res) => {
+  res.set('Cache-Control','no-store');
+  if(!cronAuthorized(req,process.env.CRON_SECRET)) return res.status(401).json({ status:'error' });
+  if(!accounts.config.enabled) return res.status(503).json({ status:'error',message:'Account configuration unavailable' });
+  try { res.json({ status:'success',...await notify() }); }
+  catch { console.warn('공시 알림 작업 실패:',{ code:'NOTIFICATION_JOB_UNAVAILABLE' }); res.status(503).json({ status:'error' }); }
+});
 
 const recentDisclosures = createRecentDisclosureService({
   sharedStore: getSharedStore,

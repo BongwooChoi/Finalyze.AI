@@ -73,6 +73,16 @@ document.addEventListener('DOMContentLoaded', () => {
   
   // 검색 버튼 클릭 이벤트
   searchBtn.addEventListener('click', () => searchCompany());
+  document.addEventListener('favorite:open',async event => {
+    try {
+      if (activePage !== 'analysis') { history.pushState({},'', '/'); renderPageFromUrl(); }
+      const response = await fetch(`/api/companies/stock/${encodeURIComponent(event.detail.stock_code)}`);
+      const result = await response.json();
+      if (!response.ok || result.status !== 'success') throw new Error('기업 조회 실패');
+      companySearchInput.value = result.data.corp_name;
+      await selectCompany(result.data);
+    } catch { showToast('기업 정보를 불러오지 못했습니다. 다시 시도해주세요.','error'); }
+  });
 
   // 엔터 키 입력 이벤트
   companySearchInput.addEventListener('keypress', (e) => {
@@ -451,6 +461,7 @@ function displaySearchResults(companies) {
 // 회사 선택 함수
 async function selectCompany(company, { skipHistory = false } = {}) {
   selectedCompany = company;
+  window.FinalyzeAccount?.setCompany(company);
 
   // 앱 모드 전환 (히어로 축소, 기능소개 숨김)
   document.body.classList.add('app-mode');

@@ -45,7 +45,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Noto+Sans+KR:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/css/style.css?v=3.11">
+  <link rel="stylesheet" href="/css/style.css?v=3.12">
   <link rel="manifest" href="/manifest.json">
   <meta name="theme-color" content="#2563eb">
 
@@ -85,6 +85,7 @@
       <div class="site-nav-links">
         <a href="/" data-page-link="analysis" data-page="analysis" aria-current="page">재무분석</a>
         <a href="/about" data-page-link="about" data-page="about">시스템 소개</a>
+        <button type="button" id="accountMenuButton" class="account-menu-button">로그인</button>
       </div>
     </nav>
   </header>
@@ -205,8 +206,9 @@
     
     <!-- 회사 정보 부분 -->
     <div class="card mb-4" id="companyInfoCard" style="display: none;">
-      <div class="card-header">
+      <div class="card-header company-info-heading">
         <h3>회사 정보</h3>
+        <button type="button" id="companyFavoriteButton" class="company-favorite-button" aria-pressed="false" hidden>☆ 관심 기업 등록</button>
       </div>
       <div class="card-body" id="companyInfo"></div>
     </div>
@@ -611,7 +613,27 @@
   <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
   <script src="/js/site-pages.js?v=1.0"></script>
-  <script src="/js/main.js?v=3.11"></script>
+  <div class="modal fade" id="accountModal" tabindex="-1" aria-labelledby="accountModalTitle" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-scrollable"><div class="modal-content account-panel">
+      <div class="modal-header"><h2 class="modal-title fs-5" id="accountModalTitle">관심 기업 · 공시 알림</h2><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="닫기"></button></div>
+      <div class="modal-body">
+        <p id="accountMessage" class="account-message" role="status"></p>
+        <div id="accountSignedOut"><p class="account-note">사용자 구분과 관심 기업 동기화에 Google 로그인을 사용합니다. 이름·프로필 사진은 저장하지 않습니다.</p></div>
+        <div id="googleAccountButton" class="account-google-button" hidden></div>
+        <div id="accountSignedIn" hidden>
+          <section><h3>관심 기업</h3><ul id="accountFavorites" class="account-favorites"></ul></section>
+          <section><h3>공시 알림</h3><p class="account-note">정기보고서·잠정실적을 약 15분 간격으로 확인합니다. 최초 확인 때는 기존 공시를 기준으로 설정하고, 이후 새로 확인되는 공시부터 알립니다. 전달은 지연될 수 있습니다.</p>
+            <div class="account-channel"><div><h4>이 기기 푸시 알림</h4><p id="accountPushStatus"></p></div><button type="button" id="pushEnableButton">알림 켜기</button><button type="button" id="pushDisableButton" hidden>알림 끄기</button></div>
+            <div class="account-channel"><div><h4>이메일 알림</h4><p id="accountEmailStatus"></p></div><button type="button" id="emailEnableButton">메일 연결</button><button type="button" id="emailDisableButton" hidden>알림 끄기</button></div>
+          </section>
+          <div class="account-session-actions"><button type="button" id="accountLogoutButton">이 기기 로그아웃</button><button type="button" id="accountDeleteButton">계정 및 데이터 삭제</button></div>
+        </div>
+        <p class="account-policy"><a href="/privacy" target="_blank" rel="noopener">개인정보 처리 안내</a></p>
+      </div>
+    </div></div>
+  </div>
+  <script src="/js/main.js?v=3.12"></script>
+  <script src="/js/accounts.js?v=1.0"></script>
   <noscript>
     <div style="padding:2rem;text-align:center;font-family:sans-serif;">
       <h2>Finalyze.AI</h2>

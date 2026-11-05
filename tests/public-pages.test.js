@@ -71,10 +71,19 @@ test('별칭 주소는 쿼리를 보존해 정규 URL로 301 이동한다', asyn
 });
 
 test('필수 정적 자산을 제공하고 존재하지 않는 경로는 404를 유지한다', async () => {
-  for (const asset of ['/js/site-pages.js', '/js/main.js', '/css/style.css', '/images/finalyze-mobile-qr.png']) {
+  for (const asset of ['/js/site-pages.js', '/js/main.js', '/js/accounts.js', '/css/style.css', '/images/finalyze-mobile-qr.png']) {
     assert.equal((await fetch(baseUrl + asset)).status, 200, asset);
   }
   assert.equal((await fetch(`${baseUrl}/page-does-not-exist`)).status, 404);
+});
+
+test('개인정보 안내와 비로그인 계정 응답을 제공하고 알림 작업은 비공개로 보호한다',async()=>{
+  const privacy=await fetch(`${baseUrl}/privacy`); assert.equal(privacy.status,200);
+  assert.match(await privacy.text(),/이름·프로필 사진·Google 비밀번호·원본 로그인 토큰은 저장하지 않습니다/);
+  const account=await fetch(`${baseUrl}/api/account`); assert.equal(account.status,200);
+  assert.equal(account.headers.get('cache-control'),'no-store'); assert.match(account.headers.get('vary'),/Cookie/);
+  const value=await account.json(); assert.equal(value.authenticated,false); assert.equal(value.csrfToken,undefined);
+  assert.equal((await fetch(`${baseUrl}/api/jobs/disclosures`,{method:'POST'})).status,401);
 });
 
 test('사이트맵의 공개 URL은 정상 HTML과 일치하는 canonical을 제공한다', async () => {

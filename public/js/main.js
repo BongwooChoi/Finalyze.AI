@@ -207,6 +207,8 @@ async function loadRecentDisclosures(force = false) {
   const status = document.getElementById('recentDisclosuresStatus');
   const retry = document.getElementById('recentDisclosuresRetry');
   recentDisclosuresLoading = true;
+  status.classList.add('is-loading');
+  status.textContent = list.childElementCount ? '새 공시를 확인하고 있습니다.' : '최신 공시를 불러오는 중입니다.';
   retry.disabled = true;
   retry.setAttribute('aria-busy', 'true');
   if (!retry.hidden) {
@@ -267,6 +269,7 @@ async function loadRecentDisclosures(force = false) {
       '최신 공시를 불러오지 못했습니다. 다시 시도하거나 기업을 검색해주세요.';
   } finally {
     recentDisclosuresLoading = false;
+    status.classList.remove('is-loading');
     retry.disabled = false;
     retry.setAttribute('aria-busy', 'false');
     retry.querySelector('span').textContent = '다시 시도';

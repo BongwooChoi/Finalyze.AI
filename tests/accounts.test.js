@@ -88,7 +88,8 @@ test('favorites require session and CSRF and stay isolated between accounts',asy
 test('push endpoints are allowlisted and subscriptions are encrypted at rest',async t => {
   const f=await fixture(t), a=f.client(); await a.login();
   assert.equal(validateSubscription(subscription),true);
-  for(const endpoint of ['http://fcm.googleapis.com/x','https://127.0.0.1/x','https://fcm.googleapis.com.attacker.example/x','https://user:password@fcm.googleapis.com/x']) {
+  assert.equal(validateSubscription({...subscription,endpoint:'https://jmt17.google.com/gcm/send/test'}),true);
+  for(const endpoint of ['http://fcm.googleapis.com/x','https://127.0.0.1/x','https://fcm.googleapis.com.attacker.example/x','https://jmt17.google.com.attacker.example/x','https://user:password@fcm.googleapis.com/x']) {
     assert.equal((await a.mutate('/account/push','POST',{subscription:{...subscription,endpoint}})).status,400);
   }
   assert.equal((await a.mutate('/account/push','POST',{subscription})).status,200);

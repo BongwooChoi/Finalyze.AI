@@ -24,7 +24,7 @@ function validateSubscription(value) {
   let url;
   try { url = new URL(value.endpoint); } catch { return false; }
   const host = url.hostname;
-  const allowed = host === 'fcm.googleapis.com' || host === 'web.push.apple.com' ||
+  const allowed = host === 'fcm.googleapis.com' || host === 'jmt17.google.com' || host === 'web.push.apple.com' ||
     host.endsWith('.push.apple.com') || host === 'updates.push.services.mozilla.com' ||
     host.endsWith('.push.services.mozilla.com') || host.endsWith('.notify.windows.com');
   if (!allowed || url.protocol !== 'https:' || url.username || url.password || (url.port && url.port !== '443')) return false;

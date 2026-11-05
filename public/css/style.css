@@ -560,6 +560,7 @@ body.app-mode .recent-disclosures { display: none; }
 .company-favorite-button { padding: 0.5rem 0.75rem; border: 1px solid #cbd5e1; border-radius: 8px; background: #fff; color: #475569; font-size: 0.85rem; }
 .company-favorite-button.is-favorite { color: #92400e; border-color: #fcd34d; background: #fffbeb; }
 .account-panel { border: 0; border-radius: 18px; }
+body.modal-open .pwa-install-banner { visibility: hidden; }
 .account-panel .modal-body { padding: 1.3rem; }
 .account-panel section { margin: 1.4rem 0; }
 .account-panel h3 { font-size: 1rem; font-weight: 700; }

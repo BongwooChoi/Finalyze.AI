@@ -2427,6 +2427,8 @@ async function exportProvisionalAsPdf() {
     const chartWrap = document.getElementById('provisionalChartWrap');
     if (chartCanvas && chartWrap && chartWrap.style.display !== 'none') {
       try {
+        provisionalChart?.stop();
+        provisionalChart?.update('none');
         const chartImg = chartCanvas.toDataURL('image/png');
         const chartHeight = 80;
         ensureSpace(chartHeight + 5);
@@ -2508,6 +2510,8 @@ async function exportProvisionalAsImage() {
     const cloneCanvas = clone.querySelector('#provisionalChart');
     if (originalCanvas && cloneCanvas) {
       try {
+        provisionalChart?.stop();
+        provisionalChart?.update('none');
         const img = document.createElement('img');
         img.src = originalCanvas.toDataURL('image/png');
         img.style.cssText = 'display:block;width:100%;height:auto;';

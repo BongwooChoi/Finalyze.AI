@@ -203,8 +203,12 @@ body {
 .architecture-node > p { color: #52647d; font-size: 0.79rem; line-height: 1.85; margin: 0; }
 .architecture-badge { padding: 0.2rem 0.45rem; border-radius: 5px; background: #f1f5f9; color: #52647d; font-size: 0.63rem; font-weight: 600; }
 .architecture-node-note { display: block; margin-top: 0.5rem; color: #6d7e95; font-size: 0.68rem; line-height: 1.7; }
-.architecture-member { border-color: #c5d7fd; background: #f0f5ff; }
+.architecture-member { display: flex; flex-direction: column; border-color: #c5d7fd; background: #f0f5ff; }
 .architecture-member .architecture-badge { color: #1d4ed8; background: #dfeaff; }
+.architecture-member-alert { display: flex; align-items: center; gap: 0.6rem; margin-top: auto; padding-top: 1rem; color: #0f8077; }
+.architecture-member-alert > i { font-size: 1.25rem; }
+.architecture-member-alert strong { font-size: 0.75rem; font-weight: 600; }
+.architecture-member-alert span { display: block; color: #617581; font-size: 0.68rem; line-height: 1.8; }
 .architecture-app { position: relative; flex: 1; padding: 1.2rem; border: 1px solid #244a85; border-radius: 14px; background: linear-gradient(145deg, #142b50, #1c3b71); color: #fff; }
 .architecture-app::before { content: ''; position: absolute; inset: -1px; border: 2px solid #6aa5ff; border-radius: inherit; box-shadow: 0 0 18px #3b82f624; pointer-events: none; animation: architecture-breathe 4s ease-in-out infinite; }
 .architecture-app-brand { display: flex; align-items: center; gap: 0.7rem; margin-bottom: 1.2rem; }
@@ -218,10 +222,20 @@ body {
 .architecture-app-route p { color: #c7d6ed; font-size: 0.74rem; line-height: 1.85; margin: 0; }
 .architecture-ai-route { border-color: #63d5dd66; }
 .architecture-ai-route > span { color: #85e5e5; }
-.architecture-provider-list { display: grid; grid-template-rows: repeat(3, minmax(0, 1fr)); flex: 1; gap: 0.65rem; list-style: none; padding: 0; margin: 0; }
+.architecture-disclosure-route { grid-column: 1 / -1; border-color: #58c6ab70; background: #2dd4bf0c; }
+.architecture-disclosure-route > span { color: #8de5cf; }
+.architecture-alert-routing { display: grid; gap: 0.25rem; margin: 0.65rem 0 0.4rem; color: #c2f2e7; font-size: 0.7rem; line-height: 1.8; }
+.architecture-disclosure-route .architecture-alert-note { font-size: 0.62rem; color: #95c9c4; }
+.architecture-provider-list { display: grid; grid-template-rows: repeat(4, minmax(0, 1fr)); flex: 1; gap: 0.65rem; list-style: none; padding: 0; margin: 0; }
 .architecture-provider-list .architecture-node { padding: 0.85rem 1rem; }
 .architecture-provider-list .architecture-node-heading { margin-bottom: 0.35rem; }
+.architecture-connections { position: relative; min-width: 0; }
 .architecture-connection { display: flex; flex-direction: column; align-items: center; justify-content: center; align-self: center; gap: 0.4rem; min-width: 0; color: var(--architecture-flow, #3b82f6); }
+.architecture-connections > .architecture-connection { position: absolute; left: 0; right: 0; }
+.architecture-request-connection { top: 32%; }
+.architecture-alert-connection { --architecture-flow: #0d9488; bottom: 9%; }
+.architecture-push-connection .architecture-wire > span { animation-direction: reverse; }
+.architecture-link-label { font-size: 0.6rem; line-height: 1; }
 .architecture-connection > i { font-size: 0.85rem; line-height: 1; }
 .architecture-wire { display: block; position: relative; width: 100%; height: 4px; border-radius: 4px; background: #d7e4f5; overflow: hidden; }
 .architecture-wire > span { position: absolute; inset: 0 auto 0 0; width: 30%; border-radius: inherit; background: var(--architecture-flow, #3b82f6); animation: architecture-flow 3.2s linear infinite; }
@@ -231,21 +245,11 @@ body {
 .architecture-storage > div + div { padding-left: 1rem; border-left: 1px solid #e2e8f0; }
 .architecture-storage dt { font-size: 0.8rem; margin-bottom: 0.35rem; }
 .architecture-storage dd { font-size: 0.73rem; }
-.architecture-notifications { --architecture-flow: #0d9488; padding: 1.25rem; border: 1px solid #d1e9e5; border-radius: 14px; background: linear-gradient(115deg, #f0faf8, #f4f9ff); }
-.architecture-notification-heading { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1rem; }
-.architecture-diagram .architecture-notification-heading h3 { margin: 0; font-size: 0.9rem; color: #155e5a; }
-.architecture-notification-heading > span { font-size: 0.68rem; color: #597b7c; }
-.architecture-notification-flow { display: grid; grid-template-columns: minmax(0, 1fr) 2rem minmax(0, 1.2fr) 2rem minmax(0, 1.4fr); align-items: center; }
-.architecture-notification-step, .architecture-notification-target { display: flex; align-items: center; gap: 0.7rem; padding: 0.85rem; border: 1px solid #d9e9e7; border-radius: 10px; background: #fff; min-width: 0; }
-.architecture-notification-step > i, .architecture-notification-target > i { color: #0f8077; font-size: 1.3rem; flex: 0 0 auto; }
-.architecture-notifications h4 { font-size: 0.8rem; font-weight: 600; line-height: 1.7; margin: 0; }
-.architecture-notification-step p, .architecture-notification-target p { font-size: 0.7rem; color: #617581; line-height: 1.8; margin: 0.15rem 0 0; }
-.architecture-notification-targets { display: grid; gap: 0.6rem; }
-.architecture-telegram-target { border-color: #c9dcff; color: var(--text-primary); text-decoration: none; transition: border-color 180ms ease, transform 180ms ease; }
-.architecture-telegram-target > i { color: var(--primary); }
-.architecture-telegram-target h4 > i { color: var(--primary); font-size: 0.7rem; }
+.architecture-telegram-service { min-width: 0; }
+.architecture-telegram-target { display: block; height: 100%; border-color: #9edbd0; background: #f1faf8; color: var(--text-primary); text-decoration: none; transition: border-color 180ms ease, transform 180ms ease; }
+.architecture-telegram-target .architecture-node-heading > i { color: #0f8077; }
+.architecture-telegram-target h3 > i { color: #0f8077; font-size: 0.7rem; }
 .architecture-telegram-target:hover { border-color: var(--primary); color: var(--text-primary); transform: translateY(-2px); }
-.architecture-notification-note { font-size: 0.7rem; line-height: 1.8; color: #587477; margin: 1rem 0 0; }
 .architecture-diagram > figcaption { font-size: 0.76rem; line-height: 1.9; color: var(--text-secondary); text-align: center; margin: 1rem 0 0; }
 @keyframes architecture-flow { from { transform: translateX(-100%); } to { transform: translateX(435%); } }
 @keyframes architecture-breathe { 0%, 100% { opacity: 0.2; } 50% { opacity: 0.85; } }
@@ -254,21 +258,20 @@ body {
   .architecture-core { grid-template-columns: minmax(0, 1fr); gap: 0.5rem; }
   .architecture-audience { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .architecture-audience .architecture-column-label { grid-column: 1 / -1; }
-  .architecture-core > .architecture-connection,
-  .architecture-notification-flow > .architecture-connection { width: 2.5rem; height: 2.5rem; justify-self: center; transform: rotate(90deg); }
+  .architecture-connections { display: flex; justify-content: center; align-items: center; gap: 1rem; height: 2.5rem; }
+  .architecture-connections > .architecture-connection { position: static; width: 2.5rem; height: 2.5rem; transform: rotate(90deg); }
+  .architecture-link-label { display: none; }
   .architecture-app { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.8rem; }
   .architecture-app-brand { grid-column: 1 / -1; margin-bottom: 0.2rem; }
   .architecture-app-route + .architecture-app-route { margin: 0; }
-  .architecture-provider-list { grid-template-columns: repeat(3, minmax(0, 1fr)); grid-template-rows: auto; }
-  .architecture-notification-flow { grid-template-columns: minmax(0, 1fr); }
-  .architecture-notification-targets { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .architecture-provider-list { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: auto; }
 }
 @media (max-width: 767px) {
   .architecture-storage > div + div { padding: 0.8rem 0 0; border-left: 0; border-top: 1px solid #e2e8f0; }
 }
 @media (max-width: 575px) {
-  .architecture-core, .architecture-notifications { padding: 1rem; }
-  .architecture-audience, .architecture-provider-list, .architecture-app, .architecture-notification-targets { grid-template-columns: minmax(0, 1fr); }
+  .architecture-core { padding: 1rem; }
+  .architecture-audience, .architecture-provider-list, .architecture-app { grid-template-columns: minmax(0, 1fr); }
   .architecture-app { padding: 1rem; }
   .architecture-diagram > figcaption { text-align: left; }
 }

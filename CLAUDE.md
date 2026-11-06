@@ -40,7 +40,7 @@ node setupDatabase.js            # dart.db에 companies 테이블 적재 + 인�
 - **dartClient.js / sharedStore.js** — 웹 서버의 DART GET 요청은 반드시 `dartClient.get()`을 사용한다. Redis 공유 응답·중복 요청 잠금·인증키별 1초 간격/하루 8,000회(KST) 제한을 적용한다. 운영에서 공유 저장소 연결 실패 시 DART 직접 호출로 우회하지 않는다. 로컬에서 Redis 환경 변수가 없으면 메모리 저장소를 사용한다.
 - **dart.db** — SQLite. `companies`(회사 검색용), `financial_statements` 테이블. **git에 커밋되어 있어 Vercel에서도 회사명/종목코드 검색에 사용된다(읽기 전용)**. 재무제표 데이터 자체는 Vercel 파일시스템이 쓰기 불가이므로 항상 DART API를 실시간 호출한다.
 - **public/** — 프레임워크·번들러 없는 SPA. `index.html` 하나에 `js/main.js`(전체 프런트 로직), `css/style.css`. `/`와 `/about`은 `sitePages.js`가 본문 표시 상태와 경로별 메타데이터를 서버 렌더링한다. 서버와 브라우저가 `public/js/site-pages.js`의 설정을 공유한다. Bootstrap 5, Chart.js, html2canvas, jsPDF는 CDN 로드. URL 파라미터 기반 딥링크 복원(`restoreStateFromUrl`) 지원.
-- **소개 페이지 구성도** — `public/index.html`의 `#system-architecture`를 HTML로 편집한다. `public/css/style.css`의 `.architecture-*`가 연결선·반응형 배치·CSS 모션을 담당한다. 이미지 재생성은 필요 없다. 공개 차트, 회원이 직접 요청하는 AI 분석, 회원 푸시와 공개 텔레그램 채널의 범위를 실제 동작과 맞춘다. 모션 일시정지와 `prefers-reduced-motion` 대응을 유지한다.
+- **소개 페이지 구성도** — `public/index.html`의 `#system-architecture`를 HTML로 편집한다. `public/css/style.css`의 `.architecture-*`가 연결선·반응형 배치·CSS 모션을 담당한다. 이미지 재생성은 필요 없다. 공개 차트, 회원이 직접 요청하는 AI 분석, 회원 푸시와 공개 텔레그램 채널의 범위를 실제 동작과 맞춘다. 공시 수집·알림도 같은 데이터 흐름 안에서 웹서비스 → 회원 푸시·텔레그램으로 연결하며 별도 흐름 패널로 분리하지 않는다. 모션 일시정지와 `prefers-reduced-motion` 대응을 유지한다.
 
 ### API 엔드포인트 (프런트에서 실제 사용)
 

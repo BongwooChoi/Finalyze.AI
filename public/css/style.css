@@ -704,10 +704,29 @@ body.modal-open .pwa-install-banner { visibility: hidden; }
 .account-favorite-open span { color: #64748b; font-size: 0.75rem; }
 .account-favorite-remove { border: 0; background: none; color: #64748b; font-size: 0.8rem; padding: 0.5rem; }
 .account-channel { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 1rem 0; border-bottom: 1px solid #e2e8f0; }
-.account-channel h4 { font-size: 0.9rem; font-weight: 600; margin: 0 0 0.35rem; }
+.account-channel-copy { flex: 1; min-width: 0; }
+.account-channel-heading { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; margin-bottom: 0.45rem; }
+.account-channel h4 { font-size: 0.9rem; font-weight: 600; margin: 0; }
+.account-channel-state { display: inline-flex; align-items: center; gap: 0.3rem; padding: 0.2rem 0.5rem; border-radius: 20px; background: #e9eef4; color: #526174; font-size: 0.68rem; font-weight: 700; white-space: nowrap; }
+.account-channel-state::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.account-channel-state.is-on { background: #dcfce7; color: #166534; }
+.account-channel-actions { display: flex; flex-shrink: 0; }
 .account-channel p { color: #64748b; font-size: 0.78rem; line-height: 1.7; margin: 0; }
-.account-channel button { flex-shrink: 0; border: 1px solid #bfdbfe; border-radius: 8px; color: #1d4ed8; background: #eff6ff; padding: 0.5rem 0.65rem; font-size: 0.78rem; }
-.account-channel button:disabled { opacity: 0.5; cursor: default; }
+.account-channel button { display: inline-flex; align-items: center; justify-content: center; gap: 0.4rem; border: 1px solid #2563eb; border-radius: 8px; color: #fff; background: #2563eb; padding: 0.6rem 0.75rem; font-size: 0.78rem; font-weight: 600; white-space: nowrap; transition: background-color .15s,transform .15s; }
+.account-channel button.account-channel-off { background: #fff; color: #526174; border-color: #cbd5e1; }
+.account-channel button:enabled:active { transform: scale(.96); }
+.account-channel button:focus-visible { outline: 3px solid #93c5fd; outline-offset: 3px; }
+.account-channel button:disabled { opacity: 0.65; cursor: default; }
+.account-channel button[aria-busy="true"]::before { content: ''; width: 12px; height: 12px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: account-notification-spin .8s linear infinite; }
+.account-channel p.account-channel-feedback { margin-top: 0.65rem; padding: 0.55rem 0.65rem; border-radius: 8px; background: #eff6ff; color: #1d4ed8; font-weight: 500; overflow-wrap: anywhere; }
+.account-channel p.account-feedback-success { background: #ecfdf5; color: #166534; }
+.account-channel p.account-feedback-error { background: #fff1f2; color: #b91c1c; }
+.account-channel [hidden] { display: none; }
+@keyframes account-notification-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .account-channel button { transition: none; }
+  .account-channel button[aria-busy="true"]::before { animation: none; }
+}
 .account-session-actions { display: flex; justify-content: space-between; gap: 1rem; margin: 1.3rem 0; }
 .account-session-actions button { border: 0; background: none; padding: 0.4rem 0; font-size: 0.78rem; color: #64748b; }
 #accountDeleteButton { color: #b91c1c; }

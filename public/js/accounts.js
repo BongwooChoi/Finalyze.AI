@@ -13,6 +13,24 @@
     element.textContent = text;
     element.classList.toggle('account-error',error);
   }
+  function channelFeedback(channel,text,tone = 'info') {
+    const element = byId(channel === 'push' ? 'accountPushFeedback' : 'accountEmailFeedback');
+    element.textContent = `${tone === 'success' ? '✓ ' : tone === 'error' ? '! ' : ''}${text}`;
+    element.className = `account-channel-feedback account-feedback-${tone}`;
+    element.hidden = !text;
+  }
+  function channelState(id,enabled) {
+    const badge = byId(id);
+    badge.textContent = enabled ? '켜짐' : '꺼짐';
+    badge.classList.toggle('is-on',enabled);
+  }
+  function channelBusy(id,pending,label) {
+    const button = byId(id);
+    button.setAttribute('aria-busy',String(pending));
+    button.textContent = pending ? label : id === 'emailEnableButton' && !byId('accountEmailConnect').hidden ? '계정 확인 중' : id.includes('Enable') ? '알림 켜기' : '알림 끄기';
+    button.disabled = pending || (id === 'emailEnableButton' && (!account.mailAvailable || !byId('accountEmailConnect').hidden)) ||
+      (id === 'pushEnableButton' && (!('Notification' in window) || !('PushManager' in window) || !('serviceWorker' in navigator) || !account.pushAvailable || Notification.permission === 'denied'));
+  }
   async function api(path,method = 'GET',body) {
     const response = await fetch(`/api${path}`,{ method,headers:{ 'Content-Type':'application/json',
       ...(account.csrfToken ? {'X-CSRF-Token':account.csrfToken} : {}) },
@@ -84,19 +102,21 @@
     byId('emailEnableButton').disabled = !account.mailAvailable;
     byId('emailEnableButton').hidden = account.emailEnabled;
     byId('emailDisableButton').hidden = !account.emailEnabled;
+    channelState('accountEmailState',account.emailEnabled);
     byId('accountEmailStatus').textContent = account.emailEnabled ? `${account.emailMasked}로 알림을 받습니다.` :
-      account.mailAvailable ? 'Google 계정의 이메일로 공시 알림을 받을 수 있습니다.' : '이메일 알림은 준비 중입니다.';
+      account.mailAvailable ? '알림을 켜려면 아래에서 메일을 받을 Google 계정을 확인해주세요.' : '이메일 알림은 준비 중입니다.';
     const supported = 'Notification' in window && 'PushManager' in window && 'serviceWorker' in navigator;
     const subscription = supported ? await currentSubscription() : null;
     const id = await subscriptionId(subscription);
     const enabled = account.subscriptions.some(item => item.id === id);
+    channelState('accountPushState',enabled);
     byId('pushEnableButton').hidden = enabled;
     byId('pushDisableButton').hidden = !enabled;
     byId('pushEnableButton').disabled = !supported || !account.pushAvailable || Notification.permission === 'denied';
     byId('accountPushStatus').textContent = enabled ? '이 기기에서 공시 알림을 받습니다.' : !supported ?
       '이 환경에서는 푸시를 사용할 수 없습니다. iPhone은 홈 화면에 추가한 앱에서 이용해주세요.' :
       Notification.permission === 'denied' ? '브라우저 설정에서 이 사이트의 알림을 허용해주세요.' :
-      account.pushAvailable ? '허용한 기기에서 관심 기업의 새 실적 공시를 알려드립니다.' : '푸시 알림을 준비하고 있습니다.';
+      account.pushAvailable ? '이 기기는 알림이 꺼져 있습니다. 알림 켜기를 눌러 연결해주세요.' : '푸시 알림을 준비하고 있습니다.';
   }
   async function refresh() {
     const wasAuthenticated = account.authenticated;
@@ -106,14 +126,24 @@
     if(wasAuthenticated !== account.authenticated) document.dispatchEvent(new CustomEvent('account:changed',{detail:{authenticated:account.authenticated}}));
     await render();
   }
-  async function perform(action) {
+  async function perform(action,feedback) {
     if(busy) return;
     busy = true; renderCompany();
+    if(feedback) {
+      channelFeedback(feedback.channel,feedback.message,'pending');
+      channelBusy(feedback.button,true,feedback.label);
+    }
     byId('accountSignedIn').setAttribute('aria-busy','true');
     byId('accountSignedIn').inert = true;
     try { await action(); }
-    catch(error) { message(error.message,true); }
-    finally { busy = false; byId('accountSignedIn').inert = false; byId('accountSignedIn').setAttribute('aria-busy','false'); renderCompany(); }
+    catch(error) {
+      if(feedback) channelFeedback(feedback.channel,error.message,'error');
+      else message(error.message,true);
+    }
+    finally {
+      busy = false; byId('accountSignedIn').inert = false; byId('accountSignedIn').setAttribute('aria-busy','false'); renderCompany();
+      if(feedback) channelBusy(feedback.button,false);
+    }
   }
   async function loadGoogle() {
     if(window.google?.accounts?.id) return;
@@ -133,7 +163,7 @@
     byId('googleEmailButton').hidden = true;
     byId('emailEnableButton').setAttribute('aria-expanded','false');
     byId('emailEnableButton').disabled = !account.mailAvailable;
-    byId('emailEnableButton').textContent = '메일 연결';
+    channelBusy('emailEnableButton',false);
   }
   async function prepareGoogle(emailOptIn = false) {
     if(!emailOptIn) closeEmailConnection();
@@ -144,11 +174,12 @@
       byId('accountEmailConnect').hidden = false;
       byId('emailEnableButton').setAttribute('aria-expanded','true');
       byId('emailEnableButton').disabled = true;
-      byId('emailEnableButton').textContent = '계정 선택 중';
+      channelBusy('emailEnableButton',true,'불러오는 중…');
+      channelFeedback('email','메일 알림 연결을 준비하고 있습니다.','pending');
       byId('accountEmailConnect').scrollIntoView({block:'nearest',behavior:'instant'});
     }
     container.replaceChildren(); container.hidden = false;
-    if(!account.enabled) { notify('로그인 기능을 준비하고 있습니다. 잠시 후 다시 이용해주세요.'); return; }
+    if(!account.enabled) { notify('로그인 기능을 준비하고 있습니다. 잠시 후 다시 이용해주세요.'); if(emailOptIn)channelBusy('emailEnableButton',false); return; }
     notify(emailOptIn ? '아래 버튼에서 Google 계정을 확인해주세요.' : loginForAnalysis ? '선택한 공시의 AI 분석을 위해 Google로 로그인해주세요.' : 'Google 로그인 후 AI 재무분석과 관심 기업 동기화를 이용할 수 있습니다.');
     await loadGoogle();
     if(attempt !== googleAttempt) return;
@@ -157,26 +188,41 @@
     google.accounts.id.initialize({ client_id:account.clientId,nonce,auto_select:false,
       callback:async response => {
         if(attempt !== googleAttempt) return;
-        notify(emailOptIn ? '메일 연결을 확인하고 있습니다.' : '로그인 정보를 확인하고 있습니다.');
-        try {
-          await api('/auth/google','POST',{ credential:response.credential,emailOptIn });
-          container.replaceChildren(); container.hidden = true;
-          await refresh();
-          if(pendingFavorite) {
-            await api('/account/favorites','POST',{corpCode:pendingFavorite.corp_code});
-            pendingFavorite = null; await refresh();
+        const complete = async () => {
+          notify(emailOptIn ? '메일 연결을 확인하고 있습니다.' : '로그인 정보를 확인하고 있습니다.');
+          try {
+            await api('/auth/google','POST',{ credential:response.credential,emailOptIn });
+            container.replaceChildren(); container.hidden = true;
+            await refresh();
+            if(pendingFavorite) {
+              await api('/account/favorites','POST',{corpCode:pendingFavorite.corp_code});
+              pendingFavorite = null; await refresh();
+            }
+            if(emailOptIn) channelFeedback('email','이메일 알림을 켰습니다. 관심 기업의 새 공시를 메일로 알려드립니다.','success');
+            else message('로그인했습니다. 관심 기업과 알림을 설정해보세요.');
+            if(loginForAnalysis) { loginForAnalysis = false; modal.hide(); }
+          } catch(error) {
+            if(attempt !== googleAttempt) return;
+            try { await prepareGoogle(emailOptIn); } catch {}
+            notify(error.message,true);
+            if(emailOptIn) channelFeedback('email',error.message,'error');
           }
-          message(emailOptIn ? '이메일 알림을 켰습니다.' : '로그인했습니다. 관심 기업과 알림을 설정해보세요.');
-          if(loginForAnalysis) { loginForAnalysis = false; modal.hide(); }
-        } catch(error) { if(attempt !== googleAttempt) return; try { await prepareGoogle(emailOptIn); } catch {} notify(error.message,true); }
+        };
+        if(emailOptIn) await perform(complete,{channel:'email',button:'emailEnableButton',label:'켜는 중…',message:'선택한 계정을 확인하고 메일 알림을 켜고 있습니다.'});
+        else await complete();
       }
     });
     google.accounts.id.renderButton(container,{ theme:'outline',size:'large',shape:'pill',text:'continue_with',width:Math.max(200,Math.min(280,Math.floor(container.clientWidth || 280))) });
-    if(emailOptIn) byId('accountEmailConnect').scrollIntoView({block:'nearest',behavior:'instant'});
+    if(emailOptIn) {
+      channelBusy('emailEnableButton',false);
+      channelFeedback('email','아래 Google 계정을 확인하면 메일 알림이 켜집니다.');
+      byId('accountEmailConnect').scrollIntoView({block:'nearest',behavior:'instant'});
+    }
   }
   async function show() {
     byId('accountModalTitle').textContent = loginForAnalysis ? 'AI 재무분석 시작하기' : '관심 기업 · 공시 알림';
     modal.show();
+    channelFeedback('push',''); channelFeedback('email','');
     message('계정 정보를 확인하고 있습니다.');
     try {
       await refresh();
@@ -195,10 +241,15 @@
     });
   }
   async function enablePush() {
-    // Request permission directly from the user's click, before other awaited work (required on iOS).
-    const permission = Notification.requestPermission();
     await perform(async () => {
-      if(await permission !== 'granted') { message('알림을 허용하면 이 기기에서 푸시를 받을 수 있습니다.'); return; }
+      // Still in the user's click before the first await (required on iOS).
+      const permission = await Notification.requestPermission();
+      if(permission !== 'granted') {
+        await render();
+        channelFeedback('push',permission === 'denied' ? '알림 권한이 차단됐습니다. 크롬·Safari의 사이트 설정에서 알림을 허용해주세요.' : '알림 허용이 완료되지 않았습니다. 다시 알림 켜기를 눌러 허용해주세요.','error');
+        return;
+      }
+      channelFeedback('push','이 기기를 푸시 알림에 연결하고 있습니다.','pending');
       const registration = await navigator.serviceWorker.ready;
       const base64 = account.pushPublicKey.replace(/-/g,'+').replace(/_/g,'/');
       const key = Uint8Array.from(atob(base64.padEnd(Math.ceil(base64.length/4)*4,'=')),char => char.charCodeAt(0));
@@ -206,8 +257,8 @@
       const subscription = existing || await registration.pushManager.subscribe({ userVisibleOnly:true,applicationServerKey:key });
       try { await api('/account/push','POST',{ subscription:subscription.toJSON() }); }
       catch(error) { if(!existing) await subscription.unsubscribe(); throw error; }
-      await refresh(); message('이 기기에서 공시 푸시 알림을 받습니다.');
-    });
+      await refresh(); channelFeedback('push','이 기기의 푸시 알림을 켰습니다. 관심 기업의 새 공시를 알려드립니다.','success');
+    },{channel:'push',button:'pushEnableButton',label:'켜는 중…',message:'알림 권한을 확인하고 있습니다. 허용 창이 뜨면 허용을 눌러주세요.'});
   }
   document.addEventListener('DOMContentLoaded',() => {
     modal = new bootstrap.Modal(byId('accountModal'));
@@ -218,18 +269,24 @@
     byId('pushDisableButton').addEventListener('click',() => perform(async () => {
       const subscription = await currentSubscription();
       if(subscription) { await api('/account/push','DELETE',{endpoint:subscription.endpoint}); await subscription.unsubscribe(); }
-      await refresh(); message('이 기기의 푸시 알림을 껐습니다.');
-    }));
+      await refresh(); channelFeedback('push','이 기기의 푸시 알림을 껐습니다. 다른 기기의 설정은 유지됩니다.','success');
+    },{channel:'push',button:'pushDisableButton',label:'끄는 중…',message:'이 기기의 푸시 알림을 끄고 있습니다.'}));
     byId('emailEnableButton').addEventListener('click',() => prepareGoogle(true).catch(error => {
       message(error.message,true,'accountEmailMessage');
+      channelFeedback('email',error.message,'error');
+      channelBusy('emailEnableButton',false);
       byId('emailEnableButton').disabled = false;
       byId('emailEnableButton').textContent = '다시 연결';
     }));
     byId('emailConnectCancel').addEventListener('click',() => {
       closeEmailConnection();
+      channelFeedback('email','메일 연결을 취소했습니다. 이메일 알림은 꺼져 있습니다.');
       byId('emailEnableButton').focus({preventScroll:true});
     });
-    byId('emailDisableButton').addEventListener('click',() => perform(async () => { await api('/account/email','DELETE'); await refresh(); message('이메일 알림을 끄고 저장된 이메일을 삭제했습니다.'); }));
+    byId('emailDisableButton').addEventListener('click',() => perform(async () => {
+      await api('/account/email','DELETE'); await refresh();
+      channelFeedback('email','이메일 알림을 끄고 저장된 이메일 주소를 삭제했습니다.','success');
+    },{channel:'email',button:'emailDisableButton',label:'끄는 중…',message:'이메일 알림을 끄고 있습니다.'}));
     byId('accountLogoutButton').addEventListener('click',() => perform(async () => {
       const subscription = await currentSubscription();
       await api('/auth/logout','POST',{endpoint:subscription?.endpoint});

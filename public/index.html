@@ -45,7 +45,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Noto+Sans+KR:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/css/style.css?v=3.21">
+  <link rel="stylesheet" href="/css/style.css?v=3.22">
   <link rel="manifest" href="/manifest.json">
   <meta name="theme-color" content="#2563eb">
 
@@ -710,8 +710,14 @@
           <p id="accountLimitsNote" class="account-note"></p>
           <section><h3>관심 기업</h3><ul id="accountFavorites" class="account-favorites"></ul></section>
           <section><h3>공시 알림</h3><p class="account-note">정기보고서·잠정실적을 약 15분 간격으로 확인합니다. 최초 확인 때는 기존 공시를 기준으로 설정하고, 이후 새로 확인되는 공시부터 알립니다. 전달은 지연될 수 있습니다.</p>
-            <div class="account-channel"><div><h4>이 기기 푸시 알림</h4><p id="accountPushStatus"></p></div><button type="button" id="pushEnableButton">알림 켜기</button><button type="button" id="pushDisableButton" hidden>알림 끄기</button></div>
-            <div class="account-channel"><div><h4>이메일 알림</h4><p id="accountEmailStatus" role="status"></p></div><button type="button" id="emailEnableButton" aria-expanded="false" aria-controls="accountEmailConnect">메일 연결</button><button type="button" id="emailDisableButton" hidden>알림 끄기</button></div>
+            <div class="account-channel">
+              <div class="account-channel-copy"><div class="account-channel-heading"><h4>이 기기 푸시 알림</h4><span id="accountPushState" class="account-channel-state">확인 중</span></div><p id="accountPushStatus"></p><p id="accountPushFeedback" class="account-channel-feedback" role="status" aria-live="polite" aria-atomic="true" hidden></p></div>
+              <div class="account-channel-actions"><button type="button" id="pushEnableButton" aria-label="이 기기 푸시 알림 켜기">알림 켜기</button><button type="button" id="pushDisableButton" class="account-channel-off" aria-label="이 기기 푸시 알림 끄기" hidden>알림 끄기</button></div>
+            </div>
+            <div class="account-channel">
+              <div class="account-channel-copy"><div class="account-channel-heading"><h4>이메일 알림</h4><span id="accountEmailState" class="account-channel-state">확인 중</span></div><p id="accountEmailStatus"></p><p id="accountEmailFeedback" class="account-channel-feedback" role="status" aria-live="polite" aria-atomic="true" hidden></p></div>
+              <div class="account-channel-actions"><button type="button" id="emailEnableButton" aria-label="이메일 알림 켜기" aria-expanded="false" aria-controls="accountEmailConnect">알림 켜기</button><button type="button" id="emailDisableButton" class="account-channel-off" aria-label="이메일 알림 끄기" hidden>알림 끄기</button></div>
+            </div>
             <div id="accountEmailConnect" class="account-email-connect" hidden>
               <h4>메일을 받을 Google 계정 확인</h4>
               <p class="account-note">로그인한 Google 계정으로 계속하면 해당 이메일로 공시 알림을 받는 데 동의하게 됩니다.</p>
@@ -727,7 +733,7 @@
     </div></div>
   </div>
   <script src="/js/main.js?v=3.18"></script>
-  <script src="/js/accounts.js?v=1.3"></script>
+  <script src="/js/accounts.js?v=1.4"></script>
   <noscript>
     <div style="padding:2rem;text-align:center;font-family:sans-serif;">
       <h2>Finalyze.AI</h2>

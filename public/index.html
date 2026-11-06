@@ -45,7 +45,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Noto+Sans+KR:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/css/style.css?v=3.18">
+  <link rel="stylesheet" href="/css/style.css?v=3.19">
   <link rel="manifest" href="/manifest.json">
   <meta name="theme-color" content="#2563eb">
 
@@ -483,7 +483,7 @@
                 <article class="architecture-node architecture-member">
                   <div class="architecture-node-heading"><i class="bi bi-person-check" aria-hidden="true"></i><h3>회원</h3><span class="architecture-badge">Google 로그인</span></div>
                   <p>공개 기능 + AI 분석 직접 요청<br>관심 기업 즐겨찾기</p>
-                  <div class="architecture-member-alert"><i class="bi bi-bell" aria-hidden="true"></i><div><strong>관심 기업 푸시 수신</strong><span>즐겨찾기 기업의 새 실적 공시</span></div></div>
+                  <div class="architecture-member-alert"><i class="bi bi-bell" aria-hidden="true"></i><div><strong>관심 기업 알림 수신</strong><span>새 실적 공시를 푸시·이메일로</span></div></div>
                 </article>
               </div>
               <div class="architecture-connections" aria-hidden="true">
@@ -496,7 +496,7 @@
                   <div class="architecture-app-brand"><i class="bi bi-bar-chart-line" aria-hidden="true"></i><div><h3>Finalyze.AI</h3><p>웹 화면 · Vercel / Express</p></div></div>
                   <div class="architecture-app-route"><span>누구나</span><h4>공시 조회와 시각화</h4><p>원문 수치를 읽고 재무비율을 계산해 차트로 전달합니다.</p></div>
                   <div class="architecture-app-route architecture-ai-route"><span><i class="bi bi-shield-check" aria-hidden="true"></i> 회원 확인 후</span><h4>AI 재무분석</h4><p>‘AI 분석 시작하기’를 눌렀을 때만 OpenAI에 설명을 요청합니다.</p></div>
-                  <div class="architecture-app-route architecture-disclosure-route"><span><i class="bi bi-clock-history" aria-hidden="true"></i> Vercel 일정 · 15분 주기 확인</span><h4>실적 공시 수집·알림</h4><p>OPEN DART 원문을 확인하고 중복 발송을 막습니다.</p><div class="architecture-alert-routing"><span>관심 기업 → 회원 푸시</span><span>주요 기업 60개 → 텔레그램</span></div><p class="architecture-alert-note">게시 지연 가능 · LLM 추가 호출 없음</p></div>
+                  <div class="architecture-app-route architecture-disclosure-route"><span><i class="bi bi-clock-history" aria-hidden="true"></i> Vercel 일정 · 15분 주기 확인</span><h4>실적 공시 수집·알림</h4><p>OPEN DART 원문을 확인하고 중복 발송을 막습니다.</p><div class="architecture-alert-routing"><span>관심 기업 → 회원 푸시·메일</span><span>주요 기업 60개 → 텔레그램</span></div><p class="architecture-alert-note">게시 지연 가능 · LLM 추가 호출 없음</p></div>
                 </article>
               </div>
               <div class="architecture-connections" aria-hidden="true">
@@ -509,6 +509,7 @@
                   <li class="architecture-node"><div class="architecture-node-heading"><i class="bi bi-file-earmark-text" aria-hidden="true"></i><h3>OPEN DART</h3></div><p>정기보고서·공시 목록<br>잠정실적 원문과 수치</p></li>
                   <li class="architecture-node"><div class="architecture-node-heading"><i class="bi bi-stars" aria-hidden="true"></i><h3>OpenAI GPT</h3></div><p>회원이 요청한 재무 분석 설명</p></li>
                   <li class="architecture-node"><div class="architecture-node-heading"><i class="bi bi-google" aria-hidden="true"></i><h3>Google 로그인</h3></div><p>로그인 정보 확인·회원 구분</p></li>
+                  <li class="architecture-node"><div class="architecture-node-heading"><i class="bi bi-envelope" aria-hidden="true"></i><h3>Gmail</h3></div><p>수신에 동의한 관심 기업 공시 메일</p></li>
                   <li class="architecture-telegram-service"><a class="architecture-node architecture-telegram-target" href="https://t.me/finalyze_ai" target="_blank" rel="noopener noreferrer"><div class="architecture-node-heading"><i class="bi bi-telegram" aria-hidden="true"></i><h3>텔레그램 채널 <i class="bi bi-arrow-up-right" aria-hidden="true"></i></h3></div><p>주요 기업 60개의 실적 공시<br>누구나 구독 · @finalyze_ai<span class="visually-hidden"> (새 창)</span></p></a></li>
                 </ul>
               </div>
@@ -519,7 +520,7 @@
               <div><dt><i class="bi bi-layers" aria-hidden="true"></i> Redis 공유 캐시</dt><dd>DART 응답 재사용·중복 조회 방지·호출 제한</dd></div>
               <div><dt><i class="bi bi-person-lock" aria-hidden="true"></i> Neon 계정 DB</dt><dd>최소 회원 식별 정보·관심 기업·푸시·발송 기록</dd></div>
             </dl>
-            <figcaption id="architectureCaption">차트는 로그인 없이 확인하고, AI 설명은 회원이 직접 요청합니다. 텔레그램 채널은 사이트 로그인 없이 구독할 수 있습니다.<br>메일 알림은 발신 설정 후 활성화 예정입니다.</figcaption>
+            <figcaption id="architectureCaption">차트는 로그인 없이 확인하고, AI 설명은 회원이 직접 요청합니다. 텔레그램 채널은 사이트 로그인 없이 구독할 수 있습니다.<br>메일 알림은 ‘관심 기업’에서 별도로 수신에 동의한 회원에게 발송합니다.</figcaption>
           </figure>
         </div>
       </section>

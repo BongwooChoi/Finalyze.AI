@@ -4,6 +4,7 @@ const { OAuth2Client } = require('google-auth-library');
 const { digest, sign, equal, seal, open, validateSubscription } = require('./accountSecurity');
 const { getMailProvider } = require('./mailSender');
 const { getSharedStore } = require('./sharedStore');
+const {defaultSettings}=require('./serviceSettings');
 
 function accountConfig(env = process.env) {
   const origin = new URL(env.APP_ORIGIN || (env.VERCEL ? 'https://finalyze-ai.vercel.app' : `http://localhost:${env.PORT || 3000}`)).origin;
@@ -11,6 +12,8 @@ function accountConfig(env = process.env) {
     identitySecret: env.USER_ID_SECRET || '', dataKey: env.USER_DATA_KEY || '',
     pushPublic: env.VAPID_PUBLIC_KEY || '', pushPrivate: env.VAPID_PRIVATE_KEY || '',
     mailAvailable: Boolean(getMailProvider(env)), production: Boolean(env.VERCEL),
+    adminEmailHashes:(env.ADMIN_EMAILS || '').split(',').map(email=>email.trim().toLowerCase()).filter(email=>/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
+      .map(email=>sign(`admin-email:${email}`,env.USER_ID_SECRET || '')),
     enabled: Boolean(env.GOOGLE_CLIENT_ID && env.SESSION_SECRET?.length >= 32 && env.USER_ID_SECRET?.length >= 32 &&
       Buffer.from(env.USER_DATA_KEY || '', 'base64').length === 32 && (!env.VERCEL || env.ACCOUNTS_DATABASE_URL || env.DATABASE_URL)) };
 }
@@ -23,7 +26,8 @@ function cookies(req) {
 }
 function httpError(status, message) { return Object.assign(new Error(message), { status }); }
 
-function createAccountRouter({ store, findCompany, config = accountConfig(), now = () => Date.now(), verifyIdentity, rateLimit, securityStore = getSharedStore }) {
+function createAccountRouter({ store, findCompany, config = accountConfig(), now = () => Date.now(), verifyIdentity, rateLimit, securityStore = getSharedStore,
+  getSettings=async()=>defaultSettings() }) {
   const router = express.Router();
   const google = new OAuth2Client(config.clientId);
   const verify = verifyIdentity || (async credential => (await google.verifyIdToken({ idToken: credential, audience: config.clientId })).getPayload());
@@ -69,6 +73,20 @@ function createAccountRouter({ store, findCompany, config = accountConfig(), now
         message:error.status===401 ? 'AI 재무분석은 로그인 후 이용할 수 있습니다.' : error.status ? error.message : '로그인 상태를 확인하지 못했습니다. 잠시 후 다시 시도해주세요.'});
     });
   }
+  async function isAdmin(id) {
+    if(!config.adminEmailHashes?.length) return false;
+    const grant=await storage().adminGrant(id);
+    return Boolean(grant && config.adminEmailHashes.some(hash=>equal(hash,grant.email_hash)));
+  }
+  function requireAdmin(req,res,next) {
+    (async()=>{
+      const value=await session(req);
+      if(req.method!=='GET' || req.get('origin')) requireOrigin(req);
+      if(!equal(req.get('x-csrf-token'),csrfFor(value.token))) throw httpError(403,'관리자 요청을 확인하지 못했습니다. 다시 로그인해주세요.');
+      if(!await isAdmin(value.user_id)) throw httpError(403,'관리자 계정만 이용할 수 있습니다. 지정된 Google 계정으로 다시 로그인해주세요.');
+      req.adminUserId=value.user_id;
+    })().then(()=>next()).catch(next);
+  }
   router.get('/account', wrap(async (req,res) => {
     const base = { enabled: config.enabled, clientId: config.clientId, mailAvailable: config.mailAvailable,
       pushAvailable: Boolean(config.pushPublic && config.pushPrivate), pushPublicKey: config.pushPublic };
@@ -82,7 +100,8 @@ function createAccountRouter({ store, findCompany, config = accountConfig(), now
       const address = open(user.email_enc,config.dataKey);
       email = address.replace(/^(.{1,2})[^@]*@/, '$1***@');
     }
-    res.json({ ...base, authenticated:true, csrfToken:csrfFor(value.token), favorites, subscriptions,
+    const {maxSessions,maxFavorites,maxPush}=await getSettings();
+    res.json({ ...base, authenticated:true, admin:await isAdmin(value.user_id), limits:{maxSessions,maxFavorites,maxPush}, csrfToken:csrfFor(value.token), favorites, subscriptions,
       emailEnabled:Boolean(user.email_enabled), emailMasked:email });
   }));
   router.post('/auth/challenge', wrap(async (req,res) => {
@@ -120,11 +139,13 @@ function createAccountRouter({ store, findCompany, config = accountConfig(), now
       email = payload.email;
     }
     await storage().ensureUser(id);
+    const adminHash=payload.email_verified===true && typeof payload.email==='string' ? sign(`admin-email:${payload.email.trim().toLowerCase()}`,config.identitySecret) : '';
+    await storage().setAdminGrant(id,config.adminEmailHashes?.some(hash=>equal(hash,adminHash)) ? adminHash : null);
     if (email) await storage().setEmail(id,seal(email,config.dataKey));
     const old = cookies(req)[sessionName];
     if (old) await storage().removeSession(digest(old));
     const token = randomBytes(32).toString('base64url');
-    await storage().addSession(digest(token),id,now()+duration);
+    await storage().addSession(digest(token),id,now()+duration,(await getSettings()).maxSessions);
     res.cookie(sessionName,token,{ ...cookieOptions,maxAge:duration });
     // ID tokens, Google profile, and Google email (without email opt-in) are never persisted.
     res.json({ status:'success' });
@@ -142,7 +163,8 @@ function createAccountRouter({ store, findCompany, config = accountConfig(), now
     if (!/^\d{8}$/.test(corp || '')) throw httpError(400,'기업 고유번호를 확인해주세요.');
     const company = await findCompany(corp);
     if (!company || !/^\d{6}$/.test(company.stock_code || '')) throw httpError(404,'상장기업 정보를 찾지 못했습니다.');
-    if (!await storage().addFavorite(value.user_id,company)) throw httpError(409,'관심 기업은 최대 50개까지 등록할 수 있습니다.');
+    const maximum=(await getSettings()).maxFavorites;
+    if (!await storage().addFavorite(value.user_id,company,maximum)) throw httpError(409,`관심 기업은 최대 ${maximum}개까지 등록할 수 있습니다.`);
     res.json({ status:'success' });
   }));
   router.delete('/account/favorites/:corp', wrap(async (req,res) => {
@@ -157,7 +179,8 @@ function createAccountRouter({ store, findCompany, config = accountConfig(), now
     const subscription = req.body?.subscription;
     if (!validateSubscription(subscription)) throw httpError(400,'푸시 구독 정보가 올바르지 않습니다.');
     const normalized = { endpoint:subscription.endpoint, keys:{ p256dh:subscription.keys.p256dh,auth:subscription.keys.auth } };
-    if (!await storage().addPush(value.user_id,digest(subscription.endpoint),seal(normalized,config.dataKey))) throw httpError(409,'푸시는 계정당 최대 5개 기기까지 사용할 수 있습니다.');
+    const maximum=(await getSettings()).maxPush;
+    if (!await storage().addPush(value.user_id,digest(subscription.endpoint),seal(normalized,config.dataKey),maximum)) throw httpError(409,`푸시는 계정당 최대 ${maximum}개 기기까지 사용할 수 있습니다.`);
     res.json({ status:'success' });
   }));
   router.delete('/account/push', wrap(async (req,res) => {
@@ -206,6 +229,6 @@ function createAccountRouter({ store, findCompany, config = accountConfig(), now
     if (!error.status) console.warn('계정 처리 실패:', { code:'ACCOUNT_UNAVAILABLE', route:req.route?.path });
     res.status(status).json({ status:'error',message:error.status ? error.message : '계정 정보를 처리하지 못했습니다. 잠시 후 다시 시도해주세요.' });
   });
-  return { router,unsubscribeToken,config,requireAnalysis };
+  return { router,unsubscribeToken,config,requireAnalysis,requireAdmin };
 }
 module.exports = { createAccountRouter,accountConfig };

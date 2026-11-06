@@ -1,4 +1,4 @@
-const CACHE_NAME = 'financial-app-cache-v41';
+const CACHE_NAME = 'financial-app-cache-v42';
 const urlsToCache = [
   '/',
   '/about',
@@ -28,7 +28,8 @@ self.addEventListener('install', event => {
 });
 
 self.addEventListener('fetch', event => {
-  if (event.request.url.includes('/api/')) {
+  const requestPath = new URL(event.request.url).pathname;
+  if (requestPath.startsWith('/api/') || /^\/admin(?:\/|\.html)?$/.test(requestPath)) {
     event.respondWith(fetch(event.request));
     return;
   }

@@ -26,6 +26,16 @@ test('공유 링크의 기업 조회는 고유번호를 검증하고 회사 DB �
   assert.equal((await fetch(`${baseUrl}/api/companies/corp/99999999`)).status,404);
   assert.equal((await fetch(`${baseUrl}/api/companies/corp/${encodeURIComponent('<img>')}`)).status,400);
 });
+test('관리자 화면은 검색·캐시 대상에서 제외하고 비회원 관리자 API를 차단한다',async()=>{
+  const response=await fetch(baseUrl+'/admin');const html=await response.text();
+  assert.equal(response.status,200);assert.equal(response.headers.get('cache-control'),'no-store');
+  assert.match(response.headers.get('x-robots-tag'),/noindex/);assert.match(html,/id="dashboard" hidden/);
+  assert.doesNotMatch(html,/bongwoo2219@gmail|email_enc|USER_ID_SECRET/);
+  const api=await fetch(baseUrl+'/api/admin/dashboard');assert.ok([401,503].includes(api.status));
+  assert.equal(api.headers.get('cache-control'),'no-store');
+  assert.equal((await fetch(baseUrl+'/js/admin.js')).status,200);assert.equal((await fetch(baseUrl+'/css/admin.css')).status,200);
+  const redirect=await fetch(baseUrl+'/admin.html',{redirect:'manual'});assert.equal(redirect.status,301);
+});
 
 test('홈은 분석 화면과 루트 canonical을 초기 HTML에 제공한다', async () => {
   const response = await fetch(baseUrl);

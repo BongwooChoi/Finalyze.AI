@@ -13,6 +13,7 @@ npm start                        # 로컬 서버 실행 (기본 포트 3000)
 npm run check:telegram-disclosures # 공개 채널 대상·중복 방지·전송 제한·비밀정보 검사
 npm run setup:accounts           # 계정 DB 스키마 준비 (Neon 또는 로컬 SQLite)
 npm run check:accounts           # 로그인·데이터 분리·푸시·알림 대기열 검사
+npm run check:admin              # 관리자 권한·설정 저장/충돌·동적 한도 검사
 npm run check:security-integration # 선택적 로컬 PostgreSQL·Redis 동시성 검사 (README 환경 설정)
 npm run check:provisional-financials # 잠정실적 원문 숫자·단위·기간·병합 셀 검사
 npm run check:public-pages        # 공개 페이지·메타데이터·리디렉션·사이트맵 HTTP 검사
@@ -70,6 +71,9 @@ node setupDatabase.js            # dart.db에 companies 테이블 적재 + 인�
 - **잠정실적은 정기공시보다 항목이 적다**: 섹션 1~3개, 항목 1~2개로 프롬프트를 따로 두고, 공시에 없는 내용(변동 요인 등)은 섹션을 만들지 않게 한다. "잠정치라 확정 실적과 다를 수 있다"는 안내는 AI가 아니라 프런트가 고정 문구로 표시한다.
 
 ## 계정과 알림
+
+- `/admin`은 `adminRoutes.js`·`public/admin.html`·`public/js/admin.js`·`public/css/admin.css`가 담당합니다. `ADMIN_EMAILS`에 명시한 검증된 Google 계정만 서버에서 권한을 부여하며, 관리자 API는 `accounts.requireAdmin`의 세션·CSRF·현재 allowlist 검사를 통과해야 합니다. 권한을 프런트 플래그나 최초 가입 여부에 의존하지 않습니다. 관리자 화면/API는 no-store/noindex이며 서비스 워커 캐시에서 제외합니다.
+- `serviceSettings.js`가 설정 검증·기본값·버전 충돌을 관리하고 계정 DB의 설정/감사 테이블에 저장합니다. AI와 계정 등록은 같은 저장된 설정을 다음 요청부터 읽습니다. 설정 저장으로 사용량을 초기화하거나 기존 즐겨찾기/구독을 삭제하지 않습니다. 관리자 통계는 집계만 반환하고 회원의 이메일·기기 원문을 복호화하지 않습니다.
 
 - 기업·공시 문자열은 HTML 문맥에서 `escapeHtml()`을 거치고 텍스트 제목은 `textContent`로 표시합니다. 공유 URL은 회사 코드 형식 확인 후 `/api/companies/corp/:corpCode`의 공식 정보를 사용하며, URL 이름을 신뢰하는 fallback을 추가하지 않습니다.
 - 유료 AI는 `requireAnalysis`가 확인한 `req.analysisUserId`를 `analysisLimits.js`의 공통 제한에 전달합니다. 두 AI API가 동일한 회원/전체 KST 일일 한도와 동시 실행 잠금을 공유합니다. 잠금은 OpenAI 작업의 `finally`에서 해제하고, upstream deadline(120초)은 Redis lease(180초)보다 짧게 유지합니다. 브라우저 연결 종료만으로 잠금을 해제하지 않습니다.

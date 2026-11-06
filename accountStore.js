@@ -4,6 +4,9 @@ const { randomUUID } = require('node:crypto');
 
 const SCHEMA = [
   `CREATE TABLE IF NOT EXISTS app_users (id TEXT PRIMARY KEY, created_at BIGINT NOT NULL, email_enc TEXT, email_enabled INTEGER NOT NULL DEFAULT 0, email_since BIGINT NOT NULL DEFAULT 0)`,
+  `CREATE TABLE IF NOT EXISTS app_admin_grants (user_id TEXT PRIMARY KEY REFERENCES app_users(id) ON DELETE CASCADE, email_hash TEXT NOT NULL)`,
+  `CREATE TABLE IF NOT EXISTS app_service_settings (id TEXT PRIMARY KEY, version BIGINT NOT NULL, value_json TEXT NOT NULL, updated_at BIGINT NOT NULL, updated_by TEXT NOT NULL)`,
+  `CREATE TABLE IF NOT EXISTS app_settings_audit (version BIGINT PRIMARY KEY, before_json TEXT NOT NULL, value_json TEXT NOT NULL, changed_at BIGINT NOT NULL, changed_by TEXT NOT NULL)`,
   `CREATE TABLE IF NOT EXISTS app_sessions (token_hash TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES app_users(id) ON DELETE CASCADE, expires_at BIGINT NOT NULL)`,
   `CREATE TABLE IF NOT EXISTS app_favorites (user_id TEXT NOT NULL REFERENCES app_users(id) ON DELETE CASCADE, corp_code TEXT NOT NULL, corp_name TEXT NOT NULL, stock_code TEXT NOT NULL, created_at BIGINT NOT NULL, monitoring_since BIGINT NOT NULL DEFAULT 0, PRIMARY KEY(user_id,corp_code))`,
   `CREATE TABLE IF NOT EXISTS app_push (user_id TEXT NOT NULL REFERENCES app_users(id) ON DELETE CASCADE, id TEXT NOT NULL, subscription_enc TEXT NOT NULL, created_at BIGINT NOT NULL, PRIMARY KEY(user_id,id))`,
@@ -72,37 +75,67 @@ function createAccountStore(database, now = () => Date.now()) {
     initialize, query, close: database.close,
     async ensureUser(id) { await query('INSERT INTO app_users(id,created_at) VALUES($1,$2) ON CONFLICT(id) DO NOTHING', [id, now()]); },
     async user(id) { return first(await query('SELECT * FROM app_users WHERE id=$1', [id])); },
+    async adminGrant(id) { return first(await query('SELECT email_hash FROM app_admin_grants WHERE user_id=$1',[id])); },
+    async setAdminGrant(id,hash) {
+      if(!hash) return query('DELETE FROM app_admin_grants WHERE user_id=$1',[id]);
+      await query('INSERT INTO app_admin_grants(user_id,email_hash) VALUES($1,$2) ON CONFLICT(user_id) DO UPDATE SET email_hash=excluded.email_hash',[id,hash]);
+    },
+    async settingsRecord() { return first(await query("SELECT version,value_json,updated_at FROM app_service_settings WHERE id='service'")); },
+    async saveSettings(values,before,version,actor,time) {
+      const json=JSON.stringify(values),previous=JSON.stringify(before);
+      const result=await transaction([
+        ["INSERT INTO app_service_settings(id,version,value_json,updated_at,updated_by) VALUES('service',0,'{}',0,'') ON CONFLICT(id) DO NOTHING",[]],
+        ["UPDATE app_service_settings SET version=version+1,value_json=$1,updated_at=$2,updated_by=$3 WHERE id='service' AND version=$4 RETURNING version",[json,time,actor,version]],
+        [`INSERT INTO app_settings_audit(version,before_json,value_json,changed_at,changed_by)
+          SELECT version,$1,value_json,updated_at,updated_by FROM app_service_settings WHERE id='service' AND version=$2 AND value_json=$3 AND updated_at=$4 AND updated_by=$5
+          ON CONFLICT(version) DO NOTHING`,[previous,version+1,json,time,actor]],
+        ['DELETE FROM app_settings_audit WHERE version NOT IN (SELECT version FROM app_settings_audit ORDER BY version DESC LIMIT 100)',[]]
+      ]);
+      return Boolean(result[1].length);
+    },
+    async settingsHistory() { return query('SELECT version,before_json,value_json,changed_at FROM app_settings_audit ORDER BY version DESC LIMIT 10'); },
+    async adminStats(start,end,time) { return first(await query(`SELECT
+      (SELECT COUNT(*) FROM app_users) AS members,
+      (SELECT COUNT(*) FROM app_users WHERE created_at>=$1 AND created_at<$2) AS new_members,
+      (SELECT COUNT(DISTINCT user_id) FROM app_sessions WHERE expires_at>$3) AS signed_in_members,
+      (SELECT COUNT(*) FROM app_sessions WHERE expires_at>$3) AS sessions,
+      (SELECT COUNT(*) FROM app_favorites) AS favorites,
+      (SELECT COUNT(*) FROM app_users WHERE email_enabled=1) AS email_members,
+      (SELECT COUNT(DISTINCT user_id) FROM app_push) AS push_members,
+      (SELECT COUNT(*) FROM app_push) AS push_devices,
+      (SELECT COUNT(*) FROM app_deliveries WHERE status='pending' AND attempts<5) AS queued_notifications,
+      COALESCE((SELECT last_success FROM app_jobs WHERE id='disclosures'),0) AS last_scan`,[start,end,time])); },
     async session(hash) { return first(await query('SELECT user_id,expires_at FROM app_sessions WHERE token_hash=$1 AND expires_at>$2', [hash, now()])); },
-    async addSession(hash, id, expires) { await transaction([
+    async addSession(hash, id, expires,maximum=5) { await transaction([
       ['UPDATE app_users SET created_at=created_at WHERE id=$1',[id]],
       ['DELETE FROM app_sessions WHERE user_id=$1 AND expires_at<=$2',[id,now()]],
       ['INSERT INTO app_sessions(token_hash,user_id,expires_at) VALUES($1,$2,$3)', [hash,id,expires]],
       [`DELETE FROM app_sessions WHERE user_id=$1 AND token_hash<>$2 AND token_hash NOT IN
-        (SELECT token_hash FROM app_sessions WHERE user_id=$1 AND token_hash<>$2 ORDER BY expires_at DESC,token_hash DESC LIMIT 4)`,[id,hash]]
+        (SELECT token_hash FROM app_sessions WHERE user_id=$1 AND token_hash<>$2 ORDER BY expires_at DESC,token_hash DESC LIMIT $3)`,[id,hash,maximum-1]]
     ]); },
     async removeSession(hash) { await query('DELETE FROM app_sessions WHERE token_hash=$1', [hash]); },
     async favorites(id) { return query('SELECT corp_code,corp_name,stock_code,created_at FROM app_favorites WHERE user_id=$1 ORDER BY created_at DESC,corp_code', [id]); },
-    async addFavorite(id, company) {
+    async addFavorite(id, company,maximum=50) {
       const rows=await transaction([
         ['UPDATE app_users SET created_at=created_at WHERE id=$1',[id]],
         [`INSERT INTO app_favorites(user_id,corp_code,corp_name,stock_code,created_at)
-        SELECT $1,$2,$3,$4,$5 WHERE (SELECT COUNT(*) FROM app_favorites WHERE user_id=$1)<50
-        ON CONFLICT(user_id,corp_code) DO NOTHING`, [id,company.corp_code,company.corp_name,company.stock_code,now()]],
+        SELECT $1,$2,$3,$4,$5 WHERE (SELECT COUNT(*) FROM app_favorites WHERE user_id=$1)<$6
+        ON CONFLICT(user_id,corp_code) DO NOTHING`, [id,company.corp_code,company.corp_name,company.stock_code,now(),maximum]],
         ['SELECT corp_code FROM app_favorites WHERE user_id=$1 AND corp_code=$2', [id,company.corp_code]]
       ]);
       return first(rows[2]);
     },
     async removeFavorite(id, corp) { await query('DELETE FROM app_favorites WHERE user_id=$1 AND corp_code=$2', [id,corp]); },
     async subscriptions(id) { return query('SELECT id FROM app_push WHERE user_id=$1', [id]); },
-    async addPush(id, target, encrypted) {
+    async addPush(id, target, encrypted,maximum=5) {
       await transaction([
         database.pushLock ? database.pushLock(target) : ['SELECT 1',[]],
         ['UPDATE app_users SET created_at=created_at WHERE id=$1',[id]],
         [`DELETE FROM app_push WHERE id=$2 AND user_id<>$1 AND
-          ((SELECT COUNT(*) FROM app_push WHERE user_id=$1)<5 OR EXISTS(SELECT 1 FROM app_push WHERE user_id=$1 AND id=$2))`,[id,target]],
+          ((SELECT COUNT(*) FROM app_push WHERE user_id=$1)<$3 OR EXISTS(SELECT 1 FROM app_push WHERE user_id=$1 AND id=$2))`,[id,target,maximum]],
         [`UPDATE app_favorites SET monitoring_since=0 WHERE user_id=$1 AND NOT EXISTS(SELECT 1 FROM app_push WHERE user_id=$1) AND EXISTS(SELECT 1 FROM app_users WHERE id=$1 AND email_enabled=0)`, [id]],
-        [`INSERT INTO app_push(user_id,id,subscription_enc,created_at) SELECT $1,$2,$3,$4 WHERE (SELECT COUNT(*) FROM app_push WHERE user_id=$1)<5 OR EXISTS(SELECT 1 FROM app_push WHERE user_id=$1 AND id=$2)
-          ON CONFLICT(user_id,id) DO UPDATE SET subscription_enc=excluded.subscription_enc`, [id,target,encrypted,now()]]
+        [`INSERT INTO app_push(user_id,id,subscription_enc,created_at) SELECT $1,$2,$3,$4 WHERE (SELECT COUNT(*) FROM app_push WHERE user_id=$1)<$5 OR EXISTS(SELECT 1 FROM app_push WHERE user_id=$1 AND id=$2)
+          ON CONFLICT(user_id,id) DO UPDATE SET subscription_enc=excluded.subscription_enc`, [id,target,encrypted,now(),maximum]]
       ]);
       return first(await query('SELECT id FROM app_push WHERE user_id=$1 AND id=$2', [id,target]));
     },

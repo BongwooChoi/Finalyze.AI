@@ -20,7 +20,7 @@ redis.call('ZREMRANGEBYSCORE',KEYS[3],'-inf',now)
 redis.call('ZREMRANGEBYSCORE',KEYS[4],'-inf',now)
 if tonumber(redis.call('GET',KEYS[1]) or '0')>=tonumber(ARGV[3]) then return {-1,tonumber(ARGV[8])} end
 if tonumber(redis.call('GET',KEYS[2]) or '0')>=tonumber(ARGV[4]) then return {-2,tonumber(ARGV[8])} end
-if redis.call('ZCARD',KEYS[3])>=1 then return {-3,1} end
+if redis.call('ZCARD',KEYS[3])>=tonumber(ARGV[9]) then return {-3,1} end
 if redis.call('ZCARD',KEYS[4])>=tonumber(ARGV[5]) then return {-4,1} end
 local next=tonumber(redis.call('GET',KEYS[5]) or '0')
 if next>now then return {-5,math.ceil((next-now)/1000)} end
@@ -64,11 +64,15 @@ function createRedisStore({ url, token, fetchImpl = fetch }) {
     async block(key, until, now) { await command(['EVAL', BLOCK_SCRIPT, 1, `${key}:blocked`, until, Math.max(1, until - now)]); },
     async acquireAnalysis(user,day,tokenValue,time,limits) {
       return command(['EVAL',ANALYSIS_SCRIPT,5,...analysisKeys(user,day),time,tokenValue,
-        limits.memberDaily,limits.globalDaily,limits.globalConcurrent,limits.intervalMs,limits.leaseMs,limits.retrySeconds]);
+        limits.memberDaily,limits.globalDaily,limits.globalConcurrent,limits.intervalMs,limits.leaseMs,limits.retrySeconds,limits.memberConcurrent || 1]);
     },
     async releaseAnalysis(user,tokenValue) {
       const keys=analysisKeys(user,'');
       await command(['EVAL',RELEASE_ANALYSIS_SCRIPT,2,keys[2],keys[3],tokenValue]);
+    },
+    async analysisUsage(day,time=Date.now()) {
+      const [used,active]=await Promise.all([command(['GET',`finalyze:ai:v1:day:${day}`]),command(['ZCOUNT','finalyze:ai:v1:active','('+time,'+inf'])]);
+      return {used:Number(used || 0),active:Number(active || 0)};
     }
   };
 }
@@ -107,7 +111,7 @@ function createMemoryStore({ now = () => Date.now() } = {}) {
       const global=Object.fromEntries(Object.entries(read(keys[3]) || {}).filter(([,until])=>until>time));
       if(Number(read(keys[0]) || 0)>=limits.memberDaily) return [-1,limits.retrySeconds];
       if(Number(read(keys[1]) || 0)>=limits.globalDaily) return [-2,limits.retrySeconds];
-      if(Object.keys(member).length>=1) return [-3,1];
+      if(Object.keys(member).length>=(limits.memberConcurrent || 1)) return [-3,1];
       if(Object.keys(global).length>=limits.globalConcurrent) return [-4,1];
       const next=Number(read(keys[4]) || 0);
       if(next>time) return [-5,Math.ceil((next-time)/1000)];
@@ -121,6 +125,9 @@ function createMemoryStore({ now = () => Date.now() } = {}) {
       for(const key of analysisKeys(user,'').slice(2,4)) {
         const active=read(key);if(active) { delete active[tokenValue]; }
       }
+    },
+    async analysisUsage(day,time=now()) {
+      return {used:Number(read(`finalyze:ai:v1:day:${day}`) || 0),active:Object.values(read('finalyze:ai:v1:active') || {}).filter(until=>until>time).length};
     }
   };
 }

@@ -16,6 +16,8 @@ const { sign } = require('./accountSecurity');
 const { readDisclosureXml,parseProvisionalFinancials } = require('./provisionalFinancials');
 const {createTelegramBroadcast,telegramConfig}=require('./telegramDisclosures');
 const {createAnalysisLimiter,OPENAI_DEADLINE_MS}=require('./analysisLimits');
+const {createSettingsService}=require('./serviceSettings');
+const {createAdminRouter}=require('./adminRoutes');
 
 // 환경변수 로드
 dotenv.config();
@@ -23,7 +25,8 @@ dotenv.config();
 const app = express();
 if(process.env.VERCEL) app.set('trust proxy',1);
 const PORT = process.env.PORT || 3000;
-const runAnalysis = createAnalysisLimiter();
+const serviceSettings=createSettingsService({store:getAccountStore});
+const runAnalysis = createAnalysisLimiter({getSettings:serviceSettings.values});
 
 // 공개 페이지는 JavaScript 실행 전에도 본문과 고유 메타데이터를 제공합니다.
 app.get('/', (req, res) => res.type('html').send(renderPage('analysis')));
@@ -34,6 +37,8 @@ app.get('/about', (req, res) => {
   res.type('html').send(renderPage('about'));
 });
 app.get('/index.html', (req, res) => res.redirect(301, `/${req.originalUrl.slice(req.path.length)}`));
+app.get('/admin', (req,res)=>res.set({'Cache-Control':'no-store','X-Robots-Tag':'noindex, nofollow'}).sendFile(path.join(__dirname,'public','admin.html')));
+app.get('/admin.html', (req,res)=>res.redirect(301,'/admin'));
 
 // 정적 파일 제공
 app.use(express.static(path.join(__dirname, 'public')));
@@ -45,6 +50,7 @@ const findCompany = corp => new Promise((resolve,reject) => db.get('SELECT * FRO
 
 const accounts = createAccountRouter({
   store:getAccountStore,
+  getSettings:serviceSettings.values,
   findCompany,
   rateLimit:async (req,stage) => {
     const key = `finalyze:login:${stage}:${sign(req.ip || 'unknown',process.env.SESSION_SECRET)}`;
@@ -54,6 +60,7 @@ const accounts = createAccountRouter({
   }
 });
 app.use('/api',accounts.router);
+app.use('/api/admin',createAdminRouter({accounts,settings:serviceSettings,sharedStore:getSharedStore}));
 app.get('/privacy',(req,res) => res.sendFile(path.join(__dirname,'public','privacy.html')));
 
 const notificationFeed = createDisclosureFeed({

@@ -74,6 +74,9 @@
     byId('accountMenuButton').textContent = account.authenticated ? `관심 기업 ${account.favorites.length}` : '로그인';
     byId('accountSignedIn').hidden = !account.authenticated;
     byId('accountSignedOut').hidden = account.authenticated;
+    const adminLink=byId('adminMenuLink');if(adminLink)adminLink.hidden=!account.admin;
+    const limitsNote=byId('accountLimitsNote');
+    if(limitsNote && account.limits)limitsNote.textContent=`관심 기업 ${account.limits.maxFavorites}개 · 푸시 기기 ${account.limits.maxPush}개 · 로그인 환경 ${account.limits.maxSessions}개까지 등록할 수 있습니다.`;
     renderCompany();
     if(!account.authenticated || account.emailEnabled) closeEmailConnection();
     if(!account.authenticated) return;

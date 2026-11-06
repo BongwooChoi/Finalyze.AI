@@ -1,0 +1,15 @@
+{
+  "model": "gpt-image-2.6-sunburst",
+  "mode": "imagegen skill fallback CLI",
+  "endpoint": "images/generations",
+  "size": "1024x1024",
+  "quality": "high",
+  "background": "opaque",
+  "prompt": "finalyze-telegram-bot-icon-prompt.txt",
+  "original": "finalyze-telegram-bot-icon.png",
+  "telegramUpload": "finalyze-telegram-bot-icon.jpg",
+  "telegramBot": "@finalyze_ai_disclosures_bot",
+  "registrationMethod": "setMyProfilePhoto",
+  "verifiedProfilePhotoSize": "640x640",
+  "date": "2026-11-06"
+}

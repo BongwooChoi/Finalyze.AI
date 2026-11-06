@@ -1,0 +1,9 @@
+Use case: logo-brand
+Asset type: Finalyze.AI Telegram bot profile avatar, square 1024 by 1024 pixels, opaque background.
+Primary request: Design a polished financial analysis app icon for Finalyze.AI, a Korean company earnings and financial visualization service. Keep the existing brand language of a bold white financial chart and a small cyan AI sparkle on blue.
+Subject: one distinctive, simple white ascending financial trend mark with three substantial geometric bars and a clean connected line, integrated into a balanced compact symbol; one small cyan four-point AI sparkle near the upper-right of the mark. It must feel calm, analytical, precise and trustworthy.
+Style/medium: crisp premium flat vector-style raster logo, extremely clean edges, restrained subtle gradient only in the background, no illustration or 3D mockup.
+Composition/framing: full-bleed square background, centered large emblem, generous clear space, every essential detail inside the central 68 percent circle so Telegram's circular crop never cuts the symbol. Strong silhouette readable at 48 by 48 pixels.
+Color palette: deep navy #13245b to royal blue #2563eb background, pure white main mark, cyan #06b6d4 accent. High contrast.
+Text: none. Do not write the brand name, letters, numbers, captions or tiny labels.
+Constraints: a single finished icon, no contact sheet, no border, no white margin, no watermark, no Telegram paper plane, no coins or currency symbols, no robot head, no investment advice, no excessive sparkles, no perspective, no drop shadow outside the mark. Background stays opaque.

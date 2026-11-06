@@ -6,9 +6,10 @@
   let modal;
   let busy = false;
   let loginForAnalysis = false;
+  let googleAttempt = 0;
   const byId = id => document.getElementById(id);
-  function message(text,error = false) {
-    const element = byId('accountMessage');
+  function message(text,error = false,target = 'accountMessage') {
+    const element = byId(target);
     element.textContent = text;
     element.classList.toggle('account-error',error);
   }
@@ -74,6 +75,7 @@
     byId('accountSignedIn').hidden = !account.authenticated;
     byId('accountSignedOut').hidden = account.authenticated;
     renderCompany();
+    if(!account.authenticated || account.emailEnabled) closeEmailConnection();
     if(!account.authenticated) return;
     renderFavorites();
     byId('emailEnableButton').disabled = !account.mailAvailable;
@@ -121,16 +123,38 @@
     });
     await googleScript;
   }
+  function closeEmailConnection() {
+    googleAttempt++;
+    byId('accountEmailConnect').hidden = true;
+    byId('googleEmailButton').replaceChildren();
+    byId('googleEmailButton').hidden = true;
+    byId('emailEnableButton').setAttribute('aria-expanded','false');
+    byId('emailEnableButton').disabled = !account.mailAvailable;
+    byId('emailEnableButton').textContent = '메일 연결';
+  }
   async function prepareGoogle(emailOptIn = false) {
-    const container = byId('googleAccountButton');
+    if(!emailOptIn) closeEmailConnection();
+    const attempt = ++googleAttempt;
+    const container = byId(emailOptIn ? 'googleEmailButton' : 'googleAccountButton');
+    const notify = (text,error = false) => message(text,error,emailOptIn ? 'accountEmailMessage' : 'accountMessage');
+    if(emailOptIn) {
+      byId('accountEmailConnect').hidden = false;
+      byId('emailEnableButton').setAttribute('aria-expanded','true');
+      byId('emailEnableButton').disabled = true;
+      byId('emailEnableButton').textContent = '계정 선택 중';
+      byId('accountEmailConnect').scrollIntoView({block:'nearest',behavior:'instant'});
+    }
     container.replaceChildren(); container.hidden = false;
-    if(!account.enabled) { message('로그인 기능을 준비하고 있습니다. 잠시 후 다시 이용해주세요.'); return; }
-    message(emailOptIn ? '메일 알림을 받을 Google 계정을 확인해주세요.' : loginForAnalysis ? '선택한 공시의 AI 분석을 위해 Google로 로그인해주세요.' : 'Google 로그인 후 AI 재무분석과 관심 기업 동기화를 이용할 수 있습니다.');
+    if(!account.enabled) { notify('로그인 기능을 준비하고 있습니다. 잠시 후 다시 이용해주세요.'); return; }
+    notify(emailOptIn ? '아래 버튼에서 Google 계정을 확인해주세요.' : loginForAnalysis ? '선택한 공시의 AI 분석을 위해 Google로 로그인해주세요.' : 'Google 로그인 후 AI 재무분석과 관심 기업 동기화를 이용할 수 있습니다.');
     await loadGoogle();
+    if(attempt !== googleAttempt) return;
     const { nonce } = await api('/auth/challenge','POST',{});
+    if(attempt !== googleAttempt) return;
     google.accounts.id.initialize({ client_id:account.clientId,nonce,auto_select:false,
       callback:async response => {
-        message('로그인 정보를 확인하고 있습니다.');
+        if(attempt !== googleAttempt) return;
+        notify(emailOptIn ? '메일 연결을 확인하고 있습니다.' : '로그인 정보를 확인하고 있습니다.');
         try {
           await api('/auth/google','POST',{ credential:response.credential,emailOptIn });
           container.replaceChildren(); container.hidden = true;
@@ -141,10 +165,11 @@
           }
           message(emailOptIn ? '이메일 알림을 켰습니다.' : '로그인했습니다. 관심 기업과 알림을 설정해보세요.');
           if(loginForAnalysis) { loginForAnalysis = false; modal.hide(); }
-        } catch(error) { try { await prepareGoogle(emailOptIn); } catch {} message(error.message,true); }
+        } catch(error) { if(attempt !== googleAttempt) return; try { await prepareGoogle(emailOptIn); } catch {} notify(error.message,true); }
       }
     });
-    google.accounts.id.renderButton(container,{ theme:'outline',size:'large',shape:'pill',text:'continue_with',width:280 });
+    google.accounts.id.renderButton(container,{ theme:'outline',size:'large',shape:'pill',text:'continue_with',width:Math.max(200,Math.min(280,Math.floor(container.clientWidth || 280))) });
+    if(emailOptIn) byId('accountEmailConnect').scrollIntoView({block:'nearest',behavior:'instant'});
   }
   async function show() {
     byId('accountModalTitle').textContent = loginForAnalysis ? 'AI 재무분석 시작하기' : '관심 기업 · 공시 알림';
@@ -183,7 +208,7 @@
   }
   document.addEventListener('DOMContentLoaded',() => {
     modal = new bootstrap.Modal(byId('accountModal'));
-    byId('accountModal').addEventListener('hidden.bs.modal',() => { loginForAnalysis = false; });
+    byId('accountModal').addEventListener('hidden.bs.modal',() => { loginForAnalysis = false; closeEmailConnection(); });
     byId('accountMenuButton').addEventListener('click',show);
     byId('companyFavoriteButton').addEventListener('click',toggleCompany);
     byId('pushEnableButton').addEventListener('click',enablePush);
@@ -192,7 +217,15 @@
       if(subscription) { await api('/account/push','DELETE',{endpoint:subscription.endpoint}); await subscription.unsubscribe(); }
       await refresh(); message('이 기기의 푸시 알림을 껐습니다.');
     }));
-    byId('emailEnableButton').addEventListener('click',() => prepareGoogle(true).catch(error => message(error.message,true)));
+    byId('emailEnableButton').addEventListener('click',() => prepareGoogle(true).catch(error => {
+      message(error.message,true,'accountEmailMessage');
+      byId('emailEnableButton').disabled = false;
+      byId('emailEnableButton').textContent = '다시 연결';
+    }));
+    byId('emailConnectCancel').addEventListener('click',() => {
+      closeEmailConnection();
+      byId('emailEnableButton').focus({preventScroll:true});
+    });
     byId('emailDisableButton').addEventListener('click',() => perform(async () => { await api('/account/email','DELETE'); await refresh(); message('이메일 알림을 끄고 저장된 이메일을 삭제했습니다.'); }));
     byId('accountLogoutButton').addEventListener('click',() => perform(async () => {
       const subscription = await currentSubscription();

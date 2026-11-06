@@ -45,7 +45,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Noto+Sans+KR:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/css/style.css?v=3.19">
+  <link rel="stylesheet" href="/css/style.css?v=3.20">
   <link rel="manifest" href="/manifest.json">
   <meta name="theme-color" content="#2563eb">
 
@@ -153,6 +153,14 @@
           <ul class="recent-disclosures-list" id="recentDisclosuresList" aria-busy="true"></ul>
           <p class="recent-disclosures-note">출처: OPEN DART · 대표기업 60개 선정 · 정기보고서·잠정실적 · 5분마다 갱신</p>
         </section>
+        <aside class="home-telegram" aria-labelledby="homeTelegramTitle">
+          <i class="bi bi-telegram home-telegram-icon" aria-hidden="true"></i>
+          <div class="home-telegram-copy">
+            <h2 id="homeTelegramTitle">텔레그램 공시 알림</h2>
+            <p>주요 기업 실적 공시<br> 무료로 받아보세요.</p>
+          </div>
+          <a class="home-telegram-link" href="https://t.me/finalyze_ai" target="_blank" rel="noopener noreferrer">무료 구독 <i class="bi bi-arrow-up-right" aria-hidden="true"></i><span class="visually-hidden"> (새 창)</span></a>
+        </aside>
       </div>
 
       <!-- 스크롤 유도 -->
@@ -699,7 +707,14 @@
           <section><h3>관심 기업</h3><ul id="accountFavorites" class="account-favorites"></ul></section>
           <section><h3>공시 알림</h3><p class="account-note">정기보고서·잠정실적을 약 15분 간격으로 확인합니다. 최초 확인 때는 기존 공시를 기준으로 설정하고, 이후 새로 확인되는 공시부터 알립니다. 전달은 지연될 수 있습니다.</p>
             <div class="account-channel"><div><h4>이 기기 푸시 알림</h4><p id="accountPushStatus"></p></div><button type="button" id="pushEnableButton">알림 켜기</button><button type="button" id="pushDisableButton" hidden>알림 끄기</button></div>
-            <div class="account-channel"><div><h4>이메일 알림</h4><p id="accountEmailStatus"></p></div><button type="button" id="emailEnableButton">메일 연결</button><button type="button" id="emailDisableButton" hidden>알림 끄기</button></div>
+            <div class="account-channel"><div><h4>이메일 알림</h4><p id="accountEmailStatus" role="status"></p></div><button type="button" id="emailEnableButton" aria-expanded="false" aria-controls="accountEmailConnect">메일 연결</button><button type="button" id="emailDisableButton" hidden>알림 끄기</button></div>
+            <div id="accountEmailConnect" class="account-email-connect" hidden>
+              <h4>메일을 받을 Google 계정 확인</h4>
+              <p class="account-note">로그인한 Google 계정으로 계속하면 해당 이메일로 공시 알림을 받는 데 동의하게 됩니다.</p>
+              <p id="accountEmailMessage" class="account-message" role="status"></p>
+              <div id="googleEmailButton" class="account-google-button" hidden></div>
+              <button type="button" id="emailConnectCancel" class="account-email-cancel">취소</button>
+            </div>
           </section>
           <div class="account-session-actions"><button type="button" id="accountLogoutButton">이 기기 로그아웃</button><button type="button" id="accountDeleteButton">계정 및 데이터 삭제</button></div>
         </div>
@@ -708,7 +723,7 @@
     </div></div>
   </div>
   <script src="/js/main.js?v=3.16"></script>
-  <script src="/js/accounts.js?v=1.1"></script>
+  <script src="/js/accounts.js?v=1.2"></script>
   <noscript>
     <div style="padding:2rem;text-align:center;font-family:sans-serif;">
       <h2>Finalyze.AI</h2>

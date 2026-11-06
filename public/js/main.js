@@ -773,9 +773,6 @@ function showAiAccess(context, member) {
   if(context.kind === 'provisional') {
     const guide = document.getElementById('analysisGuide');
     if(guide) guide.style.display = 'none';
-    document.getElementById('provisionalChartWrap').style.display = 'none';
-    document.getElementById('provisionalPdfBtn').disabled = true;
-    document.getElementById('provisionalImageBtn').disabled = true;
   }
   panel.access.hidden = false;
   panel.access.innerHTML = `<div class="ai-access-preview" aria-hidden="true"><div><span>수익성 분석</span><i></i><i></i></div><div><span>재무 건전성</span><i></i><i></i></div><div><span>실적 변화</span><i></i></div></div>
@@ -783,7 +780,7 @@ function showAiAccess(context, member) {
     <span class="ai-access-icon" aria-hidden="true"><i class="bi ${member ? 'bi-stars' : 'bi-lock'}"></i></span>
     <h4>${member ? '선택한 공시의 AI 분석을 시작해보세요' : 'AI 재무분석은 로그인 후 이용할 수 있어요'}</h4>
     <p>${member ? '분석 시작 버튼을 누르면 AI가 공시를 읽고 주요 변화를 설명합니다.' : context.kind === 'provisional' ?
-      '잠정실적의 AI 요약과 비교 차트를 확인해보세요. 공시 원문은 로그인 없이 열 수 있습니다.' :
+      '잠정실적 차트는 로그인 없이 확인할 수 있습니다. 로그인하면 실적 변화에 대한 AI 설명도 읽을 수 있어요.' :
       '재무제표와 차트는 로그인 없이 확인할 수 있습니다. 로그인하면 수익성·재무 건전성에 대한 AI 설명도 읽을 수 있어요.'}</p>
     <button type="button" class="ai-access-button" data-ai-action="${member ? 'analyze' : 'login'}"><i class="bi ${member ? 'bi-stars' : 'bi-box-arrow-in-right'}" aria-hidden="true"></i> ${member ? 'AI 분석 시작하기' : 'Google로 로그인하고 AI 분석 보기'} <span aria-hidden="true">→</span></button>
     ${member ? '' : '<small>이름·프로필 사진은 저장하지 않습니다.</small>'}</div>`;
@@ -826,7 +823,6 @@ async function requestAiAnalysis(context) {
     panel.content.innerHTML = renderAiAnalysisHtml(data.result,context.kind);
     panel.content.style.display = 'block'; context.status = 'complete';
     if(context.kind === 'provisional') {
-      renderProvisionalChart(data.chartData);
       document.getElementById('provisionalPdfBtn').disabled = false;
       document.getElementById('provisionalImageBtn').disabled = false;
       updateAnalysisGuide(context.reportName,'provisionalCard');
@@ -1703,8 +1699,30 @@ async function handleProvisionalSelect(rceptNo, reportNm, btnElement) {
   document.getElementById('provisionalPdfBtn').disabled = true;
   document.getElementById('provisionalImageBtn').disabled = true;
   activeAiAnalysis = context;
-  await requestAiAnalysis(context);
+  document.getElementById('provisionalSourceLink').href = `https://dart.fss.or.kr/dsaf001/main.do?rcpNo=${encodeURIComponent(rceptNo)}`;
+  await Promise.all([loadProvisionalFinancials(context),requestAiAnalysis(context)]);
   if(activeAiAnalysis === context) card.scrollIntoView({behavior:'smooth'});
+}
+
+async function loadProvisionalFinancials(context) {
+  const loading=document.getElementById('provisionalDataLoading');
+  const notice=document.getElementById('provisionalDataNotice');
+  loading.style.display='block'; notice.style.display='none';
+  try {
+    const response=await fetch(`/api/provisional-financials?rcept_no=${encodeURIComponent(context.receipt)}`);
+    const data=await response.json();
+    if(activeAiAnalysis!==context) return;
+    if(!response.ok || data.status!=='success') throw new Error(data.message || '잠정실적 수치를 불러오지 못했습니다.');
+    renderProvisionalChart(data.chartData);
+    context.chartAvailable=Boolean(data.chartData?.metrics?.length);
+    if(context.chartAvailable) {
+      document.getElementById('provisionalPdfBtn').disabled=false;
+      document.getElementById('provisionalImageBtn').disabled=false;
+    } else { notice.textContent=data.message || '자동으로 읽을 수 없는 표 형식입니다. DART 원문에서 수치를 확인해주세요.'; notice.style.display='block'; }
+  } catch(error) {
+    if(activeAiAnalysis!==context) return;
+    notice.textContent=error.message || '잠정실적 수치를 불러오지 못했습니다.'; notice.style.display='block';
+  } finally { if(activeAiAnalysis===context) loading.style.display='none'; }
 }
 
 // 잠정실적 비교 차트 렌더링 (당기 vs 전기 vs 전년동기)
@@ -2348,7 +2366,7 @@ async function exportProvisionalAsPdf() {
   const btn = document.getElementById('provisionalPdfBtn');
 
   const content = document.getElementById('provisionalContent');
-  if (!content || content.style.display === 'none' || !content.innerHTML.trim()) {
+  if ((!content || content.style.display === 'none' || !content.innerHTML.trim()) && document.getElementById('provisionalChartWrap').style.display === 'none') {
     showToast('내보낼 분석 결과가 없습니다. 먼저 잠정실적을 분석해주세요.', 'error');
     return;
   }
@@ -2462,7 +2480,7 @@ async function exportProvisionalAsImage() {
   const btn = document.getElementById('provisionalImageBtn');
 
   const content = document.getElementById('provisionalContent');
-  if (!content || content.style.display === 'none' || !content.innerHTML.trim()) {
+  if ((!content || content.style.display === 'none' || !content.innerHTML.trim()) && document.getElementById('provisionalChartWrap').style.display === 'none') {
     showToast('내보낼 분석 결과가 없습니다. 먼저 잠정실적을 분석해주세요.', 'error');
     return;
   }
@@ -2475,6 +2493,11 @@ async function exportProvisionalAsImage() {
   try {
     const card = document.getElementById('provisionalCard');
     const clone = card.cloneNode(true);
+    clone.querySelectorAll('.ai-access-gate').forEach(element=>element.remove());
+    if(content.style.display==='none') {
+      clone.querySelector('[aria-labelledby="provisionalAiTitle"]')?.remove();
+      clone.querySelector('.provisional-visualization')?.classList.replace('col-lg-6','col-12');
+    }
     const exportActions = clone.querySelector('.export-actions');
     if (exportActions) exportActions.remove();
 

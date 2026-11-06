@@ -12,6 +12,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 npm start                        # 로컬 서버 실행 (기본 포트 3000)
 npm run setup:accounts           # 계정 DB 스키마 준비 (Neon 또는 로컬 SQLite)
 npm run check:accounts           # 로그인·데이터 분리·푸시·알림 대기열 검사
+npm run check:provisional-financials # 잠정실적 원문 숫자·단위·기간·병합 셀 검사
 npm run check:public-pages        # 공개 페이지·메타데이터·리디렉션·사이트맵 HTTP 검사
 npm run check:recent-disclosures  # 최신 실적 공시 선정·페이지 처리·캐시 검사
 npm run check:dart-client         # DART 공유 캐시·호출 속도·하루 한도·차단 응답 검사
@@ -49,6 +50,7 @@ node setupDatabase.js            # dart.db에 companies 테이블 적재 + 인�
 - `GET /api/disclosure-list` — 최근 5년 공시목록 프록시 (정기공시 A + 거래소공시 I 병합)
 - `GET /api/recent-disclosures` — 대표기업 60개의 최신 실적 공시 최대 5개. `recentDisclosures.js`에서 선정·필요한 페이지 조회·Redis 공유 목록/수집 잠금·5분 캐시를 관리한다. 30일에 5개 미만이면 90일까지 확장한다. 잠정실적은 원문 표의 재무금액을 확인해 월간 판매대수 발표를 제외한다. 일시적 통신 오류는 한 번 재시도하고 원문 일부 실패는 `partial: true`와 확인된 목록을 반환한다(1분 캐시). 실패한 원문은 부적격으로 저장하지 않는다. 로그에는 단계·오류 코드·접수번호·`error.message`를 남기며 axios 객체 전체를 출력하지 않는다. 기업 명단은 분기마다 점검한다.
 - `GET /api/provisional-analysis` — 잠정실적 공시 원문(zip)을 내려받아 텍스트 추출 후 OpenAI GPT 분석
+- `GET /api/provisional-financials?rcept_no=` — 비회원도 조회하는 잠정실적 차트 수치. `provisionalFinancials.js`가 원문 표의 병합 셀·열 제목·단위·기간을 읽으며, 누계·증감률 열을 제외합니다. LLM을 호출하거나 누락된 값을 추측하지 않습니다.
 
 **레거시 주의**: `/api/financial-statements`와 `/api/company-report-options`는 프런트에서 사용하지 않는다. 특히 `/api/financial-statements`는 financialService.js에서 export되지 않은 함수(`getFinancialStatements`, `saveFinancialStatementsToDB`)를 참조하므로 호출 시 크래시한다.
 
@@ -61,12 +63,12 @@ node setupDatabase.js            # dart.db에 companies 테이블 적재 + 인�
 - **연결/개별 우선순위**: 연결재무제표(`fs_div === 'CFS'`) 우선, 없으면 개별(`OFS`) fallback.
 - **날짜는 KST 기준**: Vercel 서버는 UTC로 돌기 때문에 공시 날짜 계산 시 UTC+9 보정을 해야 당일 공시가 잘리지 않는다 (`/api/disclosure-list` 참고).
 - **OpenAI 호출**: 모델은 `gpt-6-luna`(`OPENAI_MODEL` 상수). Chat Completions API를 `reasoning_effort: 'none'`(리즈닝 비활성화)으로 호출하며, 429 발생 시 지수 백오프로 최대 3회 재시도(`callOpenAIAPI`). 에러 로그에는 axios `error` 객체 전체가 아닌 `error.message`만 남긴다(요청 헤더의 API 키 노출 방지).
-- **AI 응답은 structured outputs(JSON)**: `response_format: json_schema`(strict)로 `FINANCIAL_ANALYSIS_SCHEMA` / `PROVISIONAL_ANALYSIS_SCHEMA`에 맞는 JSON(`sections[{category,title,points[{tone,text}]}]`, `rating: positive|mixed|negative`, `summary`)을 받는다. 잠정실적은 차트용 `chartData`도 같은 JSON에 포함된다. `title`은 서버가 직접 붙인다. 강조는 `**굵게**`만 허용하며, 프런트 `renderAiAnalysisHtml()`이 이스케이프 후 `<strong>`으로 바꿔 평가 배지 + 섹션 카드 + ▲▼ 항목으로 렌더링한다(모델 출력 HTML을 그대로 넣지 않음). 섹션 category를 추가하면 프런트 `AI_SECTION_ICONS`에도 아이콘을 추가한다. PDF 내보내기는 `data-export` 속성이 달린 블록만 추출한다(`extractAiAnalysisText`).
+- **AI 응답은 structured outputs(JSON)**: `response_format: json_schema`(strict)로 `FINANCIAL_ANALYSIS_SCHEMA` / `PROVISIONAL_ANALYSIS_SCHEMA`에 맞는 JSON(`sections[{category,title,points[{tone,text}]}]`, `rating: positive|mixed|negative`, `summary`)을 받는다. 잠정실적 `chartData`는 `provisionalFinancials.js`가 원문 표에서 직접 추출하며 모델에 생성을 요청하지 않는다. `title`은 서버가 직접 붙인다. 강조는 `**굵게**`만 허용하며, 프런트 `renderAiAnalysisHtml()`이 이스케이프 후 `<strong>`으로 바꿔 평가 배지 + 섹션 카드 + ▲▼ 항목으로 렌더링한다(모델 출력 HTML을 그대로 넣지 않음). 섹션 category를 추가하면 프런트 `AI_SECTION_ICONS`에도 아이콘을 추가한다. PDF 내보내기는 `data-export` 속성이 달린 블록만 추출한다(`extractAiAnalysisText`).
 - **잠정실적은 정기공시보다 항목이 적다**: 섹션 1~3개, 항목 1~2개로 프롬프트를 따로 두고, 공시에 없는 내용(변동 요인 등)은 섹션을 만들지 않게 한다. "잠정치라 확정 실적과 다를 수 있다"는 안내는 AI가 아니라 프런트가 고정 문구로 표시한다.
 
 ## 계정과 알림
 
-- 정기보고서의 숫자·시각화는 공개합니다. `POST /api/ai-financial-analysis`와 `GET /api/provisional-analysis`는 `accounts.requireAnalysis`에서 회원 세션·CSRF를 확인합니다. 잠정실적은 차트 추출도 LLM을 사용하므로 AI 요약·차트 모두 회원 대상이며 비회원에게 원문 링크를 제공합니다. 프런트의 로그인 미리보기는 AI를 호출하지 않습니다. 로그인 후에는 같은 공시의 ‘AI 분석 시작하기’를 눌러 재개하고, 로그아웃·기업 변경 시 대기 중인 응답을 무시합니다.
+- 정기보고서와 잠정실적의 숫자·시각화는 공개합니다. `POST /api/ai-financial-analysis`와 `GET /api/provisional-analysis`는 `accounts.requireAnalysis`에서 회원 세션·CSRF를 확인합니다. 잠정실적 차트는 공개 API에서 먼저 읽으며 로그인·로그아웃·AI 실패가 차트를 숨기지 않습니다. 프런트의 로그인 미리보기는 AI를 호출하지 않습니다. 로그인 후에는 같은 공시의 ‘AI 분석 시작하기’를 눌러 재개하고, 로그아웃·기업 변경 시 대기 중인 AI 응답을 무시합니다.
 
 - `accountRoutes.js`는 Google ID 토큰·nonce, HttpOnly 세션, 변경 요청의 출처·CSRF를 확인합니다. Google 원본 식별자·이름·사진·로그인 토큰은 저장하지 않습니다. 이메일은 발신 설정과 별도 수신 동의가 있을 때만 암호화해 저장합니다.
 - `accountStore.js`는 운영 Neon Postgres(`DATABASE_URL`), 로컬 `.data/accounts.sqlite`를 사용합니다. `USER_ID_SECRET`·`USER_DATA_KEY`·VAPID 키는 영속 데이터와 연결되어 있으므로 재배포마다 교체하지 않습니다. 무료 캐시 Redis를 계정 저장소로 사용하지 않습니다.

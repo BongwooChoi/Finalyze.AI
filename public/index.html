@@ -45,7 +45,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Noto+Sans+KR:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/css/style.css?v=3.14">
+  <link rel="stylesheet" href="/css/style.css?v=3.15">
   <link rel="manifest" href="/manifest.json">
   <meta name="theme-color" content="#2563eb">
 
@@ -81,7 +81,7 @@
   <a class="skip-link" href="#analysisPage" id="skipLink">본문으로 이동</a>
   <header class="site-header">
     <nav class="container site-nav" aria-label="주요 메뉴">
-      <a class="site-brand" href="/" data-page-link="analysis" aria-label="Finalyze.AI 재무분석 홈">Finalyze<span>.AI</span></a>
+      <a class="site-brand" href="/" aria-label="Finalyze.AI 재무분석 홈">Finalyze<span>.AI</span></a>
       <div class="site-nav-links">
         <a href="/" data-page-link="analysis" data-page="analysis" aria-current="page">재무분석</a>
         <a href="/about" data-page-link="about" data-page="about">시스템 소개</a>
@@ -240,21 +240,31 @@
         </div>
       </div>
       <div class="card-body">
-        <div id="provisionalLoading" class="analysis-skeleton" style="display: none;">
-          <div class="skeleton-status"><span class="spinner-border spinner-border-sm me-2"></span>잠정실적 공시를 AI가 분석하는 중입니다 (약 5~10초)</div>
-          <div class="skeleton-line w-40"></div>
-          <div class="skeleton-line"></div>
-          <div class="skeleton-line"></div>
-          <div class="skeleton-line w-80"></div>
-          <div class="skeleton-line"></div>
-          <div class="skeleton-line w-60"></div>
+        <div class="row g-4">
+          <section class="col-lg-6 provisional-visualization" aria-labelledby="provisionalVisualTitle">
+            <h4 id="provisionalVisualTitle" class="provisional-section-title">잠정실적 시각화</h4>
+            <p id="provisionalDataLoading" class="account-note" role="status" style="display:none;"><span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>공시의 실적 수치를 불러오는 중입니다.</p>
+            <p id="provisionalDataNotice" class="account-note" role="status" style="display:none;"></p>
+            <div id="provisionalChartWrap" class="chart-container mb-3" style="display: none;"><canvas id="provisionalChart"></canvas></div>
+            <p class="account-note">공시 원문에 있는 수치를 표시합니다. 잠정실적은 이후 확정 실적과 다를 수 있습니다.</p>
+            <a id="provisionalSourceLink" class="ai-access-source" target="_blank" rel="noopener noreferrer">DART 원문 보기 ↗</a>
+          </section>
+          <section class="col-lg-6" aria-labelledby="provisionalAiTitle">
+            <h4 id="provisionalAiTitle" class="provisional-section-title">AI 실적 분석</h4>
+            <div id="provisionalLoading" class="analysis-skeleton" style="display: none;">
+              <div class="skeleton-status"><span class="spinner-border spinner-border-sm me-2"></span>잠정실적 공시를 AI가 분석하는 중입니다 (약 5~10초)</div>
+              <div class="skeleton-line w-40"></div>
+              <div class="skeleton-line"></div>
+              <div class="skeleton-line"></div>
+              <div class="skeleton-line w-80"></div>
+              <div class="skeleton-line"></div>
+              <div class="skeleton-line w-60"></div>
+            </div>
+            <div id="provisionalError" class="alert alert-danger" style="display: none;"></div>
+            <div id="provisionalAccess" class="ai-access-gate" hidden></div>
+            <div id="provisionalContent" style="display: none;"></div>
+          </section>
         </div>
-        <div id="provisionalError" class="alert alert-danger" style="display: none;"></div>
-        <div id="provisionalAccess" class="ai-access-gate" hidden></div>
-        <div id="provisionalChartWrap" class="chart-container mb-4" style="display: none;">
-          <canvas id="provisionalChart"></canvas>
-        </div>
-        <div id="provisionalContent" style="display: none;"></div>
       </div>
     </div>
 
@@ -540,7 +550,7 @@
           <p>서비스의 지원 범위와 결과를 확인하는 방법을 정리했습니다.</p>
         </div>
         <details open><summary>Finalyze.AI는 어떤 서비스인가요?</summary><p>Finalyze.AI는 금융감독원 OPEN DART 데이터를 이용해 한국 기업의 재무제표를 차트와 표로 보여주고, OpenAI GPT로 분석 설명을 제공하는 무료 웹 서비스입니다. 기업 검색, 정기보고서·잠정실적 분석, 연간 추이 확인, PDF·이미지 저장을 지원합니다.</p></details>
-        <details><summary>로그인 없이도 이용할 수 있나요?</summary><p>기업 검색·공시 목록·정기보고서의 재무제표와 차트·재무비율·연간 추이는 로그인 없이 확인할 수 있습니다. AI 재무분석과 잠정실적의 AI 요약·비교 차트는 Google 로그인 후 무료로 이용할 수 있습니다. 잠정실적 공시 원문은 로그인 없이 열 수 있습니다.</p></details>
+        <details><summary>로그인 없이도 이용할 수 있나요?</summary><p>기업 검색·공시 목록·정기보고서의 재무제표와 차트·재무비율·연간 추이·잠정실적 비교 차트는 로그인 없이 확인할 수 있습니다. AI 재무분석과 잠정실적의 AI 설명은 Google 로그인 후 무료로 이용할 수 있습니다. 공시 원문도 로그인 없이 열 수 있으며, 표 형식을 자동으로 읽지 못하면 원문 확인을 안내합니다.</p></details>
         <details><summary>어떤 보고서와 공시를 분석할 수 있나요?</summary><p>사업보고서·반기보고서·1분기보고서·3분기보고서의 정기보고서 4종과 잠정실적 공시를 분석합니다. 정기보고서는 주요 재무계정과 비율을 분석하고, 잠정실적은 공시 원문에 포함된 실적 수치와 설명을 요약합니다.</p></details>
         <details><summary>재무비율도 AI가 계산하나요?</summary><p>재무비율은 서버가 DART 주요계정의 수치로 계산합니다. AI는 재무데이터와 잠정실적 공시 텍스트를 바탕으로 설명을 작성합니다. 숫자의 계산과 AI의 서술 해석은 구분해 확인해 주세요.</p></details>
         <details><summary>공시 목록의 기간과 5개년 추이는 어떻게 다른가요?</summary><p>기업을 선택하면 공시 목록은 현재 연도를 포함한 최근 3개년의 정기보고서·잠정실적을 보여줍니다. 연간 추이 탭은 최근 5개년 사업보고서 데이터를 별도로 조회합니다. 아직 사업보고서가 발표되지 않았거나 DART에 데이터가 없는 연도는 실적을 확인할 수 없을 수 있습니다.</p></details>
@@ -635,7 +645,7 @@
       </div>
     </div></div>
   </div>
-  <script src="/js/main.js?v=3.14"></script>
+  <script src="/js/main.js?v=3.15"></script>
   <script src="/js/accounts.js?v=1.1"></script>
   <noscript>
     <div style="padding:2rem;text-align:center;font-family:sans-serif;">

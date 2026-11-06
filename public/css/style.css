@@ -600,6 +600,7 @@ body.modal-open .pwa-install-banner { visibility: hidden; }
 .ai-access-invite small { font-size: 0.7rem; color: #64748b; }
 .ai-access-source { font-size: 0.8rem; color: #2563eb; }
 .ai-access-check { display: flex; justify-content: center; align-items: center; min-height: 390px; padding: 20px; margin: 0; color: #64748b; font-size: 0.85rem; }
+.provisional-section-title { margin: 0 0 1.2rem; font-size: 1rem; font-weight: 700; color: #0f172a; }
 .privacy-page { max-width: 800px; margin: 3rem auto; padding: 0 1.4rem; color: #334155; line-height: 1.9; }
 .privacy-page h1 { font-size: 1.8rem; margin-top: 1rem; }
 .privacy-page h2 { font-size: 1.1rem; margin-top: 2rem; }

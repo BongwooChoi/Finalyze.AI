@@ -13,6 +13,7 @@ const { getAccountStore } = require('./accountStore');
 const { createAccountRouter } = require('./accountRoutes');
 const { createDisclosureFeed,createSenders,createNotificationJob,cronAuthorized } = require('./disclosureNotifications');
 const { sign } = require('./accountSecurity');
+const { readDisclosureXml,parseProvisionalFinancials } = require('./provisionalFinancials');
 
 // 환경변수 로드
 dotenv.config();
@@ -767,46 +768,13 @@ const FINANCIAL_ANALYSIS_SCHEMA = {
 };
 
 // 잠정실적 분석 응답 스키마 (정기공시보다 항목이 적으므로 섹션 종류도 적다)
-const NULLABLE_NUMBER = { type: ['number', 'null'] };
 const PROVISIONAL_ANALYSIS_SCHEMA = {
   name: 'provisional_analysis',
   schema: {
     type: 'object',
     additionalProperties: false,
-    required: ['chartData', 'sections', 'rating', 'summary'],
+    required: ['sections', 'rating', 'summary'],
     properties: {
-      chartData: {
-        type: 'object',
-        additionalProperties: false,
-        required: ['unit', 'labels', 'metrics'],
-        properties: {
-          unit: { type: 'string' },
-          labels: {
-            type: 'object',
-            additionalProperties: false,
-            required: ['current', 'previous', 'yearAgo'],
-            properties: {
-              current: { type: 'string' },
-              previous: { type: 'string' },
-              yearAgo: { type: 'string' }
-            }
-          },
-          metrics: {
-            type: 'array',
-            items: {
-              type: 'object',
-              additionalProperties: false,
-              required: ['name', 'current', 'previous', 'yearAgo'],
-              properties: {
-                name: { type: 'string' },
-                current: NULLABLE_NUMBER,
-                previous: NULLABLE_NUMBER,
-                yearAgo: NULLABLE_NUMBER
-              }
-            }
-          }
-        }
-      },
       sections: buildAnalysisSectionSchema(['results', 'comparison', 'drivers']),
       rating: RATING_SCHEMA,
       summary: { type: 'string' }
@@ -1103,10 +1071,6 @@ ${documentText}
 4. 공시 원문에 있는 정보만 사용하고, 원문에 없는 내용을 추측해 채우지 마세요. 잠정실적 공시는 항목이 적으므로 짧게 작성해도 됩니다.
 
 출력 형식 (지정된 JSON 스키마를 따르세요):
-- chartData: 차트용 데이터.
-  - unit: 원문에 표기된 금액 단위(예: 조원, 억원, 백만원).
-  - labels: 당기(current)·전기(previous)·전년동기(yearAgo) 라벨(예: "26.3Q").
-  - metrics: 매출액, 영업이익, 당기순이익 순서로 3개. 수치는 원문 단위 그대로의 숫자(천 단위 쉼표 없이)로 쓰고, 원문에 없는 수치는 null로 두세요.
 - sections: 1~3개. category는 results(잠정실적 수치), comparison(전년 동기·직전 분기 대비 증감), drivers(실적 변동 요인·회사 측 설명) 중에서 서로 겹치지 않게 고르고, title에는 섹션 이름(예: "실적 요약")을 한국어로 적으세요.
 - drivers 섹션은 공시 원문에 회사가 밝힌 실적 변동 요인이 실제로 있을 때만 만드세요. "설명이 없다"는 내용만 담긴 섹션이나 point는 만들지 마세요.
 - "잠정치이므로 확정 실적과 다를 수 있다"는 안내는 화면에 따로 표시되므로 summary와 points에 쓰지 마세요.
@@ -1117,6 +1081,22 @@ ${documentText}
 - 중요한 수치나 용어는 **별표 두 개**로 감싸 강조하세요. 그 외 HTML 태그나 Markdown 문법은 쓰지 마세요.
 `;
 }
+
+// 공시 원문의 숫자는 로그인과 AI 호출 없이 제공합니다.
+app.get('/api/provisional-financials',async (req,res) => {
+  if(typeof req.query.rcept_no!=='string' || !/^\d{14}$/.test(req.query.rcept_no)) return res.status(400).json({status:'error',message:'공시 접수번호를 확인해주세요.'});
+  try {
+    const response=await dartClient.get('https://opendart.fss.or.kr/api/document.xml',{
+      params:{rcept_no:req.query.rcept_no},responseType:'arraybuffer',timeout:12000
+    });
+    const chartData=parseProvisionalFinancials(readDisclosureXml(Buffer.from(response.data)));
+    res.set('Cache-Control','public, max-age=300, s-maxage=3600').json({status:'success',chartData,
+      ...(chartData ? {} : {message:'이 공시의 표 형식에서는 실적 수치를 자동으로 읽지 못했습니다. DART 원문에서 확인해주세요.'})});
+  } catch(error) {
+    console.warn('잠정실적 수치 조회 실패:',{code:error.code || 'PROVISIONAL_DATA_UNAVAILABLE',receipt:req.query.rcept_no});
+    res.set('Cache-Control','no-store').status(503).json({status:'error',message:'잠정실적 수치를 불러오지 못했습니다. 잠시 후 다시 시도하거나 DART 원문을 확인해주세요.'});
+  }
+});
 
 // 잠정실적 공시 AI 분석 API
 app.get('/api/provisional-analysis', accounts.requireAnalysis, async (req, res) => {
@@ -1147,8 +1127,10 @@ app.get('/api/provisional-analysis', accounts.requireAnalysis, async (req, res) 
     console.log(`잠정실적 분석 요청: ${corp_name || ''} ${report_nm || ''} (rcept_no: ${rcept_no}, 본문 ${documentText.length}자)`);
 
     const prompt = createProvisionalAnalysisPrompt(corp_name || '해당 회사', report_nm || '잠정실적 공시', documentText);
-    // OpenAI API 호출 (structured outputs, 차트 데이터도 같은 JSON에 포함)
-    const { chartData, ...result } = parseAnalysisJson(await callOpenAIAPI(prompt, PROVISIONAL_ANALYSIS_SCHEMA));
+    // 숫자 시각화는 원문 파서가 담당하고, 모델은 해석만 작성합니다.
+    let chartData = null;
+    try { chartData = parseProvisionalFinancials(readDisclosureXml(Buffer.from(response.data))); } catch {}
+    const result = parseAnalysisJson(await callOpenAIAPI(prompt, PROVISIONAL_ANALYSIS_SCHEMA));
     result.title = `${corp_name || '해당 회사'} 잠정실적 분석`;
 
     res.json({ status: 'success', result, chartData: chartData || null });

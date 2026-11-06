@@ -98,6 +98,24 @@ test('운영 AI 경로는 비회원의 직접 요청을 차단하고 숫자 조�
   assert.equal((await fetch(`${baseUrl}/api/financial-analysis`)).status,400);
 });
 
+test('잠정실적 수치 경로는 비회원에게 원문 표를 제공하고 LLM을 호출하지 않는다',async t=>{
+  const fs=require('node:fs'),path=require('node:path'),Zip=require('adm-zip');
+  const zip=new Zip();zip.addFile('main.xml',fs.readFileSync(path.join(__dirname,'fixtures/provisional-samsung.html')));
+  let calls=0;
+  t.mock.method(require('../dartClient'),'get',async()=>{calls++;return{data:zip.toBuffer()};});
+  t.mock.method(require('axios'),'post',async()=>assert.fail('시각화에 LLM을 호출했습니다.'));
+  assert.equal((await fetch(`${baseUrl}/api/provisional-financials?rcept_no=invalid`)).status,400);assert.equal(calls,0);
+  const r=await fetch(`${baseUrl}/api/provisional-financials?rcept_no=20261029800099`);
+  assert.equal(r.status,200);assert.match(r.headers.get('cache-control'),/public/);
+  const data=await r.json();assert.equal(data.chartData.metrics[0].current,195.25);assert.equal(calls,1);
+});
+
+test('로고는 선택 상태를 유지하는 SPA 링크가 아닌 첫 화면 링크다',async()=>{
+  const html=await(await fetch(`${baseUrl}/about?corp=00126380`)).text();
+  const logo=html.match(/<a\b[^>]*class="site-brand"[^>]*>/)[0];
+  assert.match(logo,/href="\/"/);assert.doesNotMatch(logo,/data-page-link/);
+});
+
 test('사이트맵의 공개 URL은 정상 HTML과 일치하는 canonical을 제공한다', async () => {
   const response = await fetch(`${baseUrl}/sitemap.xml`);
   assert.equal(response.status, 200);

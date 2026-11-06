@@ -6,12 +6,12 @@ const fs=require('node:fs');
 function fixture(fetchImpl) {
   const nodes=new Map(),listeners=new Map(),requests=[];
   function node() {return {style:{},hidden:true,disabled:false,innerHTML:'',textContent:'',replaceChildren(){this.innerHTML='';},
-    append(){},querySelector(){return node();}};}
+    append(){},querySelector(){return node();},getContext(){return {};}};}
   const document={getElementById(id){if(!nodes.has(id))nodes.set(id,node());return nodes.get(id);},createElement:node,
     addEventListener(type,fn){if(!listeners.has(type))listeners.set(type,[]);listeners.get(type).push(fn);}};
   let member=false;
   const context=vm.createContext({document,window:{location:{search:''},FinalyzeAccount:{analysisAccess:async()=>({authenticated:member,csrfToken:'session-csrf'})}},
-    AbortController,URLSearchParams,setTimeout:()=>{},console:{log(){},warn(){},error(){}},
+    AbortController,URLSearchParams,Chart:class {destroy(){}},setTimeout:()=>{},console:{log(){},warn(){},error(){}},
     fetch:async(url,options)=>{requests.push({url,options});return fetchImpl ? fetchImpl(url,options) : response();}});
   vm.runInContext(fs.readFileSync(require.resolve('../public/js/main.js'),'utf8'),context);
   const run=source=>vm.runInContext(source,context);
@@ -69,4 +69,23 @@ test('changing the selected company discards the previous in-flight AI result',a
   f.run('resetAiAnalysis()');deliver(response());await pending;
   assert.equal(f.document.getElementById('aiAnalysisContent').innerHTML,'');
   assert.equal(f.document.getElementById('aiAnalysisAccess').hidden,true);
+});
+
+test('public provisional charts load for guests and survive login gates and logout',async()=>{
+  const f=fixture(()=>({ok:true,json:async()=>({status:'success',chartData:{unit:'조원',labels:{},metrics:[{name:'매출액',current:195.25,previous:171.5,yearAgo:86.06}]}})}));
+  f.choose('provisional');
+  await f.run('Promise.all([loadProvisionalFinancials(activeAiAnalysis),requestAiAnalysis(activeAiAnalysis)])');
+  assert.equal(f.requests.length,1);assert.match(f.requests[0].url,/^\/api\/provisional-financials\?/);
+  assert.equal(f.document.getElementById('provisionalChartWrap').style.display,'block');
+  assert.equal(f.document.getElementById('provisionalAccess').hidden,false);
+  assert.equal(f.document.getElementById('provisionalPdfBtn').disabled,false);
+  f.change(true);f.change(false);
+  assert.equal(f.document.getElementById('provisionalChartWrap').style.display,'block');
+  assert.equal(f.requests.length,1);
+});
+test('an unsupported provisional table shows source guidance without an AI fallback',async()=>{
+  const f=fixture(()=>({ok:true,json:async()=>({status:'success',chartData:null,message:'원문 확인'})}));f.choose('provisional');
+  await f.run('loadProvisionalFinancials(activeAiAnalysis)');
+  assert.equal(f.document.getElementById('provisionalDataNotice').textContent,'원문 확인');
+  assert.equal(f.requests.length,1);assert.match(f.requests[0].url,/provisional-financials/);
 });

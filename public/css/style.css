@@ -173,14 +173,111 @@ body {
 .about-mobile-qr img { display: block; width: 100%; height: auto; }
 .about-telegram { background: linear-gradient(115deg, #f0f7ff, #fff 70%); }
 .about-telegram .about-cta { gap: 0.65rem; }
-.about-system-figure { margin: 0; }
-.about-system-figure > a { display: block; border: 1px solid var(--border-color); border-radius: var(--radius-md); overflow: hidden; }
-.about-system-figure img { display: block; width: 100%; height: auto; }
-.about-system-figure figcaption { color: var(--text-secondary); font-size: 0.76rem; text-align: center; margin: 0.85rem 0 1.5rem; }
 .about-system-notes { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1.5rem; border-top: 1px solid var(--border-color); padding-top: 1.5rem; margin: 0; }
 .about-system-notes dt { font-size: 0.9rem; margin-bottom: 0.6rem; }
 .about-system-notes dt i { color: var(--primary); margin-right: 0.3rem; }
 .about-system-notes dd { color: var(--text-secondary); font-size: 0.82rem; line-height: 1.8; margin: 0; }
+
+/* Editable architecture: content lives in #system-architecture in index.html. */
+.architecture-toolbar { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.75rem; margin-bottom: 1rem; }
+.architecture-flow-key { display: inline-flex; align-items: center; gap: 0.5rem; color: var(--text-secondary); font-size: 0.75rem; }
+.architecture-flow-key > span { width: 7px; height: 7px; border-radius: 50%; background: var(--primary); box-shadow: 0 0 0 4px #eff6ff; }
+.architecture-motion-toggle { display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.45rem 0.7rem; border: 1px solid #d6e1f1; border-radius: 8px; font-size: 0.75rem; color: #52647d; cursor: pointer; user-select: none; }
+.architecture-pause:focus-visible ~ .architecture-toolbar .architecture-motion-toggle { outline: 3px solid var(--primary); outline-offset: 3px; }
+.architecture-pause:checked ~ .architecture-toolbar .architecture-motion-toggle { border-color: #93b4fa; background: #eff6ff; color: var(--primary-dark); }
+.architecture-pause:checked ~ .architecture-diagram *,
+.architecture-pause:checked ~ .architecture-diagram *::before,
+.architecture-pause:checked ~ .architecture-diagram *::after { animation-play-state: paused !important; }
+.architecture-reduced-note { display: none; color: var(--text-secondary); font-size: 0.75rem; }
+.architecture-diagram { margin: 0; }
+.architecture-core { display: grid; grid-template-columns: minmax(0, 1fr) 2.5rem minmax(0, 1.15fr) 2.5rem minmax(0, 1fr); align-items: stretch; padding: 1.25rem; border: 1px solid #e1e9f5; border-radius: 16px; background: #f8faff; }
+.architecture-column-label { color: #667a96; font-size: 0.67rem; font-weight: 700; letter-spacing: 0.08em; margin: 0 0 0.8rem; }
+.architecture-audience { display: flex; flex-direction: column; gap: 0.75rem; }
+.architecture-audience .architecture-column-label { margin: 0; }
+.architecture-audience .architecture-node { flex: 1; }
+.architecture-service, .architecture-providers { display: flex; flex-direction: column; min-width: 0; }
+.architecture-node { min-width: 0; padding: 1rem; border: 1px solid #dfe6f0; border-radius: 12px; background: #fff; }
+.architecture-node-heading { display: flex; align-items: center; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 0.6rem; }
+.architecture-node-heading > i { color: var(--primary); font-size: 1.1rem; }
+.architecture-diagram .architecture-node-heading h3 { font-size: 0.92rem; margin: 0; }
+.architecture-node > p { color: #52647d; font-size: 0.79rem; line-height: 1.85; margin: 0; }
+.architecture-badge { padding: 0.2rem 0.45rem; border-radius: 5px; background: #f1f5f9; color: #52647d; font-size: 0.63rem; font-weight: 600; }
+.architecture-node-note { display: block; margin-top: 0.5rem; color: #6d7e95; font-size: 0.68rem; line-height: 1.7; }
+.architecture-member { border-color: #c5d7fd; background: #f0f5ff; }
+.architecture-member .architecture-badge { color: #1d4ed8; background: #dfeaff; }
+.architecture-app { position: relative; flex: 1; padding: 1.2rem; border: 1px solid #244a85; border-radius: 14px; background: linear-gradient(145deg, #142b50, #1c3b71); color: #fff; }
+.architecture-app::before { content: ''; position: absolute; inset: -1px; border: 2px solid #6aa5ff; border-radius: inherit; box-shadow: 0 0 18px #3b82f624; pointer-events: none; animation: architecture-breathe 4s ease-in-out infinite; }
+.architecture-app-brand { display: flex; align-items: center; gap: 0.7rem; margin-bottom: 1.2rem; }
+.architecture-app-brand > i { font-size: 1.65rem; color: #83d8ff; }
+.architecture-diagram .architecture-app-brand h3 { font-size: 1.12rem; letter-spacing: -0.03em; margin: 0; }
+.architecture-app-brand p { color: #b8cce9; font-size: 0.64rem; line-height: 1.7; margin: 0.2rem 0 0; }
+.architecture-app-route { padding: 0.85rem; border: 1px solid #ffffff26; border-radius: 9px; background: #ffffff08; }
+.architecture-app-route + .architecture-app-route { margin-top: 0.75rem; }
+.architecture-app-route > span { display: block; color: #b9d8ff; font-size: 0.65rem; font-weight: 600; margin-bottom: 0.35rem; }
+.architecture-app-route h4 { color: #fff; font-size: 0.87rem; font-weight: 600; margin: 0 0 0.4rem; }
+.architecture-app-route p { color: #c7d6ed; font-size: 0.74rem; line-height: 1.85; margin: 0; }
+.architecture-ai-route { border-color: #63d5dd66; }
+.architecture-ai-route > span { color: #85e5e5; }
+.architecture-provider-list { display: grid; grid-template-rows: repeat(3, minmax(0, 1fr)); flex: 1; gap: 0.65rem; list-style: none; padding: 0; margin: 0; }
+.architecture-provider-list .architecture-node { padding: 0.85rem 1rem; }
+.architecture-provider-list .architecture-node-heading { margin-bottom: 0.35rem; }
+.architecture-connection { display: flex; flex-direction: column; align-items: center; justify-content: center; align-self: center; gap: 0.4rem; min-width: 0; color: var(--architecture-flow, #3b82f6); }
+.architecture-connection > i { font-size: 0.85rem; line-height: 1; }
+.architecture-wire { display: block; position: relative; width: 100%; height: 4px; border-radius: 4px; background: #d7e4f5; overflow: hidden; }
+.architecture-wire > span { position: absolute; inset: 0 auto 0 0; width: 30%; border-radius: inherit; background: var(--architecture-flow, #3b82f6); animation: architecture-flow 3.2s linear infinite; }
+.architecture-wire > span + span { background: #14b8a6; animation-direction: reverse; animation-delay: -1.6s; }
+.architecture-storage-label { margin: 1rem 0 0.5rem; color: #667a96; font-size: 0.7rem; font-weight: 600; }
+.architecture-storage { margin: 0 0 1rem; padding: 1rem 1.2rem; border: 1px solid #e2e8f0; border-radius: 12px; background: #fbfcfe; gap: 1rem; }
+.architecture-storage > div + div { padding-left: 1rem; border-left: 1px solid #e2e8f0; }
+.architecture-storage dt { font-size: 0.8rem; margin-bottom: 0.35rem; }
+.architecture-storage dd { font-size: 0.73rem; }
+.architecture-notifications { --architecture-flow: #0d9488; padding: 1.25rem; border: 1px solid #d1e9e5; border-radius: 14px; background: linear-gradient(115deg, #f0faf8, #f4f9ff); }
+.architecture-notification-heading { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1rem; }
+.architecture-diagram .architecture-notification-heading h3 { margin: 0; font-size: 0.9rem; color: #155e5a; }
+.architecture-notification-heading > span { font-size: 0.68rem; color: #597b7c; }
+.architecture-notification-flow { display: grid; grid-template-columns: minmax(0, 1fr) 2rem minmax(0, 1.2fr) 2rem minmax(0, 1.4fr); align-items: center; }
+.architecture-notification-step, .architecture-notification-target { display: flex; align-items: center; gap: 0.7rem; padding: 0.85rem; border: 1px solid #d9e9e7; border-radius: 10px; background: #fff; min-width: 0; }
+.architecture-notification-step > i, .architecture-notification-target > i { color: #0f8077; font-size: 1.3rem; flex: 0 0 auto; }
+.architecture-notifications h4 { font-size: 0.8rem; font-weight: 600; line-height: 1.7; margin: 0; }
+.architecture-notification-step p, .architecture-notification-target p { font-size: 0.7rem; color: #617581; line-height: 1.8; margin: 0.15rem 0 0; }
+.architecture-notification-targets { display: grid; gap: 0.6rem; }
+.architecture-telegram-target { border-color: #c9dcff; color: var(--text-primary); text-decoration: none; transition: border-color 180ms ease, transform 180ms ease; }
+.architecture-telegram-target > i { color: var(--primary); }
+.architecture-telegram-target h4 > i { color: var(--primary); font-size: 0.7rem; }
+.architecture-telegram-target:hover { border-color: var(--primary); color: var(--text-primary); transform: translateY(-2px); }
+.architecture-notification-note { font-size: 0.7rem; line-height: 1.8; color: #587477; margin: 1rem 0 0; }
+.architecture-diagram > figcaption { font-size: 0.76rem; line-height: 1.9; color: var(--text-secondary); text-align: center; margin: 1rem 0 0; }
+@keyframes architecture-flow { from { transform: translateX(-100%); } to { transform: translateX(435%); } }
+@keyframes architecture-breathe { 0%, 100% { opacity: 0.2; } 50% { opacity: 0.85; } }
+
+@media (max-width: 991px) {
+  .architecture-core { grid-template-columns: minmax(0, 1fr); gap: 0.5rem; }
+  .architecture-audience { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .architecture-audience .architecture-column-label { grid-column: 1 / -1; }
+  .architecture-core > .architecture-connection,
+  .architecture-notification-flow > .architecture-connection { width: 2.5rem; height: 2.5rem; justify-self: center; transform: rotate(90deg); }
+  .architecture-app { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.8rem; }
+  .architecture-app-brand { grid-column: 1 / -1; margin-bottom: 0.2rem; }
+  .architecture-app-route + .architecture-app-route { margin: 0; }
+  .architecture-provider-list { grid-template-columns: repeat(3, minmax(0, 1fr)); grid-template-rows: auto; }
+  .architecture-notification-flow { grid-template-columns: minmax(0, 1fr); }
+  .architecture-notification-targets { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 767px) {
+  .architecture-storage > div + div { padding: 0.8rem 0 0; border-left: 0; border-top: 1px solid #e2e8f0; }
+}
+@media (max-width: 575px) {
+  .architecture-core, .architecture-notifications { padding: 1rem; }
+  .architecture-audience, .architecture-provider-list, .architecture-app, .architecture-notification-targets { grid-template-columns: minmax(0, 1fr); }
+  .architecture-app { padding: 1rem; }
+  .architecture-diagram > figcaption { text-align: left; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .architecture-diagram *, .architecture-diagram *::before, .architecture-diagram *::after { animation: none !important; transition: none !important; }
+  .architecture-pause, .architecture-motion-toggle { display: none; }
+  .architecture-reduced-note { display: inline; }
+  .architecture-telegram-target:hover { transform: none; }
+}
 .about-section { margin: 4rem 0; }
 .about-section-heading { margin-bottom: 1.8rem; }
 .about-steps { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); padding: 0; margin: 0; list-style: none; border: 1px solid var(--border-color); border-radius: var(--radius-lg); background: #fff; overflow: hidden; }

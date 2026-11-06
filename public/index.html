@@ -45,7 +45,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Noto+Sans+KR:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/css/style.css?v=3.16">
+  <link rel="stylesheet" href="/css/style.css?v=3.17">
   <link rel="manifest" href="/manifest.json">
   <meta name="theme-color" content="#2563eb">
 
@@ -423,6 +423,7 @@
 
       <nav class="about-content-nav" aria-label="소개 페이지 목차">
         <a href="#how-to-use">사용법</a>
+        <a href="#system-architecture">시스템 구성</a>
         <a href="#telegram-channel">텔레그램 채널</a>
         <a href="#analysis-method">분석 기준</a>
         <a href="#faq">자주 묻는 질문</a>
@@ -455,26 +456,77 @@
         </a>
       </section>
 
-      <section class="about-panel about-architecture" aria-labelledby="architectureTitle">
+      <section class="about-panel about-architecture" id="system-architecture" aria-labelledby="architectureTitle">
         <div class="about-panel-heading">
           <div>
             <p class="about-eyebrow">SYSTEM ARCHITECTURE</p>
             <h2 id="architectureTitle">Finalyze.AI 시스템 구성</h2>
-            <p>공시를 가져오고, 숫자를 정리하고, 분석을 전달하는 연결 구조입니다.</p>
+            <p>공개 시각화, 회원 전용 AI 분석, 공시 알림이 연결되는 흐름입니다.</p>
           </div>
-          <a class="about-text-link" href="/images/finalyze-system-v1.png" target="_blank" rel="noopener noreferrer">원본 이미지 열기 <i class="bi bi-arrow-up-right" aria-hidden="true"></i><span class="visually-hidden"> (새 창)</span></a>
         </div>
-        <figure class="about-system-figure">
-          <a href="/images/finalyze-system-v1.png" target="_blank" rel="noopener noreferrer" aria-label="Finalyze.AI 시스템 구성도 원본 이미지 열기 (새 창)">
-            <img src="/images/finalyze-system-v1.png" width="1536" height="1024" alt="사용자 화면과 Vercel의 Express 서버가 연결되고, 서버는 OPEN DART에서 공시를 조회하고 OpenAI GPT에 분석을 요청합니다. SQLite는 회사 검색에 사용합니다." decoding="async">
-          </a>
-          <figcaption>작은 화면에서는 이미지를 눌러 원본을 확대해 보세요.</figcaption>
-        </figure>
-        <dl class="about-system-notes">
-          <div><dt><i class="bi bi-file-earmark-text" aria-hidden="true"></i> 공시 데이터</dt><dd>재무제표·공시 목록·잠정실적 원문은 요청할 때 OPEN DART에서 조회합니다.</dd></div>
-          <div><dt><i class="bi bi-calculator" aria-hidden="true"></i> 계산과 해석</dt><dd>서버가 재무비율을 계산하고, OpenAI GPT가 수치와 공시 텍스트를 바탕으로 설명합니다.</dd></div>
-          <div><dt><i class="bi bi-database" aria-hidden="true"></i> 회사 검색</dt><dd>SQLite의 회사 목록을 읽어 회사명과 종목코드를 찾습니다.</dd></div>
-        </dl>
+        <div class="architecture-map">
+          <input class="visually-hidden architecture-pause" type="checkbox" id="architecturePause" aria-label="모션 일시정지">
+          <div class="architecture-toolbar">
+            <span class="architecture-flow-key"><span aria-hidden="true"></span> 데이터가 오가는 흐름</span>
+            <label class="architecture-motion-toggle" for="architecturePause"><i class="bi bi-pause-circle" aria-hidden="true"></i> 모션 일시정지</label>
+            <span class="architecture-reduced-note">기기 설정에 따라 모션을 줄였습니다</span>
+          </div>
+          <figure class="architecture-diagram" aria-labelledby="architectureTitle" aria-describedby="architectureCaption">
+            <div class="architecture-core">
+              <div class="architecture-audience">
+                <p class="architecture-column-label">01 / 이용자</p>
+                <article class="architecture-node architecture-guest">
+                  <div class="architecture-node-heading"><i class="bi bi-person" aria-hidden="true"></i><h3>비로그인</h3><span class="architecture-badge">공개</span></div>
+                  <p>기업·공시 검색<br>재무 수치·비율·차트 확인</p>
+                  <span class="architecture-node-note">정기보고서와 잠정실적 모두</span>
+                </article>
+                <article class="architecture-node architecture-member">
+                  <div class="architecture-node-heading"><i class="bi bi-person-check" aria-hidden="true"></i><h3>회원</h3><span class="architecture-badge">Google 로그인</span></div>
+                  <p>공개 기능 + AI 분석 직접 요청<br>즐겨찾기·관심 기업 푸시 알림</p>
+                </article>
+              </div>
+              <div class="architecture-connection" aria-hidden="true"><span class="architecture-wire"><span></span><span></span></span><i class="bi bi-arrow-left-right"></i></div>
+              <div class="architecture-service">
+                <p class="architecture-column-label">02 / 웹서비스</p>
+                <article class="architecture-app">
+                  <div class="architecture-app-brand"><i class="bi bi-bar-chart-line" aria-hidden="true"></i><div><h3>Finalyze.AI</h3><p>웹 화면 · Vercel / Express</p></div></div>
+                  <div class="architecture-app-route"><span>누구나</span><h4>공시 조회와 시각화</h4><p>원문 수치를 읽고 재무비율을 계산해 차트로 전달합니다.</p></div>
+                  <div class="architecture-app-route architecture-ai-route"><span><i class="bi bi-shield-check" aria-hidden="true"></i> 회원 확인 후</span><h4>AI 재무분석</h4><p>‘AI 분석 시작하기’를 눌렀을 때만 OpenAI에 설명을 요청합니다.</p></div>
+                </article>
+              </div>
+              <div class="architecture-connection" aria-hidden="true"><span class="architecture-wire"><span></span><span></span></span><i class="bi bi-arrow-left-right"></i></div>
+              <div class="architecture-providers">
+                <p class="architecture-column-label">03 / 데이터·인증</p>
+                <ul class="architecture-provider-list">
+                  <li class="architecture-node"><div class="architecture-node-heading"><i class="bi bi-file-earmark-text" aria-hidden="true"></i><h3>OPEN DART</h3></div><p>정기보고서·공시 목록<br>잠정실적 원문과 수치</p></li>
+                  <li class="architecture-node"><div class="architecture-node-heading"><i class="bi bi-stars" aria-hidden="true"></i><h3>OpenAI GPT</h3></div><p>회원이 요청한 재무 분석 설명</p></li>
+                  <li class="architecture-node"><div class="architecture-node-heading"><i class="bi bi-google" aria-hidden="true"></i><h3>Google 로그인</h3></div><p>로그인 정보 확인·회원 구분</p></li>
+                </ul>
+              </div>
+            </div>
+            <p class="architecture-storage-label"><i class="bi bi-hdd-network" aria-hidden="true"></i> 웹서비스에 연결된 저장소</p>
+            <dl class="about-system-notes architecture-storage">
+              <div><dt><i class="bi bi-database" aria-hidden="true"></i> SQLite</dt><dd>기업명·종목코드 검색용 목록</dd></div>
+              <div><dt><i class="bi bi-layers" aria-hidden="true"></i> Redis 공유 캐시</dt><dd>DART 응답 재사용·중복 조회 방지·호출 제한</dd></div>
+              <div><dt><i class="bi bi-person-lock" aria-hidden="true"></i> Neon 계정 DB</dt><dd>최소 회원 식별 정보·관심 기업·푸시·발송 기록</dd></div>
+            </dl>
+            <div class="architecture-notifications" role="group" aria-labelledby="notificationFlowTitle">
+              <div class="architecture-notification-heading"><h3 id="notificationFlowTitle"><i class="bi bi-broadcast" aria-hidden="true"></i> 공시 알림의 흐름</h3><span>Vercel 일정 · 15분 주기 확인 · 지연 가능</span></div>
+              <div class="architecture-notification-flow">
+                <div class="architecture-notification-step"><i class="bi bi-clock-history" aria-hidden="true"></i><div><h4>새 공시 확인</h4><p>OPEN DART 조회</p></div></div>
+                <div class="architecture-connection" aria-hidden="true"><span class="architecture-wire"><span></span></span><i class="bi bi-arrow-right"></i></div>
+                <div class="architecture-notification-step"><i class="bi bi-file-earmark-check" aria-hidden="true"></i><div><h4>실적 공시 수집</h4><p>원문 확인·중복 발송 방지</p></div></div>
+                <div class="architecture-connection" aria-hidden="true"><span class="architecture-wire"><span></span></span><i class="bi bi-arrow-right"></i></div>
+                <div class="architecture-notification-targets">
+                  <div class="architecture-notification-target"><i class="bi bi-bell" aria-hidden="true"></i><div><h4>관심 기업 푸시</h4><p>회원 · 즐겨찾기 대상</p></div></div>
+                  <a class="architecture-notification-target architecture-telegram-target" href="https://t.me/finalyze_ai" target="_blank" rel="noopener noreferrer"><i class="bi bi-telegram" aria-hidden="true"></i><div><h4>텔레그램 채널 <i class="bi bi-arrow-up-right" aria-hidden="true"></i></h4><p>주요 기업 60개 · 누구나 구독<span class="visually-hidden"> (새 창)</span></p></div></a>
+                </div>
+              </div>
+              <p class="architecture-notification-note">공시 알림은 LLM을 추가 호출하지 않습니다. 메일 알림은 발신 설정 후 활성화 예정입니다.</p>
+            </div>
+            <figcaption id="architectureCaption">차트는 로그인 없이 확인하고, AI 설명은 회원이 직접 요청합니다. 텔레그램 채널은 사이트 로그인 없이 구독할 수 있습니다.</figcaption>
+          </figure>
+        </div>
       </section>
 
       <section class="about-section" id="how-to-use" aria-labelledby="processTitle">
@@ -486,7 +538,7 @@
         <ol class="about-steps">
           <li><span class="about-step-number">01 / SEARCH</span><i class="bi bi-search" aria-hidden="true"></i><h3>기업을 찾습니다</h3><p>회사명을 2글자 이상 입력하고 기업을 선택하면 최근 3개년의 정기보고서·잠정실적 공시 목록을 확인할 수 있습니다.</p></li>
           <li><span class="about-step-number">02 / SELECT</span><i class="bi bi-file-earmark-check" aria-hidden="true"></i><h3>공시를 선택합니다</h3><p>정기보고서나 잠정실적의 분석 버튼을 눌러 관심 있는 기간의 실적을 불러옵니다.</p></li>
-          <li><span class="about-step-number">03 / ANALYZE</span><i class="bi bi-bar-chart-line" aria-hidden="true"></i><h3>차트와 설명을 읽습니다</h3><p>주요 수치와 변화를 시각화하고, AI가 공시 데이터에 기반한 분석을 덧붙입니다.</p></li>
+          <li><span class="about-step-number">03 / ANALYZE</span><i class="bi bi-bar-chart-line" aria-hidden="true"></i><h3>차트와 설명을 읽습니다</h3><p>주요 수치와 차트를 확인하고, 로그인 후 ‘AI 분석 시작하기’를 눌러 설명을 요청합니다.</p></li>
           <li><span class="about-step-number">04 / EXPORT</span><i class="bi bi-download" aria-hidden="true"></i><h3>결과를 저장합니다</h3><p>분석을 PDF나 이미지로 저장하거나, 기업·공시 선택이 담긴 주소를 공유할 수 있습니다.</p></li>
         </ol>
       </section>

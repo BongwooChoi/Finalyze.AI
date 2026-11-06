@@ -1,4 +1,4 @@
-const CACHE_NAME = 'financial-app-cache-v36';
+const CACHE_NAME = 'financial-app-cache-v37';
 const urlsToCache = [
   '/',
   '/about',
@@ -7,7 +7,6 @@ const urlsToCache = [
   '/js/main.js',
   '/js/site-pages.js',
   '/js/accounts.js',
-  '/images/finalyze-system-v1.png',
   '/images/finalyze-mobile-qr.png',
   '/images/finalyze-telegram-qr.png',
   '/manifest.json',

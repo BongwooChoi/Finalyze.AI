@@ -171,6 +171,8 @@ body {
 .about-mobile-tip { color: var(--text-secondary); font-size: 0.8rem; line-height: 1.8; margin: 1rem 0 0; }
 .about-mobile-qr { display: block; width: 200px; background: #fff; border: 1px solid var(--border-color); border-radius: var(--radius-md); overflow: hidden; }
 .about-mobile-qr img { display: block; width: 100%; height: auto; }
+.about-telegram { background: linear-gradient(115deg, #f0f7ff, #fff 70%); }
+.about-telegram .about-cta { gap: 0.65rem; }
 .about-system-figure { margin: 0; }
 .about-system-figure > a { display: block; border: 1px solid var(--border-color); border-radius: var(--radius-md); overflow: hidden; }
 .about-system-figure img { display: block; width: 100%; height: auto; }

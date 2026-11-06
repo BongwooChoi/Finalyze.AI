@@ -338,22 +338,19 @@ async function restoreStateFromUrl() {
   const params = new URLSearchParams(window.location.search);
   const corpCode = params.get('corp');
   if (!corpCode) return;
-
-  const name = params.get('name') || '';
-  let company = null;
-  if (name) {
-    try {
-      const response = await fetch(`/api/companies/search?keyword=${encodeURIComponent(name)}`);
-      const data = await response.json();
-      if (data.status === 'success') {
-        company = (data.data || []).find(c => c.corp_code === corpCode) || null;
-      }
-    } catch (e) {
-      console.warn('URL 상태 복원 중 회사 조회 실패:', e);
-    }
+  if (!/^\d{8}$/.test(corpCode)) {
+    showToast('기업 고유번호가 올바르지 않습니다.', 'error');
+    return;
   }
-  if (!company) {
-    company = { corp_code: corpCode, corp_name: name || `기업 (${corpCode})`, corp_eng_name: '', stock_code: '', modify_date: '' };
+  let company;
+  try {
+    const response = await fetch(`/api/companies/corp/${corpCode}`);
+    const data = await response.json();
+    if (!response.ok || data.status !== 'success' || data.data?.corp_code !== corpCode) throw new Error('기업 조회 실패');
+    company = data.data;
+  } catch {
+    showToast('기업 정보를 찾지 못했습니다. 기업을 검색하거나 잠시 후 다시 시도해주세요.', 'error');
+    return;
   }
 
   companySearchInput.value = company.corp_name;
@@ -414,7 +411,7 @@ async function searchCompany(quiet = false) {
     if (data.status === 'success') {
       displaySearchResults(data.data);
     } else {
-      searchResults.innerHTML = `<div class="alert alert-danger">${data.message}</div>`;
+      searchResults.innerHTML = `<div class="alert alert-danger">${escapeHtml(data.message)}</div>`;
     }
   } catch (error) {
     if (requestId !== searchRequestSeq) return;
@@ -447,11 +444,11 @@ function displaySearchResults(companies) {
     
     item.innerHTML = `
       <div class="d-flex justify-content-between align-items-center">
-        <h5 class="mb-1">${company.corp_name}</h5>
-        <span class="badge ${stockCode !== '상장되지 않음' ? 'bg-success' : 'bg-secondary'}">${stockCode}</span>
+        <h5 class="mb-1">${escapeHtml(company.corp_name)}</h5>
+        <span class="badge ${stockCode !== '상장되지 않음' ? 'bg-success' : 'bg-secondary'}">${escapeHtml(stockCode)}</span>
       </div>
-      <p class="mb-1">${company.corp_eng_name || ''}</p>
-      <small>고유번호: ${company.corp_code}</small>
+      <p class="mb-1">${escapeHtml(company.corp_eng_name)}</p>
+      <small>고유번호: ${escapeHtml(company.corp_code)}</small>
     `;
     
     item.addEventListener('click', () => selectCompany(company));
@@ -483,13 +480,13 @@ async function selectCompany(company, { skipHistory = false } = {}) {
   companyInfo.innerHTML = `
     <div class="row">
       <div class="col-md-6">
-        <h4>${company.corp_name}</h4>
-        <p>${company.corp_eng_name || ''}</p>
-        <p><strong>고유번호:</strong> ${company.corp_code}</p>
+        <h4>${escapeHtml(company.corp_name)}</h4>
+        <p>${escapeHtml(company.corp_eng_name)}</p>
+        <p><strong>고유번호:</strong> ${escapeHtml(company.corp_code)}</p>
       </div>
       <div class="col-md-6">
-        <p><strong>종목코드:</strong> ${company.stock_code && company.stock_code.trim() ? company.stock_code : '상장되지 않음'}</p>
-        <p><strong>최종변경일자:</strong> ${formatDate(company.modify_date)}</p>
+        <p><strong>종목코드:</strong> ${escapeHtml(company.stock_code && company.stock_code.trim() ? company.stock_code : '상장되지 않음')}</p>
+        <p><strong>최종변경일자:</strong> ${escapeHtml(formatDate(company.modify_date))}</p>
       </div>
     </div>
   `;
@@ -543,7 +540,7 @@ async function fetchFinancialAnalysis() {
   previousYear = String(parseInt(year) - 1);
   
   // 카드 제목 업데이트
-  analysisCardTitle.innerHTML = `${selectedCompany.corp_name} - ${year}년 ${reportName} 분석`;
+  analysisCardTitle.textContent = `${selectedCompany.corp_name} - ${year}년 ${reportName} 분석`;
   
   // 로딩 표시 및 초기화 (여기서 보여주기만 함)
   analysisCard.style.display = 'block';
@@ -1537,19 +1534,21 @@ async function fetchAndDisplayDisclosureList(corpCode) {
     // 리스트 표시
     let html = '<div class="card disclosure-card"><div class="card-header"><h3><i class="bi bi-journal-text me-2"></i>최근 3년 정기공시·잠정실적 공시</h3></div><ul class="list-group list-group-flush">';
     filtered.forEach(item => {
+      const receipt = escapeHtml(item.rcept_no);
+      const reportName = escapeHtml(item.report_nm);
       const badge = isProvisionalDisclosure(item.report_nm)
         ? '<span class="badge disclosure-badge badge-provisional">잠정실적</span>'
         : '<span class="badge disclosure-badge badge-periodic">정기공시</span>';
-      html += `<li class="list-group-item disclosure-item" data-rcept_no="${item.rcept_no}" data-report_nm="${item.report_nm}">
+      html += `<li class="list-group-item disclosure-item" data-rcept_no="${receipt}" data-report_nm="${reportName}">
         <div class="disclosure-info">
-          <span class="disclosure-title">${badge}${item.report_nm}</span>
-          <span class="disclosure-date">${item.rcept_dt}</span>
+          <span class="disclosure-title">${badge}${reportName}</span>
+          <span class="disclosure-date">${escapeHtml(item.rcept_dt)}</span>
         </div>
         <div class="disclosure-actions">
-          <button class="btn btn-sm btn-analyze" data-rcept_no="${item.rcept_no}" data-report_nm="${item.report_nm}">
+          <button class="btn btn-sm btn-analyze" data-rcept_no="${receipt}" data-report_nm="${reportName}">
             <i class="bi bi-bar-chart-line me-1"></i>분석하기
           </button>
-          <a href="https://dart.fss.or.kr/dsaf001/main.do?rcpNo=${item.rcept_no}" target="_blank" class="btn btn-sm btn-outline-secondary" onclick="event.stopPropagation()">
+          <a href="https://dart.fss.or.kr/dsaf001/main.do?rcpNo=${escapeHtml(encodeURIComponent(item.rcept_no))}" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-outline-secondary" onclick="event.stopPropagation()">
             <i class="bi bi-box-arrow-up-right me-1"></i>원문
           </a>
         </div>
@@ -1803,7 +1802,7 @@ function showAnalysisGuide(reportNm, targetId = 'analysisCard') {
         <span class="spinner-border spinner-border-sm"></span>
       </div>
       <div class="analysis-guide-text">
-        <strong>${reportNm}</strong> 분석 중입니다...
+        <strong>${escapeHtml(reportNm)}</strong> 분석 중입니다...
       </div>
       <button class="btn btn-sm btn-analysis-guide-scroll" onclick="document.getElementById('${targetId}').scrollIntoView({behavior:'smooth'})">
         <i class="bi bi-arrow-down-circle me-1"></i>결과 보기
@@ -1823,7 +1822,7 @@ function updateAnalysisGuide(reportNm, targetId = 'analysisCard') {
         <i class="bi bi-check-circle-fill"></i>
       </div>
       <div class="analysis-guide-text">
-        <strong>${reportNm}</strong> 분석이 완료되었습니다
+        <strong>${escapeHtml(reportNm)}</strong> 분석이 완료되었습니다
       </div>
       <button class="btn btn-sm btn-analysis-guide-scroll" onclick="document.getElementById('${targetId}').scrollIntoView({behavior:'smooth'})">
         <i class="bi bi-arrow-down-circle me-1"></i>결과 보기
@@ -1846,7 +1845,7 @@ function failAnalysisGuide(reportNm) {
         <i class="bi bi-x-circle-fill"></i>
       </div>
       <div class="analysis-guide-text">
-        <strong>${reportNm}</strong> 분석에 실패했습니다
+        <strong>${escapeHtml(reportNm)}</strong> 분석에 실패했습니다
       </div>
     </div>
   `;

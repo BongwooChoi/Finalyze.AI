@@ -13,6 +13,7 @@ npm start                        # 로컬 서버 실행 (기본 포트 3000)
 npm run check:telegram-disclosures # 공개 채널 대상·중복 방지·전송 제한·비밀정보 검사
 npm run setup:accounts           # 계정 DB 스키마 준비 (Neon 또는 로컬 SQLite)
 npm run check:accounts           # 로그인·데이터 분리·푸시·알림 대기열 검사
+npm run check:security-integration # 선택적 로컬 PostgreSQL·Redis 동시성 검사 (README 환경 설정)
 npm run check:provisional-financials # 잠정실적 원문 숫자·단위·기간·병합 셀 검사
 npm run check:public-pages        # 공개 페이지·메타데이터·리디렉션·사이트맵 HTTP 검사
 npm run check:recent-disclosures  # 최신 실적 공시 선정·페이지 처리·캐시 검사
@@ -69,6 +70,10 @@ node setupDatabase.js            # dart.db에 companies 테이블 적재 + 인�
 - **잠정실적은 정기공시보다 항목이 적다**: 섹션 1~3개, 항목 1~2개로 프롬프트를 따로 두고, 공시에 없는 내용(변동 요인 등)은 섹션을 만들지 않게 한다. "잠정치라 확정 실적과 다를 수 있다"는 안내는 AI가 아니라 프런트가 고정 문구로 표시한다.
 
 ## 계정과 알림
+
+- 기업·공시 문자열은 HTML 문맥에서 `escapeHtml()`을 거치고 텍스트 제목은 `textContent`로 표시합니다. 공유 URL은 회사 코드 형식 확인 후 `/api/companies/corp/:corpCode`의 공식 정보를 사용하며, URL 이름을 신뢰하는 fallback을 추가하지 않습니다.
+- 유료 AI는 `requireAnalysis`가 확인한 `req.analysisUserId`를 `analysisLimits.js`의 공통 제한에 전달합니다. 두 AI API가 동일한 회원/전체 KST 일일 한도와 동시 실행 잠금을 공유합니다. 잠금은 OpenAI 작업의 `finally`에서 해제하고, upstream deadline(120초)은 Redis lease(180초)보다 짧게 유지합니다. 브라우저 연결 종료만으로 잠금을 해제하지 않습니다.
+- 로그인 challenge는 Redis에서 단회 소비합니다. Postgres 계정 자원 한도는 계정 행 잠금과 다음 statement의 COUNT/INSERT를 `ReadCommitted` 트랜잭션으로 묶습니다. 같은 INSERT/CTE 내부의 잠금만으로 대체하지 않습니다.
 
 - 정기보고서와 잠정실적의 숫자·시각화는 공개합니다. `POST /api/ai-financial-analysis`와 `GET /api/provisional-analysis`는 `accounts.requireAnalysis`에서 회원 세션·CSRF를 확인합니다. 잠정실적 차트는 공개 API에서 먼저 읽으며 로그인·로그아웃·AI 실패가 차트를 숨기지 않습니다. 프런트의 로그인 미리보기는 AI를 호출하지 않습니다. 로그인 후에는 같은 공시의 ‘AI 분석 시작하기’를 눌러 재개하고, 로그아웃·기업 변경 시 대기 중인 AI 응답을 무시합니다.
 

@@ -19,6 +19,14 @@ function mainTag(html, id) {
   return html.match(new RegExp(`<main\\b[^>]*id="${id}"[^>]*>`))[0];
 }
 
+test('공유 링크의 기업 조회는 고유번호를 검증하고 회사 DB 정보만 반환한다',async()=>{
+  const response=await fetch(`${baseUrl}/api/companies/corp/00126380`);
+  assert.equal(response.status,200);const value=await response.json();
+  assert.equal(value.data.corp_code,'00126380');assert.equal(value.data.corp_name,'삼성전자');
+  assert.equal((await fetch(`${baseUrl}/api/companies/corp/99999999`)).status,404);
+  assert.equal((await fetch(`${baseUrl}/api/companies/corp/${encodeURIComponent('<img>')}`)).status,400);
+});
+
 test('홈은 분석 화면과 루트 canonical을 초기 HTML에 제공한다', async () => {
   const response = await fetch(baseUrl);
   const html = await response.text();

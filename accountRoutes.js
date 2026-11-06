@@ -3,6 +3,7 @@ const { randomBytes } = require('node:crypto');
 const { OAuth2Client } = require('google-auth-library');
 const { digest, sign, equal, seal, open, validateSubscription } = require('./accountSecurity');
 const { getMailProvider } = require('./mailSender');
+const { getSharedStore } = require('./sharedStore');
 
 function accountConfig(env = process.env) {
   const origin = new URL(env.APP_ORIGIN || (env.VERCEL ? 'https://finalyze-ai.vercel.app' : `http://localhost:${env.PORT || 3000}`)).origin;
@@ -22,7 +23,7 @@ function cookies(req) {
 }
 function httpError(status, message) { return Object.assign(new Error(message), { status }); }
 
-function createAccountRouter({ store, findCompany, config = accountConfig(), now = () => Date.now(), verifyIdentity, rateLimit }) {
+function createAccountRouter({ store, findCompany, config = accountConfig(), now = () => Date.now(), verifyIdentity, rateLimit, securityStore = getSharedStore }) {
   const router = express.Router();
   const google = new OAuth2Client(config.clientId);
   const verify = verifyIdentity || (async credential => (await google.verifyIdToken({ idToken: credential, audience: config.clientId })).getPayload());
@@ -61,6 +62,7 @@ function createAccountRouter({ store, findCompany, config = accountConfig(), now
       // GET requests also need the session-bound token: links and cross-site navigation cannot spend AI credits.
       if(req.method !== 'GET' || req.get('origin')) requireOrigin(req);
       if(!equal(req.get('x-csrf-token'),csrfFor(value.token))) throw httpError(403,'분석 요청을 확인하지 못했습니다. 화면을 새로고침해주세요.');
+      req.analysisUserId=value.user_id;
     })().then(() => next()).catch(error => {
       if(!error.status) console.warn('AI 이용 권한 확인 실패:',{code:'ACCOUNT_UNAVAILABLE'});
       res.status(error.status || 503).json({status:'error',code:error.status===401 ? 'LOGIN_REQUIRED' : 'ANALYSIS_ACCESS_DENIED',
@@ -85,7 +87,7 @@ function createAccountRouter({ store, findCompany, config = accountConfig(), now
   }));
   router.post('/auth/challenge', wrap(async (req,res) => {
     requireEnabled(); requireOrigin(req);
-    if (rateLimit && !await rateLimit(req)) throw httpError(429,'로그인 요청이 많습니다. 잠시 후 다시 시도해주세요.');
+    if (rateLimit && !await rateLimit(req,'challenge')) throw httpError(429,'로그인 요청이 많습니다. 잠시 후 다시 시도해주세요.');
     const nonce = randomBytes(32).toString('base64url');
     const body = Buffer.from(JSON.stringify({ nonce, expires:now()+600000 })).toString('base64url');
     res.cookie(challengeName,`${body}.${sign(body,config.sessionSecret)}`,{ ...cookieOptions,maxAge:600000 });
@@ -93,12 +95,17 @@ function createAccountRouter({ store, findCompany, config = accountConfig(), now
   }));
   router.post('/auth/google', wrap(async (req,res) => {
     requireEnabled(); requireOrigin(req);
+    if (rateLimit && !await rateLimit(req,'complete')) throw httpError(429,'로그인 요청이 많습니다. 잠시 후 다시 시도해주세요.');
     const challenge = cookies(req)[challengeName] || '';
     res.clearCookie(challengeName,cookieOptions);
     const [body,signature] = challenge.split('.');
     let expected;
     try { expected = JSON.parse(Buffer.from(body || '', 'base64url').toString()); } catch {}
-    if (!body || !equal(signature,sign(body,config.sessionSecret)) || !expected || expected.expires<now()) throw httpError(403,'로그인 요청이 만료됐습니다. 다시 시도해주세요.');
+    if (!body || !equal(signature,sign(body,config.sessionSecret)) || !expected ||
+        !/^[A-Za-z0-9_-]{43}$/.test(expected.nonce || '') || !Number.isFinite(expected.expires) || expected.expires<=now()) throw httpError(403,'로그인 요청이 만료됐습니다. 다시 시도해주세요.');
+    const shared=typeof securityStore==='function'?securityStore():securityStore;
+    // NX makes a challenge single-use across instances, including failed verification attempts.
+    if (!await shared.lock(`finalyze:login:used:${digest(expected.nonce)}`,'used',600)) throw httpError(403,'이미 사용한 로그인 요청입니다. 다시 시도해주세요.');
     const credential = req.body?.credential;
     if (typeof credential !== 'string' || credential.length>12000) throw httpError(400,'로그인 응답이 올바르지 않습니다.');
     let payload;

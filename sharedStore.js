@@ -14,6 +14,25 @@ return {next-now, used+1}`;
 const UNLOCK_SCRIPT = `if redis.call('GET', KEYS[1]) == ARGV[1] then return redis.call('DEL', KEYS[1]) end return 0`;
 const BLOCK_SCRIPT = `local old=tonumber(redis.call('GET',KEYS[1]) or '0')
 if old < tonumber(ARGV[1]) then redis.call('SET',KEYS[1],ARGV[1],'PX',ARGV[2]) end return 1`;
+const ANALYSIS_SCRIPT = `
+local now=tonumber(ARGV[1])
+redis.call('ZREMRANGEBYSCORE',KEYS[3],'-inf',now)
+redis.call('ZREMRANGEBYSCORE',KEYS[4],'-inf',now)
+if tonumber(redis.call('GET',KEYS[1]) or '0')>=tonumber(ARGV[3]) then return {-1,tonumber(ARGV[8])} end
+if tonumber(redis.call('GET',KEYS[2]) or '0')>=tonumber(ARGV[4]) then return {-2,tonumber(ARGV[8])} end
+if redis.call('ZCARD',KEYS[3])>=1 then return {-3,1} end
+if redis.call('ZCARD',KEYS[4])>=tonumber(ARGV[5]) then return {-4,1} end
+local next=tonumber(redis.call('GET',KEYS[5]) or '0')
+if next>now then return {-5,math.ceil((next-now)/1000)} end
+for i=1,2 do redis.call('INCR',KEYS[i]); redis.call('EXPIRE',KEYS[i],172800) end
+for i=3,4 do redis.call('ZADD',KEYS[i],now+tonumber(ARGV[7]),ARGV[2]); redis.call('PEXPIRE',KEYS[i],ARGV[7]) end
+redis.call('SET',KEYS[5],now+tonumber(ARGV[6]),'PX',ARGV[6])
+return {1,0}`;
+const RELEASE_ANALYSIS_SCRIPT = `for i=1,2 do redis.call('ZREM',KEYS[i],ARGV[1]) end return 1`;
+function analysisKeys(user,day) {
+  return [`finalyze:ai:v1:user:${user}:day:${day}`,`finalyze:ai:v1:day:${day}`,
+    `finalyze:ai:v1:user:${user}:active`,'finalyze:ai:v1:active',`finalyze:ai:v1:user:${user}:next`];
+}
 
 function cacheError() {
   return Object.assign(new Error('공유 캐시에 연결하지 못했습니다.'), { code: 'DART_CACHE_UNAVAILABLE' });
@@ -42,7 +61,15 @@ function createRedisStore({ url, token, fetchImpl = fetch }) {
     async reserve(key, day, now, interval, limit, maxWait) {
       return command(['EVAL', RESERVE_SCRIPT, 3, `${key}:next`, `${key}:day:${day}`, `${key}:blocked`, now, interval, limit, maxWait]);
     },
-    async block(key, until, now) { await command(['EVAL', BLOCK_SCRIPT, 1, `${key}:blocked`, until, Math.max(1, until - now)]); }
+    async block(key, until, now) { await command(['EVAL', BLOCK_SCRIPT, 1, `${key}:blocked`, until, Math.max(1, until - now)]); },
+    async acquireAnalysis(user,day,tokenValue,time,limits) {
+      return command(['EVAL',ANALYSIS_SCRIPT,5,...analysisKeys(user,day),time,tokenValue,
+        limits.memberDaily,limits.globalDaily,limits.globalConcurrent,limits.intervalMs,limits.leaseMs,limits.retrySeconds]);
+    },
+    async releaseAnalysis(user,tokenValue) {
+      const keys=analysisKeys(user,'');
+      await command(['EVAL',RELEASE_ANALYSIS_SCRIPT,2,keys[2],keys[3],tokenValue]);
+    }
   };
 }
 
@@ -73,6 +100,27 @@ function createMemoryStore({ now = () => Date.now() } = {}) {
     },
     async block(key, until, timestamp) {
       if (Number(read(`${key}:blocked`) || 0) < until) put(`${key}:blocked`, until, (until - timestamp) / 1000);
+    },
+    async acquireAnalysis(user,day,tokenValue,time,limits) {
+      const keys=analysisKeys(user,day);
+      const member=Object.fromEntries(Object.entries(read(keys[2]) || {}).filter(([,until])=>until>time));
+      const global=Object.fromEntries(Object.entries(read(keys[3]) || {}).filter(([,until])=>until>time));
+      if(Number(read(keys[0]) || 0)>=limits.memberDaily) return [-1,limits.retrySeconds];
+      if(Number(read(keys[1]) || 0)>=limits.globalDaily) return [-2,limits.retrySeconds];
+      if(Object.keys(member).length>=1) return [-3,1];
+      if(Object.keys(global).length>=limits.globalConcurrent) return [-4,1];
+      const next=Number(read(keys[4]) || 0);
+      if(next>time) return [-5,Math.ceil((next-time)/1000)];
+      for(const key of keys.slice(0,2)) put(key,Number(read(key) || 0)+1,172800);
+      member[tokenValue]=global[tokenValue]=time+limits.leaseMs;
+      put(keys[2],member,limits.leaseMs/1000);put(keys[3],global,limits.leaseMs/1000);
+      put(keys[4],time+limits.intervalMs,limits.intervalMs/1000);
+      return [1,0];
+    },
+    async releaseAnalysis(user,tokenValue) {
+      for(const key of analysisKeys(user,'').slice(2,4)) {
+        const active=read(key);if(active) { delete active[tokenValue]; }
+      }
     }
   };
 }

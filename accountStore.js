@@ -14,6 +14,7 @@ const SCHEMA = [
   `CREATE TABLE IF NOT EXISTS app_telegram_baselines (chat_id TEXT NOT NULL REFERENCES app_telegram_channels(chat_id) ON DELETE CASCADE, corp_code TEXT NOT NULL, started_at BIGINT NOT NULL, PRIMARY KEY(chat_id,corp_code))`,
   `CREATE TABLE IF NOT EXISTS app_telegram_deliveries (chat_id TEXT NOT NULL REFERENCES app_telegram_channels(chat_id) ON DELETE CASCADE, receipt TEXT NOT NULL, event_json TEXT NOT NULL, created_at BIGINT NOT NULL, status TEXT NOT NULL, attempts INTEGER NOT NULL DEFAULT 0, next_attempt BIGINT NOT NULL DEFAULT 0, lease_until BIGINT NOT NULL DEFAULT 0, message_id TEXT, PRIMARY KEY(chat_id,receipt))`,
   `CREATE INDEX IF NOT EXISTS app_sessions_expiry ON app_sessions(expires_at)`,
+  `CREATE INDEX IF NOT EXISTS app_sessions_user_expiry ON app_sessions(user_id,expires_at)`,
   `CREATE INDEX IF NOT EXISTS app_deliveries_pending ON app_deliveries(status,next_attempt)`
 ];
 
@@ -49,13 +50,13 @@ function sqliteDatabase(filename = ':memory:') {
     close: () => new Promise((resolve, reject) => db.close(error => error ? reject(error) : resolve())) };
 }
 
-function neonDatabase(url) {
-  const { neon } = require('@neondatabase/serverless');
+function neonDatabase(url,neon = require('@neondatabase/serverless').neon) {
   const sql = neon(url, { fetchOptions: { signal: undefined } });
   const query = (text, params = []) => sql.query(text, params, { fetchOptions: { signal: AbortSignal.timeout(15000) } });
   const transaction = queries => sql.transaction(queries.map(([text, params]) => sql.query(text, params)),
-    { fetchOptions: { signal: AbortSignal.timeout(20000) } });
-  return { query, transaction, migrate: () => transaction(SCHEMA.map(text => [text, []])), close: async () => {} };
+    { isolationLevel:'ReadCommitted',fetchOptions: { signal: AbortSignal.timeout(20000) } });
+  return { query, transaction, migrate: () => transaction(SCHEMA.map(text => [text, []])), close: async () => {},
+    pushLock:target=>['SELECT pg_advisory_xact_lock(hashtextextended($1,0))',[target]] };
 }
 
 function createAccountStore(database, now = () => Date.now()) {
@@ -72,20 +73,33 @@ function createAccountStore(database, now = () => Date.now()) {
     async ensureUser(id) { await query('INSERT INTO app_users(id,created_at) VALUES($1,$2) ON CONFLICT(id) DO NOTHING', [id, now()]); },
     async user(id) { return first(await query('SELECT * FROM app_users WHERE id=$1', [id])); },
     async session(hash) { return first(await query('SELECT user_id,expires_at FROM app_sessions WHERE token_hash=$1 AND expires_at>$2', [hash, now()])); },
-    async addSession(hash, id, expires) { await query('INSERT INTO app_sessions(token_hash,user_id,expires_at) VALUES($1,$2,$3)', [hash,id,expires]); },
+    async addSession(hash, id, expires) { await transaction([
+      ['UPDATE app_users SET created_at=created_at WHERE id=$1',[id]],
+      ['DELETE FROM app_sessions WHERE user_id=$1 AND expires_at<=$2',[id,now()]],
+      ['INSERT INTO app_sessions(token_hash,user_id,expires_at) VALUES($1,$2,$3)', [hash,id,expires]],
+      [`DELETE FROM app_sessions WHERE user_id=$1 AND token_hash<>$2 AND token_hash NOT IN
+        (SELECT token_hash FROM app_sessions WHERE user_id=$1 AND token_hash<>$2 ORDER BY expires_at DESC,token_hash DESC LIMIT 4)`,[id,hash]]
+    ]); },
     async removeSession(hash) { await query('DELETE FROM app_sessions WHERE token_hash=$1', [hash]); },
     async favorites(id) { return query('SELECT corp_code,corp_name,stock_code,created_at FROM app_favorites WHERE user_id=$1 ORDER BY created_at DESC,corp_code', [id]); },
     async addFavorite(id, company) {
-      await query(`INSERT INTO app_favorites(user_id,corp_code,corp_name,stock_code,created_at)
+      const rows=await transaction([
+        ['UPDATE app_users SET created_at=created_at WHERE id=$1',[id]],
+        [`INSERT INTO app_favorites(user_id,corp_code,corp_name,stock_code,created_at)
         SELECT $1,$2,$3,$4,$5 WHERE (SELECT COUNT(*) FROM app_favorites WHERE user_id=$1)<50
-        ON CONFLICT(user_id,corp_code) DO NOTHING`, [id,company.corp_code,company.corp_name,company.stock_code,now()]);
-      return first(await query('SELECT corp_code FROM app_favorites WHERE user_id=$1 AND corp_code=$2', [id,company.corp_code]));
+        ON CONFLICT(user_id,corp_code) DO NOTHING`, [id,company.corp_code,company.corp_name,company.stock_code,now()]],
+        ['SELECT corp_code FROM app_favorites WHERE user_id=$1 AND corp_code=$2', [id,company.corp_code]]
+      ]);
+      return first(rows[2]);
     },
     async removeFavorite(id, corp) { await query('DELETE FROM app_favorites WHERE user_id=$1 AND corp_code=$2', [id,corp]); },
     async subscriptions(id) { return query('SELECT id FROM app_push WHERE user_id=$1', [id]); },
     async addPush(id, target, encrypted) {
       await transaction([
-        ['DELETE FROM app_push WHERE id=$2 AND user_id<>$1',[id,target]],
+        database.pushLock ? database.pushLock(target) : ['SELECT 1',[]],
+        ['UPDATE app_users SET created_at=created_at WHERE id=$1',[id]],
+        [`DELETE FROM app_push WHERE id=$2 AND user_id<>$1 AND
+          ((SELECT COUNT(*) FROM app_push WHERE user_id=$1)<5 OR EXISTS(SELECT 1 FROM app_push WHERE user_id=$1 AND id=$2))`,[id,target]],
         [`UPDATE app_favorites SET monitoring_since=0 WHERE user_id=$1 AND NOT EXISTS(SELECT 1 FROM app_push WHERE user_id=$1) AND EXISTS(SELECT 1 FROM app_users WHERE id=$1 AND email_enabled=0)`, [id]],
         [`INSERT INTO app_push(user_id,id,subscription_enc,created_at) SELECT $1,$2,$3,$4 WHERE (SELECT COUNT(*) FROM app_push WHERE user_id=$1)<5 OR EXISTS(SELECT 1 FROM app_push WHERE user_id=$1 AND id=$2)
           ON CONFLICT(user_id,id) DO UPDATE SET subscription_enc=excluded.subscription_enc`, [id,target,encrypted,now()]]
@@ -95,6 +109,7 @@ function createAccountStore(database, now = () => Date.now()) {
     async removePush(id, target) { await query('DELETE FROM app_push WHERE user_id=$1 AND id=$2', [id,target]); },
     async setEmail(id, encrypted) {
       await transaction([
+        ['UPDATE app_users SET created_at=created_at WHERE id=$1',[id]],
         ['UPDATE app_favorites SET monitoring_since=0 WHERE user_id=$1 AND NOT EXISTS(SELECT 1 FROM app_push WHERE user_id=$1) AND EXISTS(SELECT 1 FROM app_users WHERE id=$1 AND email_enabled=0)', [id]],
         ['UPDATE app_users SET email_enc=$2,email_enabled=$3,email_since=$4 WHERE id=$1', [id,encrypted,encrypted ? 1 : 0,encrypted ? now() : 0]]
       ]);

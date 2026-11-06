@@ -15,6 +15,7 @@ const { createDisclosureFeed,createSenders,createNotificationJob,cronAuthorized 
 const { sign } = require('./accountSecurity');
 const { readDisclosureXml,parseProvisionalFinancials } = require('./provisionalFinancials');
 const {createTelegramBroadcast,telegramConfig}=require('./telegramDisclosures');
+const {createAnalysisLimiter,OPENAI_DEADLINE_MS}=require('./analysisLimits');
 
 // 환경변수 로드
 dotenv.config();
@@ -22,6 +23,7 @@ dotenv.config();
 const app = express();
 if(process.env.VERCEL) app.set('trust proxy',1);
 const PORT = process.env.PORT || 3000;
+const runAnalysis = createAnalysisLimiter();
 
 // 공개 페이지는 JavaScript 실행 전에도 본문과 고유 메타데이터를 제공합니다.
 app.get('/', (req, res) => res.type('html').send(renderPage('analysis')));
@@ -39,12 +41,13 @@ app.use(express.json());
 
 // 데이터베이스 연결
 const db = financialService.connectDB();
+const findCompany = corp => new Promise((resolve,reject) => db.get('SELECT * FROM companies WHERE corp_code=? LIMIT 1',[corp],(error,row) => error ? reject(error) : resolve(row)));
 
 const accounts = createAccountRouter({
   store:getAccountStore,
-  findCompany:corp => new Promise((resolve,reject) => db.get('SELECT * FROM companies WHERE corp_code=? LIMIT 1',[corp],(error,row) => error ? reject(error) : resolve(row))),
-  rateLimit:async req => {
-    const key = `finalyze:login:${sign(req.ip || 'unknown',process.env.SESSION_SECRET)}`;
+  findCompany,
+  rateLimit:async (req,stage) => {
+    const key = `finalyze:login:${stage}:${sign(req.ip || 'unknown',process.env.SESSION_SECRET)}`;
     const time = Date.now();
     const [delay] = await getSharedStore().reserve(key,new Date(time).toISOString().slice(0,10),time,1000,600,0);
     return delay>=0;
@@ -176,6 +179,18 @@ app.get('/api/companies/search', async (req, res) => {
       status: 'error', 
       message: '서버 오류가 발생했습니다.' 
     });
+  }
+});
+
+// 공유 링크도 URL의 표시 이름 대신 회사 DB의 확인된 정보를 사용합니다.
+app.get('/api/companies/corp/:corpCode', async (req,res) => {
+  if (!/^\d{8}$/.test(req.params.corpCode)) return res.status(400).json({status:'error',message:'기업 고유번호를 확인해주세요.'});
+  try {
+    const company = await findCompany(req.params.corpCode);
+    if (!company) return res.status(404).json({status:'error',message:'기업 정보를 찾지 못했습니다.'});
+    res.json({status:'success',data:company});
+  } catch {
+    res.status(503).json({status:'error',message:'기업 정보를 불러오지 못했습니다.'});
   }
 });
 
@@ -712,7 +727,7 @@ app.post('/api/ai-financial-analysis', accounts.requireAnalysis, async (req, res
     const prompt = createFinancialAnalysisPrompt(companyName, year, previousYear, balanceSheet, incomeStatement, ratio, isFinancialComp);
     
     // OpenAI API 호출 (structured outputs)
-    const result = parseAnalysisJson(await callOpenAIAPI(prompt, FINANCIAL_ANALYSIS_SCHEMA));
+    const result = await runAnalysis(req.analysisUserId,async()=>parseAnalysisJson(await callOpenAIAPI(prompt, FINANCIAL_ANALYSIS_SCHEMA)));
     result.title = `${companyName} ${year}년 재무 분석`;
 
     res.json({
@@ -720,8 +735,9 @@ app.post('/api/ai-financial-analysis', accounts.requireAnalysis, async (req, res
       result
     });
   } catch (error) {
-    console.error('AI 재무분석 중 오류 발생:', error);
-    res.status(500).json({ 
+    console.error('AI 재무분석 중 오류 발생:', error.message);
+    if(error.retryAfter) res.set('Retry-After',String(error.retryAfter));
+    res.status(error.status || 500).json({
       status: 'error', 
       message: `AI 재무분석 중 오류가 발생했습니다: ${error.message}` 
     });
@@ -817,6 +833,7 @@ async function callOpenAIAPI(prompt, jsonSchema) {
   }
 
   const maxRetries = 3;
+  const signal = AbortSignal.timeout(OPENAI_DEADLINE_MS);
   let delay = 1000; // 초기 대기 시간 1초
 
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
@@ -841,6 +858,7 @@ async function callOpenAIAPI(prompt, jsonSchema) {
           })
         },
         {
+          signal, timeout:45000,
           headers: {
             'Authorization': `Bearer ${apiKey}`,
             'Content-Type': 'application/json'
@@ -861,6 +879,7 @@ async function callOpenAIAPI(prompt, jsonSchema) {
         throw new Error('AI 응답 형식이 유효하지 않습니다.');
       }
     } catch (error) {
+      if(signal.aborted) throw new Error('AI 분석 시간이 초과되었습니다. 잠시 후 다시 시도해주세요.');
       const isRateLimit = error.response && error.response.status === 429;
 
       if (isRateLimit && attempt < maxRetries) {
@@ -1140,13 +1159,14 @@ app.get('/api/provisional-analysis', accounts.requireAnalysis, async (req, res) 
     // 숫자 시각화는 원문 파서가 담당하고, 모델은 해석만 작성합니다.
     let chartData = null;
     try { chartData = parseProvisionalFinancials(readDisclosureXml(Buffer.from(response.data))); } catch {}
-    const result = parseAnalysisJson(await callOpenAIAPI(prompt, PROVISIONAL_ANALYSIS_SCHEMA));
+    const result = await runAnalysis(req.analysisUserId,async()=>parseAnalysisJson(await callOpenAIAPI(prompt, PROVISIONAL_ANALYSIS_SCHEMA)));
     result.title = `${corp_name || '해당 회사'} 잠정실적 분석`;
 
     res.json({ status: 'success', result, chartData: chartData || null });
   } catch (error) {
-    console.error('잠정실적 분석 중 오류 발생:', error);
-    res.status(500).json({
+    console.error('잠정실적 분석 중 오류 발생:', error.message);
+    if(error.retryAfter) res.set('Retry-After',String(error.retryAfter));
+    res.status(error.status || 500).json({
       status: 'error',
       message: `잠정실적 분석 중 오류가 발생했습니다: ${error.message}`
     });

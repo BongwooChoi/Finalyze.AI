@@ -19,7 +19,7 @@ async function fixture(t,options = {}) {
   const identities = new Map();
   const accounts = createAccountRouter({ store,config:{...config,...options},now,
     findCompany:async id => id===COMPANY.corp_code ? COMPANY : null,
-    verifyIdentity:async token => { if(!identities.has(token)) throw new Error('forged'); return identities.get(token); } });
+    verifyIdentity:async token => { if(!identities.has(token)) throw new Error('forged'); return identities.get(token); },...options.router });
   const app = express(); app.use(express.json()); app.use('/api',accounts.router);
   let analysisCalls=0;
   const analysis=(req,res)=>{analysisCalls++;res.json({status:'success'});};
@@ -83,6 +83,44 @@ test('Google profile and email are discarded; sessions only persist token hashes
   const sessions=await f.store.query('SELECT * FROM app_sessions');
   assert.equal(sessions[0].token_hash,digest(a.jar.finalyze_session));
   assert.notEqual(sessions[0].token_hash,a.jar.finalyze_session);
+});
+
+test('a copied challenge is consumed once across concurrent requests and cannot issue replay sessions',async t=>{
+  const f=await fixture(t),a=f.client();const challenge=await (await a.request('/auth/challenge','POST',{})).json();
+  const cookie='finalyze_challenge='+a.jar.finalyze_challenge;
+  f.identities.set('valid',{sub:'replay-user',nonce:challenge.nonce});
+  const results=await Promise.all(Array.from({length:8},()=>a.request('/auth/google','POST',{credential:'valid'},{Cookie:cookie})));
+  assert.equal(results.filter(r=>r.status===200).length,1);assert.equal(results.filter(r=>r.status===403).length,7);
+  assert.equal((await a.request('/auth/google','POST',{credential:'valid'},{Cookie:cookie})).status,403);
+  assert.equal((await f.store.query('SELECT * FROM app_sessions')).length,1);
+});
+test('failed verification also consumes the challenge; an expired challenge creates no session',async t=>{
+  const f=await fixture(t),a=f.client();let challenge=await (await a.request('/auth/challenge','POST',{})).json();
+  const cookie='finalyze_challenge='+a.jar.finalyze_challenge;
+  assert.equal((await a.request('/auth/google','POST',{credential:'forged'},{Cookie:cookie})).status,401);
+  f.identities.set('valid',{sub:'retry-user',nonce:challenge.nonce});
+  assert.equal((await a.request('/auth/google','POST',{credential:'valid'},{Cookie:cookie})).status,403);
+  challenge=await (await a.request('/auth/challenge','POST',{})).json();
+  f.identities.set('expired',{sub:'retry-user',nonce:challenge.nonce});f.advance(600000);
+  assert.equal((await a.request('/auth/google','POST',{credential:'expired'})).status,403);
+  assert.equal((await f.store.query('SELECT * FROM app_sessions')).length,0);
+  assert.equal((await a.login('retry-user')).status,200);
+});
+test('login completion has its own limit and shared-store failure never issues a session',async t=>{
+  const stages=[];const f=await fixture(t,{router:{rateLimit:async(req,stage)=>{stages.push(stage);return stage!=='complete';}}});
+  assert.equal((await f.client().login()).status,429);assert.deepEqual(stages,['challenge','complete']);
+  assert.equal((await f.store.query('SELECT * FROM app_sessions')).length,0);
+  const broken=await fixture(t,{router:{securityStore:{lock:async()=>{throw Error('secret connection');}}}});
+  const r=await broken.client().login();assert.equal(r.status,503);assert.doesNotMatch(await r.text(),/secret connection/);
+  assert.equal((await broken.store.query('SELECT * FROM app_sessions')).length,0);
+});
+test('simultaneous session issuance retains at most five sessions per user and the newest login remains valid',async t=>{
+  const f=await fixture(t);await f.store.ensureUser('bounded');await f.store.ensureUser('other');
+  await f.store.addSession('other-session','other',f.now()+100000);
+  await Promise.all(Array.from({length:20},(_,i)=>f.store.addSession('session-'+i,'bounded',f.now()+100000+i)));
+  await f.store.addSession('latest','bounded',f.now()+100500);
+  assert.equal((await f.store.query('SELECT * FROM app_sessions WHERE user_id=$1',['bounded'])).length,5);
+  assert.ok(await f.store.session('latest'));assert.ok(await f.store.session('other-session'));
 });
 test('login requires correct origin, valid identity, and the browser-bound nonce',async t => {
   const f=await fixture(t), a=f.client();

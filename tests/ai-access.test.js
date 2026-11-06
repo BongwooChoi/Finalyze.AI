@@ -61,6 +61,15 @@ test('a late AI response cannot reveal content after logout',async()=>{
   assert.equal(f.document.getElementById('aiAnalysisContent').innerHTML,'');
   assert.equal(f.document.getElementById('aiAnalysisAccess').hidden,false);
 });
+
+test('a quota response shows the server guidance and allows a later explicit retry',async()=>{
+  let calls=0;const f=fixture(()=>++calls===1 ? {status:429,ok:false,json:async()=>({status:'error',message:'오늘 AI 분석 한도에 도달했습니다.'})} : response());
+  f.change(true);f.choose();await f.run('requestAiAnalysis(activeAiAnalysis)');
+  assert.match(f.document.getElementById('aiAnalysisError').textContent,/한도/);
+  assert.equal(f.run('activeAiAnalysis.status'),'error');
+  await f.run('requestAiAnalysis(activeAiAnalysis)');
+  assert.equal(f.requests.length,2);assert.equal(f.run('activeAiAnalysis.status'),'complete');
+});
 test('changing the selected company discards the previous in-flight AI result',async()=>{
   let deliver,started;
   const ready=new Promise(resolve=>{started=resolve;});

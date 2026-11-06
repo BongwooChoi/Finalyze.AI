@@ -70,15 +70,18 @@ function createSenders({ config,env = process.env,unsubscribeToken,fetchImpl = f
   };
 }
 
-function createNotificationJob({ store,collect,senders,now = () => Date.now() }) {
+function createNotificationJob({ store,collect,senders,broadcast,now = () => Date.now() }) {
   return async function run() {
+    const startedAt=now();
     const storage = typeof store==='function' ? store() : store;
     const lease = await storage.acquireJob();
     if(!lease) return { busy:true };
     const result = { scanned:0,sent:0,failed:0,skipped:0 };
     try {
       await storage.cleanup();
-      const companies = await storage.watchedCompanies();
+      const watched = await storage.watchedCompanies();
+      const featured = broadcast?.enabled ? await broadcast.companies() : [];
+      const companies = [...new Map([...watched,...featured].map(row=>[row.corp_code,row])).values()];
       if(companies.length) {
         const observedAt = now();
         let events;
@@ -86,6 +89,7 @@ function createNotificationJob({ store,collect,senders,now = () => Date.now() })
         catch { result.partial=true; console.warn('알림 공시 수집 지연:',{code:'FEED_UNAVAILABLE'}); }
         if(events) {
           for(const event of events) await storage.recordDisclosure(event,observedAt);
+          if(broadcast?.enabled) await broadcast.capture(featured,events,observedAt,events.incompleteCompanies || []);
           await storage.completeScan(lease.token,observedAt,events.incompleteCompanies || []);
           result.scanned = events.length;
           if(events.incompleteCompanies?.length) result.partial=true;
@@ -112,6 +116,7 @@ function createNotificationJob({ store,collect,senders,now = () => Date.now() })
           }
         }));
       }
+      if(broadcast?.enabled) result.telegram=await broadcast.deliver({deadline:startedAt+180000});
       return result;
     } finally { await storage.releaseJob(lease.token); }
   };

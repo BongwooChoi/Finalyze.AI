@@ -243,4 +243,5 @@ function createRecentDisclosureService({ fetchList, fetchDocumentText, now = () 
   };
 }
 
-module.exports = { createRecentDisclosureService, hasFinancialResults, reportType };
+module.exports = { createRecentDisclosureService, hasFinancialResults, reportType,
+  getFeaturedStockCodes: () => [...FEATURED_STOCK_CODES] };

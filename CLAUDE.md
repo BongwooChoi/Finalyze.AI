@@ -10,6 +10,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ```
 npm start                        # 로컬 서버 실행 (기본 포트 3000)
+npm run check:telegram-disclosures # 공개 채널 대상·중복 방지·전송 제한·비밀정보 검사
 npm run setup:accounts           # 계정 DB 스키마 준비 (Neon 또는 로컬 SQLite)
 npm run check:accounts           # 로그인·데이터 분리·푸시·알림 대기열 검사
 npm run check:provisional-financials # 잠정실적 원문 숫자·단위·기간·병합 셀 검사
@@ -77,6 +78,8 @@ node setupDatabase.js            # dart.db에 companies 테이블 적재 + 인�
 - UI는 `public/js/accounts.js`, 푸시 수신·이동은 `public/sw.js`입니다. 관심 기업과 푸시 링크를 열어도 분석은 자동 실행하지 않습니다. 처리 정보는 `/privacy`에서 안내합니다.
 
 ## 프런트엔드 캐시 무효화 (필수)
+
+텔레그램 공개 채널은 `telegramDisclosures.js`와 기존 공시 알림 작업이 담당합니다. 대상 기업은 `getFeaturedStockCodes()`를 공유하고, 원문 수치는 기존 잠정실적 파서를 사용합니다. 별도 DART 폴링이나 LLM 호출을 추가하지 않습니다. 운영과 전송 상태는 `docs/telegram-disclosures.md`를 참고합니다.
 
 public/의 CSS·JS를 수정하면 배포된 사용자에게 반영되도록 **두 곳의 버전을 함께 올려야 한다**:
 1. `public/sw.js`의 `CACHE_NAME` (예: `financial-app-cache-v16` → `v17`)

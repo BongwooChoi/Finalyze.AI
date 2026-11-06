@@ -6,7 +6,7 @@ const AdmZip = require('adm-zip');
 const dotenv = require('dotenv');
 const config = require('./config');
 const { renderPage } = require('./sitePages');
-const { createRecentDisclosureService } = require('./recentDisclosures');
+const { createRecentDisclosureService,getFeaturedStockCodes } = require('./recentDisclosures');
 const dartClient = require('./dartClient');
 const { getSharedStore } = require('./sharedStore');
 const { getAccountStore } = require('./accountStore');
@@ -14,6 +14,7 @@ const { createAccountRouter } = require('./accountRoutes');
 const { createDisclosureFeed,createSenders,createNotificationJob,cronAuthorized } = require('./disclosureNotifications');
 const { sign } = require('./accountSecurity');
 const { readDisclosureXml,parseProvisionalFinancials } = require('./provisionalFinancials');
+const {createTelegramBroadcast,telegramConfig}=require('./telegramDisclosures');
 
 // 환경변수 로드
 dotenv.config();
@@ -58,12 +59,21 @@ const notificationFeed = createDisclosureFeed({
     params:{rcept_no:receipt},responseType:'arraybuffer',timeout:12000
   })).data)
 });
-const notify = createNotificationJob({ store:getAccountStore,collect:notificationFeed,
+const telegram=createTelegramBroadcast({config:telegramConfig(),store:getAccountStore,
+  companies:()=>new Promise((resolve,reject)=>{
+    const stocks=getFeaturedStockCodes();
+    db.all(`SELECT corp_code,corp_name,stock_code FROM companies WHERE stock_code IN (${stocks.map(()=>'?').join(',')})`,stocks,(error,rows)=>error?reject(error):resolve(rows));
+  }),
+  fetchDocument:async receipt=>(await dartClient.get('https://opendart.fss.or.kr/api/document.xml',{
+    params:{rcept_no:receipt},responseType:'arraybuffer',timeout:12000
+  })).data
+});
+const notify = createNotificationJob({ store:getAccountStore,collect:notificationFeed,broadcast:telegram,
   senders:createSenders({ config:accounts.config,unsubscribeToken:accounts.unsubscribeToken }) });
 app.post('/api/jobs/disclosures',async (req,res) => {
   res.set('Cache-Control','no-store');
   if(!cronAuthorized(req,process.env.CRON_SECRET)) return res.status(401).json({ status:'error' });
-  if(!accounts.config.enabled) return res.status(503).json({ status:'error',message:'Account configuration unavailable' });
+  if(!accounts.config.enabled && !telegram.enabled) return res.status(503).json({ status:'error',message:'Notification configuration unavailable' });
   try { res.json({ status:'success',...await notify() }); }
   catch { console.warn('공시 알림 작업 실패:',{ code:'NOTIFICATION_JOB_UNAVAILABLE' }); res.status(503).json({ status:'error' }); }
 });

@@ -10,6 +10,9 @@ const SCHEMA = [
   `CREATE TABLE IF NOT EXISTS app_disclosures (receipt TEXT PRIMARY KEY, corp_code TEXT NOT NULL, corp_name TEXT NOT NULL, report_name TEXT NOT NULL, receipt_date TEXT NOT NULL, first_seen BIGINT NOT NULL)`,
   `CREATE TABLE IF NOT EXISTS app_deliveries (id TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES app_users(id) ON DELETE CASCADE, receipt TEXT NOT NULL REFERENCES app_disclosures(receipt) ON DELETE CASCADE, channel TEXT NOT NULL, target_id TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'pending', attempts INTEGER NOT NULL DEFAULT 0, next_attempt BIGINT NOT NULL DEFAULT 0, lease_until BIGINT NOT NULL DEFAULT 0)`,
   `CREATE TABLE IF NOT EXISTS app_jobs (id TEXT PRIMARY KEY, last_success BIGINT NOT NULL DEFAULT 0, lease_token TEXT NOT NULL DEFAULT '', lease_until BIGINT NOT NULL DEFAULT 0)`,
+  `CREATE TABLE IF NOT EXISTS app_telegram_channels (chat_id TEXT PRIMARY KEY, blocked_until BIGINT NOT NULL DEFAULT 0)`,
+  `CREATE TABLE IF NOT EXISTS app_telegram_baselines (chat_id TEXT NOT NULL REFERENCES app_telegram_channels(chat_id) ON DELETE CASCADE, corp_code TEXT NOT NULL, started_at BIGINT NOT NULL, PRIMARY KEY(chat_id,corp_code))`,
+  `CREATE TABLE IF NOT EXISTS app_telegram_deliveries (chat_id TEXT NOT NULL REFERENCES app_telegram_channels(chat_id) ON DELETE CASCADE, receipt TEXT NOT NULL, event_json TEXT NOT NULL, created_at BIGINT NOT NULL, status TEXT NOT NULL, attempts INTEGER NOT NULL DEFAULT 0, next_attempt BIGINT NOT NULL DEFAULT 0, lease_until BIGINT NOT NULL DEFAULT 0, message_id TEXT, PRIMARY KEY(chat_id,receipt))`,
   `CREATE INDEX IF NOT EXISTS app_sessions_expiry ON app_sessions(expires_at)`,
   `CREATE INDEX IF NOT EXISTS app_deliveries_pending ON app_deliveries(status,next_attempt)`
 ];
@@ -142,9 +145,33 @@ function createAccountStore(database, now = () => Date.now()) {
       WHERE d.id=$1 AND f.monitoring_since>0 AND f.monitoring_since<=e.first_seen AND
       ((d.channel='email' AND u.email_enabled=1 AND u.email_since<=e.first_seen) OR (d.channel='push' AND p.created_at<=e.first_seen))`, [delivery.id])); },
     async finishDelivery(id, status, delay = 0) { await query('UPDATE app_deliveries SET status=$2,next_attempt=$3,lease_until=0 WHERE id=$1', [id,status,now()+delay]); },
+    async captureTelegram(chat,companies,events,observedAt,incomplete=[]) {
+      const unhealthy=new Set(incomplete);
+      const commands=[['INSERT INTO app_telegram_channels(chat_id) VALUES($1) ON CONFLICT(chat_id) DO NOTHING',[chat]]];
+      for(const event of events) commands.push([`INSERT INTO app_telegram_deliveries(chat_id,receipt,event_json,created_at,status)
+        VALUES($1,$2,$3,$4,CASE WHEN EXISTS(SELECT 1 FROM app_telegram_baselines WHERE chat_id=$1 AND corp_code=$5 AND started_at<=$4) THEN 'pending' ELSE 'baseline' END)
+        ON CONFLICT(chat_id,receipt) DO NOTHING`,[chat,event.rcept_no,JSON.stringify(event),observedAt,event.corp_code]]);
+      for(const company of companies.filter(item=>!unhealthy.has(item.corp_code))) commands.push([
+        'INSERT INTO app_telegram_baselines(chat_id,corp_code,started_at) VALUES($1,$2,$3) ON CONFLICT(chat_id,corp_code) DO NOTHING',[chat,company.corp_code,observedAt+1]
+      ]);
+      await transaction(commands);
+    },
+    async telegramPending(chat) {
+      // A process may have crashed after Telegram accepted a message. Never blindly resend that receipt.
+      await query("UPDATE app_telegram_deliveries SET status='uncertain' WHERE chat_id=$1 AND status='sending' AND lease_until<$2",[chat,now()]);
+      return query(`SELECT d.* FROM app_telegram_deliveries d JOIN app_telegram_channels c ON c.chat_id=d.chat_id
+        WHERE d.chat_id=$1 AND d.status='pending' AND d.attempts<5 AND d.next_attempt<=$2 AND c.blocked_until<=$2 ORDER BY d.receipt LIMIT 8`,[chat,now()]);
+    },
+    async claimTelegram(chat,receipt) { return first(await query(`UPDATE app_telegram_deliveries SET status='sending',attempts=attempts+1,lease_until=$3
+      WHERE chat_id=$1 AND receipt=$2 AND status='pending' AND next_attempt<=$4 AND attempts<5 RETURNING *`,[chat,receipt,now()+30000,now()])); },
+    async finishTelegram(chat,receipt,status,delay=0,messageId=null) {
+      await query('UPDATE app_telegram_deliveries SET status=$3,next_attempt=$4,lease_until=0,message_id=$5 WHERE chat_id=$1 AND receipt=$2',[chat,receipt,status,now()+delay,messageId]);
+    },
+    async pauseTelegram(chat,delay) { await query('UPDATE app_telegram_channels SET blocked_until=$2 WHERE chat_id=$1',[chat,now()+delay]); },
     async cleanup() { await transaction([
       ['DELETE FROM app_sessions WHERE expires_at<$1', [now()]],
-      ['DELETE FROM app_disclosures WHERE first_seen<$1', [now()-30*86400000]]
+      ['DELETE FROM app_disclosures WHERE first_seen<$1', [now()-30*86400000]],
+      ['DELETE FROM app_telegram_deliveries WHERE created_at<$1',[now()-30*86400000]]
     ]); }
   };
 }

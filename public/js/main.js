@@ -750,15 +750,38 @@ function resetAiAnalysis() {
   aiRequestController?.abort();
   activeAiAnalysis = null;
   for(const id of ['aiAnalysisAccess','provisionalAccess']) document.getElementById(id).hidden = true;
+  for(const id of ['aiAnalysisNotice','provisionalNotice']) {const notice=document.getElementById(id);notice.hidden=true;notice.replaceChildren();}
   aiAnalysisContent.replaceChildren();
   document.getElementById('provisionalContent').replaceChildren();
 }
 
 function aiPanel(context) {
   return context.kind === 'financial' ? {loading:aiAnalysisLoading,error:aiAnalysisError,content:aiAnalysisContent,
-    access:document.getElementById('aiAnalysisAccess')} : {
+    access:document.getElementById('aiAnalysisAccess'),notice:document.getElementById('aiAnalysisNotice')} : {
     loading:document.getElementById('provisionalLoading'),error:document.getElementById('provisionalError'),
-    content:document.getElementById('provisionalContent'),access:document.getElementById('provisionalAccess')};
+    content:document.getElementById('provisionalContent'),access:document.getElementById('provisionalAccess'),notice:document.getElementById('provisionalNotice')};
+}
+
+function showAiNotice(context,data) {
+  const notices={
+    AI_MEMBER_DAILY_LIMIT:{status:'limited',title:'오늘 이용 가능한 AI 분석을 모두 사용했어요',icon:'bi-calendar-check'},
+    AI_GLOBAL_DAILY_LIMIT:{status:'limited',title:'오늘의 AI 분석 제공량이 소진됐어요',icon:'bi-calendar-check'},
+    AI_MEMBER_BUSY:{status:'waiting',title:'진행 중인 분석을 기다려주세요',icon:'bi-hourglass-split'},
+    AI_SERVICE_BUSY:{status:'waiting',title:'AI 분석 요청이 몰리고 있어요',icon:'bi-hourglass-split'},
+    AI_REQUEST_INTERVAL:{status:'waiting',title:'잠시 간격을 두고 요청해주세요',icon:'bi-clock'},
+    AI_PAUSED:{status:'paused',title:'AI 분석을 잠시 쉬고 있어요',icon:'bi-pause-circle'}
+  };
+  if(!Object.hasOwn(notices,data.code)) return false;
+  const notice=notices[data.code],panel=aiPanel(context);
+  context.status=notice.status;panel.access.hidden=true;panel.error.style.display='none';
+  panel.notice.className=`ai-notice${notice.status==='waiting'?' ai-notice-wait':''}`;
+  panel.notice.innerHTML=`<span class="ai-notice-icon" aria-hidden="true"><i class="bi ${notice.icon}"></i></span>
+    <div><span class="ai-notice-label">${notice.status==='waiting'?'잠시 대기':'이용 안내'}</span><h4>${notice.title}</h4>
+    <p>${escapeHtml(data.message)}</p><small>재무제표와 차트는 계속 이용할 수 있습니다.</small>
+    ${notice.status==='waiting'?'<button type="button" class="ai-notice-retry" data-ai-action="analyze">AI 분석 다시 시도</button>':''}</div>`;
+  panel.notice.hidden=false;
+  const guide=document.getElementById('analysisGuide');if(guide)guide.style.display='none';
+  return true;
 }
 
 function showAiAccess(context, member) {
@@ -766,6 +789,7 @@ function showAiAccess(context, member) {
   const panel = aiPanel(context);
   context.status = member ? 'ready' : 'locked';
   panel.loading.style.display = 'none'; panel.error.style.display = 'none';
+  panel.notice.hidden = true;panel.notice.replaceChildren();
   panel.content.style.display = 'none'; panel.content.replaceChildren();
   if(context.kind === 'provisional') {
     const guide = document.getElementById('analysisGuide');
@@ -798,6 +822,7 @@ async function requestAiAnalysis(context) {
   const current = () => context === activeAiAnalysis && version === aiRequestVersion;
   context.status = 'checking';
   panel.loading.style.display = 'none'; panel.error.style.display = 'none'; panel.content.style.display = 'none';
+  panel.notice.hidden = true;panel.notice.replaceChildren();
   panel.access.hidden = false;
   panel.access.innerHTML = '<p class="ai-access-check" role="status"><span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>로그인 상태를 확인하고 있습니다.</p>';
   try {
@@ -816,7 +841,10 @@ async function requestAiAnalysis(context) {
     const data = await response.json();
     if(!current()) return;
     if(response.status === 401) { showAiAccess(context,false); return; }
-    if(!response.ok || data.status !== 'success') throw new Error(data.message || 'AI 분석을 불러오지 못했습니다.');
+    if(!response.ok || data.status !== 'success') {
+      if(showAiNotice(context,data)) return;
+      throw new Error(data.message || 'AI 분석을 불러오지 못했습니다. 잠시 후 다시 시도해주세요.');
+    }
     panel.content.innerHTML = renderAiAnalysisHtml(data.result,context.kind);
     panel.content.style.display = 'block'; context.status = 'complete';
     if(context.kind === 'provisional') {
@@ -827,7 +855,7 @@ async function requestAiAnalysis(context) {
   } catch(error) {
     if(!current() || error.name === 'AbortError') return;
     context.status = 'error'; panel.access.hidden = true;
-    panel.error.style.display = 'block'; panel.error.textContent = error.message || 'AI 분석을 불러오지 못했습니다.';
+    panel.error.style.display = 'block'; panel.error.textContent = error.message || 'AI 분석을 불러오지 못했습니다. 잠시 후 다시 시도해주세요.';
     if(context.kind === 'provisional') failAnalysisGuide(context.reportName);
   } finally {
     if(current()) {
@@ -843,7 +871,9 @@ async function requestAiAnalysis(context) {
 document.addEventListener('click',event => {
   const button = event.target.closest('[data-ai-action]');
   const context = activeAiAnalysis;
-  if(!button || !context || button.closest('.ai-access-gate') !== aiPanel(context).access) return;
+  if(!button || !context) return;
+  const panel=aiPanel(context),container=button.closest('.ai-access-gate, .ai-notice');
+  if(container!==panel.access && container!==panel.notice) return;
   if(button.dataset.aiAction === 'analyze') requestAiAnalysis(context);
   else window.FinalyzeAccount?.openAnalysisLogin().catch(() => showToast('로그인을 불러오지 못했습니다. 다시 시도해주세요.','error'));
 });
@@ -1840,7 +1870,7 @@ function failAnalysisGuide(reportNm) {
   const guide = document.getElementById('analysisGuide');
   if (!guide || guide.style.display === 'none') return;
   guide.innerHTML = `
-    <div class="analysis-guide-content analysis-guide-done">
+    <div class="analysis-guide-content analysis-guide-error">
       <div class="analysis-guide-icon">
         <i class="bi bi-x-circle-fill"></i>
       </div>

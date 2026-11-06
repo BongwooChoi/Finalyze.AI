@@ -77,6 +77,7 @@ node setupDatabase.js            # dart.db에 companies 테이블 적재 + 인�
 
 - 기업·공시 문자열은 HTML 문맥에서 `escapeHtml()`을 거치고 텍스트 제목은 `textContent`로 표시합니다. 공유 URL은 회사 코드 형식 확인 후 `/api/companies/corp/:corpCode`의 공식 정보를 사용하며, URL 이름을 신뢰하는 fallback을 추가하지 않습니다.
 - 유료 AI는 `requireAnalysis`가 확인한 `req.analysisUserId`를 `analysisLimits.js`의 공통 제한에 전달합니다. 두 AI API가 동일한 회원/전체 KST 일일 한도와 동시 실행 잠금을 공유합니다. 잠금은 OpenAI 작업의 `finally`에서 해제하고, upstream deadline(120초)은 Redis lease(180초)보다 짧게 유지합니다. 브라우저 연결 종료만으로 잠금을 해제하지 않습니다.
+- 한도·대기·운영 중지는 `analysisFailure()`의 명시적 사유 코드로 응답하고 프런트의 안내 카드로 표시합니다. 알려진 이용 사유만 안내로 분류하고 외부 API 429·저장소 장애 등은 실제 오류로 유지합니다. 재무제표/차트는 유지하며 자동 AI 재시도를 추가하지 않습니다. 일일 한도는 KST 자정 안내, 설정값 0은 운영 중지로 처리합니다.
 - 로그인 challenge는 Redis에서 단회 소비합니다. Postgres 계정 자원 한도는 계정 행 잠금과 다음 statement의 COUNT/INSERT를 `ReadCommitted` 트랜잭션으로 묶습니다. 같은 INSERT/CTE 내부의 잠금만으로 대체하지 않습니다.
 
 - 정기보고서와 잠정실적의 숫자·시각화는 공개합니다. `POST /api/ai-financial-analysis`와 `GET /api/provisional-analysis`는 `accounts.requireAnalysis`에서 회원 세션·CSRF를 확인합니다. 잠정실적 차트는 공개 API에서 먼저 읽으며 로그인·로그아웃·AI 실패가 차트를 숨기지 않습니다. 프런트의 로그인 미리보기는 AI를 호출하지 않습니다. 로그인 후에는 같은 공시의 ‘AI 분석 시작하기’를 눌러 재개하고, 로그아웃·기업 변경 시 대기 중인 AI 응답을 무시합니다.

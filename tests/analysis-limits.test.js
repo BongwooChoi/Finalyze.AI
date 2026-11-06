@@ -1,7 +1,7 @@
 const {test}=require('node:test');
 const assert=require('node:assert/strict');
 const {createMemoryStore,createRedisStore}=require('../sharedStore');
-const {createAnalysisLimiter,OPENAI_DEADLINE_MS}=require('../analysisLimits');
+const {createAnalysisLimiter,OPENAI_DEADLINE_MS,analysisFailure}=require('../analysisLimits');
 function fixture(env={}) {
   let time=Date.parse('2026-11-06T01:00:00Z');const now=()=>time,store=createMemoryStore({now});
   return {store,now,advance:ms=>{time+=ms;},run:createAnalysisLimiter({store,now,env})};
@@ -48,8 +48,30 @@ test('store failure is fail-closed, and lock leases outlive the complete upstrea
   complete();await pending;
 });
 test('zero disables analysis and malformed limit settings fail closed',async()=>{
-  const f=fixture({AI_GLOBAL_DAILY_LIMIT:'0'});await assert.rejects(f.run('member',()=>assert.fail('disabled')),{status:429});
+  const f=fixture({AI_GLOBAL_DAILY_LIMIT:'0'});await assert.rejects(f.run('member',()=>assert.fail('disabled')),{status:503,code:'AI_PAUSED'});
   for(const value of ['-1','NaN','Infinity','1.2']) assert.throws(()=>createAnalysisLimiter({env:{AI_MEMBER_DAILY_LIMIT:value}}));
+});
+test('quota reasons survive the HTTP response without an outage prefix',async()=>{
+  for(const [result,code] of [[-1,'AI_MEMBER_DAILY_LIMIT'],[-2,'AI_GLOBAL_DAILY_LIMIT'],[-3,'AI_MEMBER_BUSY'],[-4,'AI_SERVICE_BUSY'],[-5,'AI_REQUEST_INTERVAL']]) {
+    const run=createAnalysisLimiter({store:{acquireAnalysis:async()=>[result,10]},env:{}});
+    await assert.rejects(run('member',()=>assert.fail('rejected operation ran')),error=>{
+      const response=analysisFailure(error);assert.equal(error.code,code);assert.equal(response.status,429);
+      assert.equal(response.body.code,code);assert.equal(response.body.retryAfter,10);assert.equal(response.retryAfter,10);
+      assert.doesNotMatch(response.body.message,/오류|실패/);
+      if(result===-1 || result===-2)assert.match(response.body.message,/한국 시간 자정\(00:00\)/);
+      return true;
+    });
+  }
+});
+test('actual failures stay distinct from business notices and never expose provider details',()=>{
+  for(const code of ['AI_LIMIT_UNAVAILABLE','UPSTREAM_RATE_LIMIT',undefined]){
+    const response=analysisFailure(Object.assign(new Error('private-provider-details'),{status:429,code}));
+    assert.equal(response.status,code==='AI_LIMIT_UNAVAILABLE'?503:500);
+    assert.equal(response.body.code,code==='AI_LIMIT_UNAVAILABLE'?code:'AI_UNAVAILABLE');
+    assert.doesNotMatch(response.body.message,/private-provider-details/);assert.equal(response.retryAfter,undefined);
+  }
+  const pause=analysisFailure({code:'AI_PAUSED',message:'AI 분석 제공을 잠시 중지했습니다.'});
+  assert.equal(pause.status,503);assert.equal(pause.body.code,'AI_PAUSED');
 });
 
 // Opt-in real Redis transport; the test CLI targets only an isolated loopback container.

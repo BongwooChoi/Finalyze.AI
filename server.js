@@ -15,7 +15,7 @@ const { createDisclosureFeed,createSenders,createNotificationJob,cronAuthorized 
 const { sign } = require('./accountSecurity');
 const { readDisclosureXml,parseProvisionalFinancials } = require('./provisionalFinancials');
 const {createTelegramBroadcast,telegramConfig}=require('./telegramDisclosures');
-const {createAnalysisLimiter,OPENAI_DEADLINE_MS}=require('./analysisLimits');
+const {createAnalysisLimiter,OPENAI_DEADLINE_MS,analysisFailure}=require('./analysisLimits');
 const {createSettingsService}=require('./serviceSettings');
 const {createAdminRouter}=require('./adminRoutes');
 
@@ -742,12 +742,11 @@ app.post('/api/ai-financial-analysis', accounts.requireAnalysis, async (req, res
       result
     });
   } catch (error) {
-    console.error('AI 재무분석 중 오류 발생:', error.message);
-    if(error.retryAfter) res.set('Retry-After',String(error.retryAfter));
-    res.status(error.status || 500).json({
-      status: 'error', 
-      message: `AI 재무분석 중 오류가 발생했습니다: ${error.message}` 
-    });
+    const failure=analysisFailure(error);
+    if(failure.notice) console.info('AI 분석 이용 안내:',{code:failure.body.code});
+    else console.error('AI 재무분석 중 오류 발생:', error.message);
+    if(failure.retryAfter) res.set('Retry-After',String(failure.retryAfter));
+    res.status(failure.status).json(failure.body);
   }
 });
 
@@ -1171,12 +1170,11 @@ app.get('/api/provisional-analysis', accounts.requireAnalysis, async (req, res) 
 
     res.json({ status: 'success', result, chartData: chartData || null });
   } catch (error) {
-    console.error('잠정실적 분석 중 오류 발생:', error.message);
-    if(error.retryAfter) res.set('Retry-After',String(error.retryAfter));
-    res.status(error.status || 500).json({
-      status: 'error',
-      message: `잠정실적 분석 중 오류가 발생했습니다: ${error.message}`
-    });
+    const failure=analysisFailure(error);
+    if(failure.notice) console.info('AI 분석 이용 안내:',{code:failure.body.code});
+    else console.error('잠정실적 분석 중 오류 발생:', error.message);
+    if(failure.retryAfter) res.set('Retry-After',String(failure.retryAfter));
+    res.status(failure.status).json(failure.body);
   }
 });
 

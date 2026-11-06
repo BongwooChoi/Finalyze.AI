@@ -63,12 +63,50 @@ test('a late AI response cannot reveal content after logout',async()=>{
 });
 
 test('a quota response shows the server guidance and allows a later explicit retry',async()=>{
-  let calls=0;const f=fixture(()=>++calls===1 ? {status:429,ok:false,json:async()=>({status:'error',message:'오늘 AI 분석 한도에 도달했습니다.'})} : response());
+  let calls=0;const f=fixture(()=>++calls===1 ? {status:429,ok:false,json:async()=>({status:'error',code:'AI_MEMBER_DAILY_LIMIT',message:'오늘 AI 분석 한도에 도달했습니다. 한국 시간 자정 이후 이용해주세요.'})} : response());
   f.change(true);f.choose();await f.run('requestAiAnalysis(activeAiAnalysis)');
-  assert.match(f.document.getElementById('aiAnalysisError').textContent,/한도/);
-  assert.equal(f.run('activeAiAnalysis.status'),'error');
+  assert.equal(f.document.getElementById('aiAnalysisError').style.display,'none');
+  assert.match(f.document.getElementById('aiAnalysisNotice').innerHTML,/자정/);
+  assert.equal(f.run('activeAiAnalysis.status'),'limited');assert.equal(f.requests.length,1);
   await f.run('requestAiAnalysis(activeAiAnalysis)');
   assert.equal(f.requests.length,2);assert.equal(f.run('activeAiAnalysis.status'),'complete');
+  assert.equal(f.document.getElementById('aiAnalysisNotice').hidden,true);
+});
+
+test('daily caps and planned pauses are notices for both report types, preserving charts and hiding failure guides',async()=>{
+  for(const kind of ['financial','provisional']) for(const code of ['AI_MEMBER_DAILY_LIMIT','AI_GLOBAL_DAILY_LIMIT','AI_PAUSED']) {
+    const f=fixture(()=>({status:code==='AI_PAUSED'?503:429,ok:false,json:async()=>({status:'error',code,message:'이용 안내 <img src=x onerror=alert(1)>'})}));
+    f.change(true);f.choose(kind);f.document.getElementById('provisionalChartWrap').style.display='block';
+    f.document.getElementById('chartRow').style.display='flex';await f.run('requestAiAnalysis(activeAiAnalysis)');
+    const notice=f.document.getElementById(kind==='financial'?'aiAnalysisNotice':'provisionalNotice');
+    assert.equal(notice.hidden,false);assert.equal(notice.className,'ai-notice');
+    assert.match(notice.innerHTML,/재무제표와 차트는 계속/);assert.doesNotMatch(notice.innerHTML,/<img|분석에 실패|data-ai-action/);
+    assert.equal(f.document.getElementById(kind==='financial'?'aiAnalysisError':'provisionalError').style.display,'none');
+    assert.equal(f.document.getElementById('provisionalChartWrap').style.display,'block');
+    assert.equal(f.document.getElementById('chartRow').style.display,'flex');
+    assert.equal(f.document.getElementById('analysisGuide').style.display,'none');
+    assert.equal(f.requests.length,1);f.change(false);assert.equal(notice.hidden,true);
+  }
+});
+test('busy and interval notices offer an explicit retry without retrying automatically',async()=>{
+  for(const code of ['AI_MEMBER_BUSY','AI_SERVICE_BUSY','AI_REQUEST_INTERVAL']) {
+    const f=fixture(()=>({status:429,ok:false,json:async()=>({status:'error',code,message:'잠시 후 다시 요청해주세요.'})}));
+    f.change(true);f.choose();await f.run('requestAiAnalysis(activeAiAnalysis)');
+    const notice=f.document.getElementById('aiAnalysisNotice');assert.equal(notice.hidden,false);
+    assert.match(notice.className,/ai-notice-wait/);assert.match(notice.innerHTML,/data-ai-action="analyze"/);
+    assert.equal(f.run('activeAiAnalysis.status'),'waiting');assert.equal(f.requests.length,1);
+  }
+});
+test('actual outages and unknown 429 errors retain the error presentation',async()=>{
+  for(const kind of ['financial','provisional']) for(const [status,code] of [[500,'AI_UNAVAILABLE'],[503,'AI_LIMIT_UNAVAILABLE'],[429,'UPSTREAM_RATE_LIMIT'],[429,'__proto__']]) {
+    const f=fixture(()=>({status,ok:false,json:async()=>({status:'error',code,message:'AI 분석을 불러오지 못했습니다. 잠시 후 다시 시도해주세요.'})}));
+    f.change(true);f.choose(kind);await f.run('requestAiAnalysis(activeAiAnalysis)');
+    assert.equal(f.document.getElementById(kind==='financial'?'aiAnalysisNotice':'provisionalNotice').hidden,true);
+    assert.equal(f.document.getElementById(kind==='financial'?'aiAnalysisError':'provisionalError').style.display,'block');
+    assert.match(f.document.getElementById(kind==='financial'?'aiAnalysisError':'provisionalError').textContent,/불러오지 못했습니다/);
+    if(kind==='provisional')assert.match(f.document.getElementById('analysisGuide').innerHTML,/analysis-guide-error/);
+    assert.equal(f.run('activeAiAnalysis.status'),'error');
+  }
 });
 test('changing the selected company discards the previous in-flight AI result',async()=>{
   let deliver,started;

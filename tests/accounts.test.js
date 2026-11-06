@@ -142,6 +142,22 @@ test('mail remains off without sender setup, and GET unsubscribe never changes c
   assert.equal((await a.request(`/notifications/unsubscribe/${token}`,'POST',{})).status,200);
   assert.equal((await f.store.user(id)).email_enc,null);
 });
+
+test('configured mail still requires explicit consent and deletes the encrypted address on opt-out',async t => {
+  const f=await fixture(t,{mailAvailable:true}),a=f.client();
+  await a.login('mail-consent-user');
+  const id=(await f.store.query('SELECT id FROM app_users'))[0].id;
+  assert.equal((await f.store.user(id)).email_enc,null);
+  assert.equal((await a.login('mail-consent-user',{body:{emailOptIn:true}})).status,200);
+  const user=await f.store.user(id);
+  assert.equal(user.email_enabled,1);
+  assert.notEqual(user.email_enc,'private@gmail.com');
+  assert.equal(open(user.email_enc,config.dataKey),'private@gmail.com');
+  assert.equal((await a.status()).emailEnabled,true);
+  assert.equal((await a.mutate('/account/email','DELETE')).status,200);
+  assert.equal((await f.store.user(id)).email_enc,null);
+  assert.equal((await a.status()).emailEnabled,false);
+});
 test('logout removes the current device, and account deletion cascades only its own records',async t => {
   const f=await fixture(t), a=f.client(),b=f.client(); await a.login(); await b.login('another-user');
   await a.mutate('/account/favorites','POST',{corpCode:COMPANY.corp_code});

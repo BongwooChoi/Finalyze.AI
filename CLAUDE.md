@@ -75,7 +75,7 @@ node setupDatabase.js            # dart.db에 companies 테이블 적재 + 인�
 - `accountRoutes.js`는 Google ID 토큰·nonce, HttpOnly 세션, 변경 요청의 출처·CSRF를 확인합니다. Google 원본 식별자·이름·사진·로그인 토큰은 저장하지 않습니다. 이메일은 발신 설정과 별도 수신 동의가 있을 때만 암호화해 저장합니다.
 - `accountStore.js`는 운영 Neon Postgres(`DATABASE_URL`), 로컬 `.data/accounts.sqlite`를 사용합니다. `USER_ID_SECRET`·`USER_DATA_KEY`·VAPID 키는 영속 데이터와 연결되어 있으므로 재배포마다 교체하지 않습니다. 무료 캐시 Redis를 계정 저장소로 사용하지 않습니다.
 - `disclosureNotifications.js`는 관심 기업을 합쳐 A/I002 공시를 수집하고, DB 잠금·대기열·기기별 중복 방지·최대 5회 재시도를 관리합니다. DART 호출은 기존 `dartClient.get()`을 사용하고 LLM을 호출하지 않습니다. 신규 관심 기업의 최초 성공 조회는 과거 공시 기준만 설정합니다.
-- `vercel.json`의 Schedules(Beta)가 15분 간격/15분 지터로 `POST /api/jobs/disclosures`를 호출하며 `CRON_SECRET` Bearer 인증이 필수입니다. Preview에는 운영 사용자 DB·인증 키를 연결하지 않습니다. 메일은 `RESEND_API_KEY`·`MAIL_FROM`이 모두 준비된 뒤 활성화합니다.
+- `vercel.json`의 Schedules(Beta)가 15분 간격/15분 지터로 `POST /api/jobs/disclosures`를 호출하며 `CRON_SECRET` Bearer 인증이 필수입니다. Preview에는 운영 사용자 DB·인증 키를 연결하지 않습니다. 메일은 `mailSender.js`의 `getMailProvider()`가 발신 설정을 확인한 뒤 활성화합니다. 무료 Gmail은 `MAIL_PROVIDER=gmail`·`GMAIL_USER`·`GMAIL_APP_PASSWORD`(2단계 인증 후 발급한 앱 비밀번호), 도메인 연결 후 Resend는 `MAIL_PROVIDER=resend`·`RESEND_API_KEY`·`MAIL_FROM`을 사용합니다. 일반 Google 로그인 비밀번호를 저장하지 않습니다. 제공업체 실패 시 다른 업체로 자동 전환해 중복 발송하지 않으며 SMTP 오류 원문을 로그에 남기지 않습니다.
 - UI는 `public/js/accounts.js`, 푸시 수신·이동은 `public/sw.js`입니다. 관심 기업과 푸시 링크를 열어도 분석은 자동 실행하지 않습니다. 처리 정보는 `/privacy`에서 안내합니다.
 
 ## 프런트엔드 캐시 무효화 (필수)

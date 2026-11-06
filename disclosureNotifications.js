@@ -1,6 +1,7 @@
 const webpush = require('web-push');
 const { reportType,hasFinancialResults } = require('./recentDisclosures');
 const { open,equal,digest } = require('./accountSecurity');
+const { createMailSender } = require('./mailSender');
 
 function kstDate(timestamp) { return new Date(timestamp+9*3600000).toISOString().slice(0,10).replace(/-/g,''); }
 function createDisclosureFeed({ fetchList,fetchDocumentText,now = () => Date.now() }) {
@@ -40,6 +41,7 @@ function createDisclosureFeed({ fetchList,fetchDocumentText,now = () => Date.now
 }
 
 function createSenders({ config,env = process.env,unsubscribeToken,fetchImpl = fetch,pushImpl = webpush.sendNotification.bind(webpush) }) {
+  const sendMail = createMailSender({ env,fetchImpl });
   function link(event) {
     const params = new URLSearchParams({ corp:event.corp_code,name:event.corp_name,rcept:event.receipt });
     return `${config.origin}/?${params}`;
@@ -57,15 +59,11 @@ function createSenders({ config,env = process.env,unsubscribeToken,fetchImpl = f
       if(!config.mailAvailable) throw Object.assign(new Error('MAIL_DISABLED'),{ permanent:true });
       const token = unsubscribeToken(delivery.user_id,Number(target.email_since));
       const unsubscribe = `${config.origin}/api/notifications/unsubscribe/${token}`;
-      const response = await fetchImpl('https://api.resend.com/emails', {
-        method:'POST',headers:{ Authorization:`Bearer ${env.RESEND_API_KEY}`,'Content-Type':'application/json','Idempotency-Key':delivery.id },
-        signal:AbortSignal.timeout(10000),body:JSON.stringify({ from:env.MAIL_FROM,to:[open(target.email_enc,config.dataKey)],
-          subject:`[Finalyze.AI] ${target.corp_name} 새 실적 공시`,
-          text:`${target.corp_name}\n${target.report_name}\n공시일: ${target.receipt_date}\n\n공시 보기: ${link(target)}\n\n이메일 알림 끄기: ${unsubscribe}`,
-          headers:{ 'List-Unsubscribe':`<${unsubscribe}>`,'List-Unsubscribe-Post':'List-Unsubscribe=One-Click' }
-        })
+      await sendMail({ to:open(target.email_enc,config.dataKey),idempotencyKey:delivery.id,
+        subject:`[Finalyze.AI] ${target.corp_name} 새 실적 공시`,
+        text:`${target.corp_name}\n${target.report_name}\n공시일: ${target.receipt_date}\n\n공시 보기: ${link(target)}\n\n이메일 알림 끄기: ${unsubscribe}`,
+        headers:{ 'List-Unsubscribe':`<${unsubscribe}>`,'List-Unsubscribe-Post':'List-Unsubscribe=One-Click' }
       });
-      if(!response.ok) throw Object.assign(new Error('MAIL_SEND_FAILED'),{ statusCode:response.status });
     }
   };
 }

@@ -2,13 +2,14 @@ const express = require('express');
 const { randomBytes } = require('node:crypto');
 const { OAuth2Client } = require('google-auth-library');
 const { digest, sign, equal, seal, open, validateSubscription } = require('./accountSecurity');
+const { getMailProvider } = require('./mailSender');
 
 function accountConfig(env = process.env) {
   const origin = new URL(env.APP_ORIGIN || (env.VERCEL ? 'https://finalyze-ai.vercel.app' : `http://localhost:${env.PORT || 3000}`)).origin;
   return { origin, clientId: env.GOOGLE_CLIENT_ID || '', sessionSecret: env.SESSION_SECRET || '',
     identitySecret: env.USER_ID_SECRET || '', dataKey: env.USER_DATA_KEY || '',
     pushPublic: env.VAPID_PUBLIC_KEY || '', pushPrivate: env.VAPID_PRIVATE_KEY || '',
-    mailAvailable: Boolean(env.RESEND_API_KEY && env.MAIL_FROM), production: Boolean(env.VERCEL),
+    mailAvailable: Boolean(getMailProvider(env)), production: Boolean(env.VERCEL),
     enabled: Boolean(env.GOOGLE_CLIENT_ID && env.SESSION_SECRET?.length >= 32 && env.USER_ID_SECRET?.length >= 32 &&
       Buffer.from(env.USER_DATA_KEY || '', 'base64').length === 32 && (!env.VERCEL || env.ACCOUNTS_DATABASE_URL || env.DATABASE_URL)) };
 }

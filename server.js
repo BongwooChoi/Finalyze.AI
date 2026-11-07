@@ -6,7 +6,8 @@ const AdmZip = require('adm-zip');
 const dotenv = require('dotenv');
 const config = require('./config');
 const { renderPage } = require('./sitePages');
-const { createRecentDisclosureService,getFeaturedStockCodes } = require('./recentDisclosures');
+const { createRecentDisclosureService } = require('./recentDisclosures');
+const { getIndexStockCodes } = require('./indexUniverse');
 const dartClient = require('./dartClient');
 const { getSharedStore } = require('./sharedStore');
 const { getAccountStore } = require('./accountStore');
@@ -71,7 +72,7 @@ const notificationFeed = createDisclosureFeed({
 });
 const telegram=createTelegramBroadcast({config:telegramConfig(),store:getAccountStore,
   companies:()=>new Promise((resolve,reject)=>{
-    const stocks=getFeaturedStockCodes();
+    const stocks=getIndexStockCodes();
     db.all(`SELECT corp_code,corp_name,stock_code FROM companies WHERE stock_code IN (${stocks.map(()=>'?').join(',')})`,stocks,(error,rows)=>error?reject(error):resolve(rows));
   }),
   fetchDocument:async receipt=>(await dartClient.get('https://opendart.fss.or.kr/api/document.xml',{
@@ -90,7 +91,7 @@ app.post('/api/jobs/disclosures',async (req,res) => {
 
 const recentDisclosures = createRecentDisclosureService({
   sharedStore: getSharedStore,
-  namespace: `${dartClient.namespace}:recent:v3:5`,
+  namespace: `${dartClient.namespace}:recent:v4:5`,
   fetchList: async params => {
     const { data } = await dartClient.get('https://opendart.fss.or.kr/api/list.json', {
       params: { ...params, crtfc_key: config.OPEN_DART_API_KEY }, timeout: 12000

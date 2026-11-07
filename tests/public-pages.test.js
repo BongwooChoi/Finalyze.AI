@@ -80,6 +80,20 @@ test('기업 선택 파라미터가 있는 소개 URL도 같은 공개 canonical
   assert.match(html, /rel="canonical" href="https:\/\/finalyze-ai\.vercel\.app\/about"/);
 });
 
+test('공시 선정 기준과 실제 구성종목의 기준일·출처를 공개한다', async () => {
+  const response = await fetch(`${baseUrl}/data/disclosure-universe.json`);
+  assert.equal(response.status, 200);
+  const universe = await response.json();
+  assert.deepEqual(universe.indices.map(index => index.constituents.length), universe.indices.map(index => index.reportedCount));
+  for (const page of ['/', '/about']) {
+    const html = await (await fetch(baseUrl + page)).text();
+    assert.ok(html.includes(universe.asOf));
+    assert.match(html, /코스피200·코스닥150/);
+    assert.match(html, /id="disclosure-universe"/);
+    assert.doesNotMatch(html, /\{\{DISCLOSURE_UNIVERSE_AS_OF\}\}|(?:대표기업|주요 기업) 60개/);
+  }
+});
+
 test('별칭 주소는 쿼리를 보존해 정규 URL로 301 이동한다', async () => {
   for (const [source, destination] of [['/index.html?corp=00126380', '/?corp=00126380'], ['/about/?corp=00126380', '/about?corp=00126380']]) {
     const response = await fetch(baseUrl + source, { redirect: 'manual' });
@@ -183,7 +197,7 @@ test('최신 공시 API는 기업별 목록과 갱신 시각을 공유 캐시로
   assert.ok(cacheSeconds > 0 && cacheSeconds <= 300);
   const body = await response.json();
   assert.equal(body.data.length, 5);
-  assert.equal(body.companyCount, 60);
+  assert.equal(body.companyCount, require('../indexUniverse').getIndexStockCodes().length);
   assert.equal(body.stale, false);
   assert.ok(Number.isFinite(Date.parse(body.updatedAt)));
 });

@@ -2,6 +2,8 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { createRecentDisclosureService, hasFinancialResults, reportType } = require('../recentDisclosures');
 const { createMemoryStore } = require('../sharedStore');
+const { getIndexUniverseSummary } = require('../indexUniverse');
+const universe = require('../public/data/disclosure-universe.json');
 
 const TODAY = Date.parse('2026-11-03T02:00:00Z');
 const STOCKS = ['005930', '000660', '005380', '000270', '035420', '035720', '373220', '051910', '006400'];
@@ -41,7 +43,7 @@ test('빈 재무 양식 뒤 판매대수·날짜를 재무금액으로 오인하
   assert.equal(hasFinancialResults('영업수익 | 당해실적 | 0 |'), true);
 });
 
-test('인지도 목록 밖·비상장·자회사·철회·정정 전 공시를 제외하고 기업별 최신 5개를 고른다', async () => {
+test('지수 구성종목 밖·비상장·자회사·철회·정정 전 공시를 제외하고 기업별 최신 5개를 고른다', async () => {
   const rows = STOCKS.map((_, index) => row(index));
   rows.push(row(0, { rcept_no: '20261103000999', report_nm: '연결재무제표기준영업(잠정)실적(공정공시)(자회사의 주요경영사항)' }));
   rows.push(row(1, { rcept_no: '20261103000998', report_nm: '사업보고서 (2025.12)', rm: '정' }));
@@ -53,7 +55,7 @@ test('인지도 목록 밖·비상장·자회사·철회·정정 전 공시를 �
   assert.equal(new Set(result.data.map(item => item.corp_code)).size, 5);
   assert.ok(result.data.every(item => !['20261103000999', '20261103000998', '20261103000997'].includes(item.rcept_no)));
   assert.equal(result.lookbackDays, 30);
-  assert.equal(result.companyCount, 60);
+  assert.equal(result.companyCount, require('../indexUniverse').getIndexStockCodes().length);
 });
 
 test('같은 날 연결 실적을 우선하고 정정 여부를 보존한다', async () => {
@@ -63,6 +65,30 @@ test('같은 날 연결 실적을 우선하고 정정 여부를 보존한다', a
   assert.equal(result.data.length, 1);
   assert.equal(result.data[0].corrected, true);
   assert.match(result.data[0].report_nm, /연결재무제표/);
+});
+
+test('두 시장의 지수 구성 기업을 모두 포함하고 기준일과 출처를 반환한다', async () => {
+  const reports = universe.indices.map((index, i) => row(i, {
+    stock_code: index.constituents[0].stockCode, corp_cls: i === 0 ? 'Y' : 'K'
+  }));
+  reports.push(row(22, { stock_code: '999999', corp_cls: 'K' }));
+  const result = await service(reports).getRecentDisclosures();
+  assert.equal(result.data.length, 2);
+  assert.deepEqual(new Set(result.data.map(item => item.stock_code)), new Set(reports.slice(0, 2).map(item => item.stock_code)));
+  assert.equal(result.universe.asOf, universe.asOf);
+  assert.equal(result.companyCount, require('../indexUniverse').getIndexStockCodes().length);
+});
+
+test('구성종목 revision으로 이전 대상의 캐시를 분리한다', async () => {
+  const storage = createMemoryStore({ now: () => TODAY });
+  const old = { status: 'success', data: [], companyCount: 60, updatedAt: new Date(TODAY).toISOString(), refreshSeconds: 300 };
+  await storage.set('scope-test:snapshot', old, 300);
+  await storage.set('scope-test:previous-revision:snapshot', old, 300);
+  const result = await service([row(0)], { sharedStore: storage, namespace: 'scope-test' }).getRecentDisclosures();
+  assert.equal(result.data.length, 1);
+  assert.equal(result.companyCount, require('../indexUniverse').getIndexStockCodes().length);
+  const current = await storage.get(`scope-test:${getIndexUniverseSummary().revision}:snapshot`);
+  assert.equal(current.universe.revision, getIndexUniverseSummary().revision);
 });
 
 test('월간 판매실적을 건너뛴 후에도 다른 기업의 더 최근 공시를 빠뜨리지 않는다', async () => {

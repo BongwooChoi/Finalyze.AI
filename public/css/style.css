@@ -165,6 +165,9 @@ body {
 .about-panel-heading p:last-child,
 .about-section-heading > p:last-child { color: var(--text-secondary); font-size: 0.9rem; line-height: 1.8; margin-bottom: 0; }
 .about-text-link { display: inline-flex; gap: 0.5rem; align-items: center; color: var(--primary-dark); font-size: 0.8rem; font-weight: 600; text-decoration: none; }
+.about-universe-details { margin: 1rem 0; font-size: 0.85rem; line-height: 1.7; scroll-margin-top: 6rem; }
+.about-universe-details summary { cursor: pointer; color: var(--primary-dark); font-weight: 600; }
+.about-universe-details p { margin: 0.7rem 0; }
 .about-text-link:hover { text-decoration: underline; }
 .about-mobile { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2rem; align-items: center; margin-bottom: 2rem; }
 .about-mobile-description { color: var(--text-secondary); font-size: 0.9rem; line-height: 1.8; margin-bottom: 1rem; }

@@ -131,6 +131,18 @@ test('login requires correct origin, valid identity, and the browser-bound nonce
   assert.equal((await a.request('/auth/google','POST',{credential:'forged'})).status,401);
   assert.equal((await a.status()).authenticated,false);
 });
+test('official alphanumeric stock codes can be saved as favorites without accepting malformed codes',async t => {
+  let stock='0126Z0';
+  const f=await fixture(t,{router:{findCompany:async()=>({...COMPANY,stock_code:stock})}}),a=f.client();
+  await a.login();
+  assert.equal((await a.mutate('/account/favorites','POST',{corpCode:COMPANY.corp_code})).status,200);
+  assert.equal((await a.status()).favorites[0].stock_code,'0126Z0');
+  for(const invalid of ['0126z0','<12345','12345','1234567']) {
+    stock=invalid;
+    assert.equal((await a.mutate('/account/favorites','POST',{corpCode:COMPANY.corp_code})).status,404);
+  }
+});
+
 test('favorites require session and CSRF and stay isolated between accounts',async t => {
   const f=await fixture(t), a=f.client(),b=f.client();
   assert.equal((await a.request('/account/favorites','POST',{corpCode:COMPANY.corp_code})).status,401);

@@ -1,4 +1,5 @@
-const {getFeaturedStockCodes,reportType}=require('./recentDisclosures');
+const {reportType}=require('./recentDisclosures');
+const {getIndexStockCodes}=require('./indexUniverse');
 const {parseProvisionalFinancials,readDisclosureXml}=require('./provisionalFinancials');
 const html=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
@@ -61,7 +62,7 @@ function createTelegramApi({token,fetchImpl=fetch}) {
 function createTelegramBroadcast({config=telegramConfig(),store,companies,fetchDocument,api=createTelegramApi({token:config.token}),
   now=()=>Date.now(),pause=ms=>new Promise(resolve=>setTimeout(resolve,ms))}) {
   const storage=()=>typeof store==='function'?store():store;
-  const allowed=()=>new Set(getFeaturedStockCodes());
+  const allowed=()=>new Set(getIndexStockCodes());
   const eligible=async()=> {const stocks=allowed();return (await companies()).filter(row=>stocks.has(row.stock_code));};
   return {
     enabled:config.enabled,

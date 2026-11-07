@@ -4,6 +4,9 @@
   "description": "OPEN DART API를 사용하는 프로젝트",
   "main": "server.js",
   "scripts": {
+    "update:index-universe": "node scripts/updateIndexUniverse.js",
+    "sync:index-companies": "node scripts/syncIndexCompanies.js",
+    "check:index-universe": "node --test tests/index-universe.test.js",
     "check:telegram-disclosures": "node --test tests/telegram-disclosures.test.js",
     "check:provisional-financials": "node --test tests/provisional-financials.test.js",
     "setup:accounts": "node scripts/setupAccounts.js",

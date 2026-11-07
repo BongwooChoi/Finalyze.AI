@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const { pages, getPageStructuredData } = require('./public/js/site-pages');
+const { getIndexUniverseSummary } = require('./indexUniverse');
 
 const template = fs.readFileSync(path.join(__dirname, 'public', 'index.html'), 'utf8');
 
@@ -11,7 +12,9 @@ function escapeAttribute(value) {
 function renderPage(pageName) {
   const page = pages[pageName];
   const isAbout = pageName === 'about';
-  let html = template.replace(/<title>[\s\S]*?<\/title>/, `<title>${escapeAttribute(page.title)}</title>`);
+  let html = template.replaceAll('{{DISCLOSURE_UNIVERSE_AS_OF}}', getIndexUniverseSummary().asOf)
+    .replaceAll('{{DISCLOSURE_UNIVERSE_COUNT}}', String(getIndexUniverseSummary().companyCount))
+    .replace(/<title>[\s\S]*?<\/title>/, `<title>${escapeAttribute(page.title)}</title>`);
   const meta = {
     description: page.description,
     'og:title': page.title,

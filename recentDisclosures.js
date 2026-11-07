@@ -1,17 +1,7 @@
-// 대형 대표기업과 소비자에게 익숙한 브랜드 기업을 함께 선정한 편집 목록입니다.
-// 인기 순위나 투자 추천 목록이 아니며, 종목코드로 비교해 상호 변경에 대응합니다.
-const FEATURED_STOCK_CODES = new Set([
-  '005930', '000660', '005380', '000270', '035420', '035720',
-  '373220', '051910', '006400', '005490', '086280', '207940',
-  '068270', '028260', '012330', '066570', '034020', '012450',
-  '009540', '329180', '003550', '017670', '030200', '032640',
-  '015760', '096770', '034730', '105560', '055550', '086790',
-  '316140', '000810', '032830', '033780', '018260', '010950',
-  '011200', '003490', '036570', '251270', '259960', '352820',
-  '041510', '035900', '051900', '090430', '271560', '097950',
-  '004170', '139480', '008770', '023530', '004990', '004370',
-  '007310', '005300', '282330', '007070', '030000', '036460'
-]);
+// 홈페이지와 공개 텔레그램은 같은 KRX 지수 구성종목 스냅샷을 사용합니다.
+const { getIndexStockCodes, getIndexUniverseSummary } = require('./indexUniverse');
+const INDEX_STOCK_CODES = new Set(getIndexStockCodes());
+const INDEX_UNIVERSE = getIndexUniverseSummary();
 const REFRESH_MS = 5 * 60 * 1000;
 const MAX_STALE_MS = 24 * 60 * 60 * 1000;
 const { randomUUID } = require('node:crypto');
@@ -56,7 +46,9 @@ function compareReports(a, b) {
 
 function createRecentDisclosureService({ fetchList, fetchDocumentText, now = () => Date.now(),
   pause = ms => new Promise(resolve => setTimeout(resolve, ms)), onDocumentError = () => {},
-  sharedStore, namespace = 'finalyze:recent:v3:5' }) {
+  sharedStore, namespace = 'finalyze:recent:v4:5' }) {
+  // 구성종목을 갱신하면 이전 대상의 목록·실패 캐시를 재사용하지 않습니다.
+  namespace = `${namespace}:${INDEX_UNIVERSE.revision}`;
   let cached = null;
   let inFlight = null;
   let retryAfter = 0;
@@ -127,7 +119,7 @@ function createRecentDisclosureService({ fetchList, fetchDocumentText, now = () 
   async function selectReports(rows, failedDocuments) {
     const groups = new Map();
     const receipts = new Set();
-    rows.filter(row => FEATURED_STOCK_CODES.has(row.stock_code) && ['Y', 'K'].includes(row.corp_cls) &&
+    rows.filter(row => INDEX_STOCK_CODES.has(row.stock_code) && ['Y', 'K'].includes(row.corp_cls) &&
       /^\d{8}$/.test(row.corp_code) && /^\d{14}$/.test(row.rcept_no) && /^\d{8}$/.test(row.rcept_dt) &&
       typeof row.corp_name === 'string' && typeof row.report_nm === 'string' && !/자회사의\s*주요경영사항/.test(row.report_nm) &&
       !/[철정]/.test(row.rm || '') && reportType(row.report_nm))
@@ -187,7 +179,7 @@ function createRecentDisclosureService({ fetchList, fetchDocumentText, now = () 
       throw Object.assign(new Error('잠정실적 원문을 확인하지 못했습니다.'), { stage: 'document' });
     }
     cached = { status: 'success', data, updatedAt: new Date(timestamp).toISOString(), lookbackDays,
-      companyCount: FEATURED_STOCK_CODES.size, refreshSeconds: partial ? 60 : REFRESH_MS / 1000, stale: false, partial };
+      companyCount: INDEX_STOCK_CODES.size, universe: getIndexUniverseSummary(), refreshSeconds: partial ? 60 : REFRESH_MS / 1000, stale: false, partial };
     retryAfter = 0;
     return cached;
   }
@@ -244,4 +236,4 @@ function createRecentDisclosureService({ fetchList, fetchDocumentText, now = () 
 }
 
 module.exports = { createRecentDisclosureService, hasFinancialResults, reportType,
-  getFeaturedStockCodes: () => [...FEATURED_STOCK_CODES] };
+  getIndexStockCodes };

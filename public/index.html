@@ -45,7 +45,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Noto+Sans+KR:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/css/style.css?v=3.23">
+  <link rel="stylesheet" href="/css/style.css?v=3.24">
   <link rel="manifest" href="/manifest.json">
   <meta name="theme-color" content="#2563eb">
 
@@ -152,7 +152,7 @@
           </div>
           <p class="recent-disclosures-status is-loading" id="recentDisclosuresStatus" role="status">최신 공시를 불러오는 중입니다.</p>
           <ul class="recent-disclosures-list" id="recentDisclosuresList" aria-busy="true"></ul>
-          <p class="recent-disclosures-note">출처: OPEN DART · 대표기업 60개 선정 · 정기보고서·잠정실적 · 5분마다 갱신</p>
+          <p class="recent-disclosures-note">출처: OPEN DART · 코스피200·코스닥150 구성 기업 · 정기보고서·잠정실적 · 5분마다 갱신<br><a href="/about#disclosure-universe">대상 선정 기준</a> · 구성종목 기준일 {{DISCLOSURE_UNIVERSE_AS_OF}}</p>
         </section>
         <aside class="home-telegram" aria-labelledby="homeTelegramTitle">
           <i class="bi bi-telegram home-telegram-icon" aria-hidden="true"></i>
@@ -458,7 +458,8 @@
         <div>
           <p class="about-eyebrow">TELEGRAM CHANNEL</p>
           <h2 id="telegramTitle">텔레그램으로 실적 공시 받기</h2>
-          <p class="about-mobile-description">주요 기업 60개의 새 정기보고서·잠정실적 공시를 모아 전합니다. 공시 원문과 Finalyze.AI의 차트·분석 링크를 채널에서 확인하세요.</p>
+          <p class="about-mobile-description">코스피200·코스닥150 구성 기업의 새 정기보고서·잠정실적 공시를 모아 전합니다. 공시 원문과 Finalyze.AI의 차트·분석 링크를 채널에서 확인하세요.</p>
+          <details id="disclosure-universe" class="about-universe-details"><summary>공시 대상 선정 기준</summary><p>한국거래소의 코스피200·코스닥150 구성종목을 대상으로 합니다. 자체 인지도 순위나 투자 추천 목록이 아닙니다. 메인 화면은 대상 기업별 최신 실적 공시를 최대 5건 표시하고, 텔레그램은 새 실적 공시를 전합니다. 기업 검색·분석과 회원 관심 기업 알림은 이 범위로 제한하지 않습니다.</p><p>구성종목 기준일: <strong>{{DISCLOSURE_UNIVERSE_AS_OF}}</strong> · 적용 종목 {{DISCLOSURE_UNIVERSE_COUNT}}개. 지수명에 들어간 숫자와 실제 구성종목 수는 다를 수 있으며 공식 목록 전체를 적용합니다. 지수 변경 시 공식 목록을 확인해 갱신합니다.</p><p><a href="/data/disclosure-universe.json" target="_blank" rel="noopener">적용 중인 구성종목 목록(JSON)</a> · <a href="https://index.krx.co.kr/" target="_blank" rel="noopener noreferrer">한국거래소 지수정보</a></p></details>
           <a class="about-cta" href="https://t.me/finalyze_ai" target="_blank" rel="noopener noreferrer"><i class="bi bi-telegram" aria-hidden="true"></i> 텔레그램 채널 바로가기 <i class="bi bi-arrow-up-right" aria-hidden="true"></i><span class="visually-hidden"> (새 창)</span></a>
           <p class="about-mobile-tip">@finalyze_ai · QR코드를 스캔하거나 바로가기 버튼을 누르세요.<br>공시는 15분 주기로 확인하며 게시가 지연될 수 있습니다.</p>
         </div>
@@ -507,7 +508,7 @@
                   <div class="architecture-app-brand"><i class="bi bi-bar-chart-line" aria-hidden="true"></i><div><h3>Finalyze.AI</h3><p>웹 화면 · Vercel / Express</p></div></div>
                   <div class="architecture-app-route"><span>누구나</span><h4>공시 조회와 시각화</h4><p>원문 수치를 읽고 재무비율을 계산해 차트로 전달합니다.</p></div>
                   <div class="architecture-app-route architecture-ai-route"><span><i class="bi bi-shield-check" aria-hidden="true"></i> 회원 확인 후</span><h4>AI 재무분석</h4><p>‘AI 분석 시작하기’를 눌렀을 때만 OpenAI에 설명을 요청합니다.</p></div>
-                  <div class="architecture-app-route architecture-disclosure-route"><span><i class="bi bi-clock-history" aria-hidden="true"></i> Vercel 일정 · 15분 주기 확인</span><h4>실적 공시 수집·알림</h4><p>OPEN DART 원문을 확인하고 중복 발송을 막습니다.</p><div class="architecture-alert-routing"><span>관심 기업 → 회원 푸시·메일</span><span>주요 기업 60개 → 텔레그램</span></div><p class="architecture-alert-note">게시 지연 가능 · LLM 추가 호출 없음</p></div>
+                  <div class="architecture-app-route architecture-disclosure-route"><span><i class="bi bi-clock-history" aria-hidden="true"></i> Vercel 일정 · 15분 주기 확인</span><h4>실적 공시 수집·알림</h4><p>OPEN DART 원문을 확인하고 중복 발송을 막습니다.</p><div class="architecture-alert-routing"><span>관심 기업 → 회원 푸시·메일</span><span>코스피200·코스닥150 → 텔레그램</span></div><p class="architecture-alert-note">게시 지연 가능 · LLM 추가 호출 없음</p></div>
                 </article>
               </div>
               <div class="architecture-connections" aria-hidden="true">
@@ -521,7 +522,7 @@
                   <li class="architecture-node"><div class="architecture-node-heading"><i class="bi bi-stars" aria-hidden="true"></i><h3>OpenAI GPT</h3></div><p>회원이 요청한 재무 분석 설명</p></li>
                   <li class="architecture-node"><div class="architecture-node-heading"><i class="bi bi-google" aria-hidden="true"></i><h3>Google 로그인</h3></div><p>로그인 정보 확인·회원 구분</p></li>
                   <li class="architecture-node"><div class="architecture-node-heading"><i class="bi bi-envelope" aria-hidden="true"></i><h3>Gmail</h3></div><p>수신에 동의한 관심 기업 공시 메일</p></li>
-                  <li class="architecture-telegram-service"><a class="architecture-node architecture-telegram-target" href="https://t.me/finalyze_ai" target="_blank" rel="noopener noreferrer"><div class="architecture-node-heading"><i class="bi bi-telegram" aria-hidden="true"></i><h3>텔레그램 채널 <i class="bi bi-arrow-up-right" aria-hidden="true"></i></h3></div><p>주요 기업 60개의 실적 공시<br>누구나 구독 · @finalyze_ai<span class="visually-hidden"> (새 창)</span></p></a></li>
+                  <li class="architecture-telegram-service"><a class="architecture-node architecture-telegram-target" href="https://t.me/finalyze_ai" target="_blank" rel="noopener noreferrer"><div class="architecture-node-heading"><i class="bi bi-telegram" aria-hidden="true"></i><h3>텔레그램 채널 <i class="bi bi-arrow-up-right" aria-hidden="true"></i></h3></div><p>코스피200·코스닥150 실적 공시<br>누구나 구독 · @finalyze_ai<span class="visually-hidden"> (새 창)</span></p></a></li>
                 </ul>
               </div>
             </div>

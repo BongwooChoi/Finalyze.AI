@@ -2,7 +2,7 @@ const {test}=require('node:test');
 const assert=require('node:assert/strict');
 const {createAccountStore,sqliteDatabase}=require('../accountStore');
 const {createTelegramBroadcast,createTelegramApi,telegramConfig,formatTelegramDisclosure,change}=require('../telegramDisclosures');
-const {getFeaturedStockCodes}=require('../recentDisclosures');
+const {getIndexStockCodes}=require('../recentDisclosures');
 const {createNotificationJob}=require('../disclosureNotifications');
 const COMPANY={corp_code:'00126380',corp_name:'삼성전자',stock_code:'005930'};
 const SECOND={corp_code:'00164779',corp_name:'현대자동차',stock_code:'005380'};
@@ -21,7 +21,7 @@ test('explicit configuration is required and the shared featured list is copied'
   assert.equal(telegramConfig({}).enabled,false);
   assert.equal(telegramConfig({TELEGRAM_ENABLED:'true',TELEGRAM_BOT_TOKEN:config.token,TELEGRAM_CHAT_ID:config.chat}).enabled,true);
   assert.equal(telegramConfig({TELEGRAM_ENABLED:'true',TELEGRAM_BOT_TOKEN:config.token,TELEGRAM_CHAT_ID:'123'}).enabled,false);
-  const stocks=getFeaturedStockCodes();assert.equal(stocks.length,60);stocks.pop();assert.equal(getFeaturedStockCodes().length,60);
+  const stocks=getIndexStockCodes();assert.equal(stocks.length,require('../indexUniverse').getIndexUniverseSummary().companyCount);stocks.pop();assert.equal(getIndexStockCodes().length,require('../indexUniverse').getIndexUniverseSummary().companyCount);
 });
 test('initial history is skipped; all new receipts send once and only featured companies are captured',async t=>{
   const f=await fixture(t);await f.capture([event(1),event(8,OTHER)]);
@@ -36,6 +36,21 @@ test('a failed first document delays only its company baseline',async t=>{
   await f.capture([event(2),event(3,SECOND)]);assert.equal((await f.broadcast.deliver()).sent,1);
   assert.match(f.calls[0].payload.text,/현대자동차/);
   f.advance(1000);await f.capture([event(4)]);assert.equal((await f.broadcast.deliver()).sent,1);
+});
+
+test('new index constituents establish their own baseline without replaying history or resetting existing companies',async t=>{
+  const universe=require('../public/data/disclosure-universe.json');
+  const added={corp_code:'88888888',corp_name:'신규 지수 기업',stock_code:universe.indices[1].constituents[0].stockCode};
+  let companies=[COMPANY];
+  const f=await fixture(t,{companies:async()=>companies});
+  await f.capture([event(1)]);
+  companies=[COMPANY,added];f.advance(1000);
+  await f.capture([event(2),event(3,added)]);
+  assert.equal((await f.broadcast.deliver()).sent,1);
+  assert.match(f.calls[0].payload.text,/삼성전자/);
+  f.advance(1000);await f.capture([event(2),event(3,added),event(4,added)]);
+  assert.equal((await f.broadcast.deliver()).sent,1);
+  assert.match(f.calls[1].payload.text,/신규 지수 기업/);
 });
 test('a company removed from scope is skipped even when its event is already queued',async t=>{
   let companies=[COMPANY];const f=await fixture(t,{companies:async()=>companies});

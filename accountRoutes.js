@@ -162,7 +162,7 @@ function createAccountRouter({ store, findCompany, config = accountConfig(), now
     const corp = req.body?.corpCode;
     if (!/^\d{8}$/.test(corp || '')) throw httpError(400,'기업 고유번호를 확인해주세요.');
     const company = await findCompany(corp);
-    if (!company || !/^\d{6}$/.test(company.stock_code || '')) throw httpError(404,'상장기업 정보를 찾지 못했습니다.');
+    if (!company || !/^[0-9A-Z]{6}$/.test(company.stock_code || '')) throw httpError(404,'상장기업 정보를 찾지 못했습니다.');
     const maximum=(await getSettings()).maxFavorites;
     if (!await storage().addFavorite(value.user_id,company,maximum)) throw httpError(409,`관심 기업은 최대 ${maximum}개까지 등록할 수 있습니다.`);
     res.json({ status:'success' });

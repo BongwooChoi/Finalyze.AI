@@ -1,0 +1,1432 @@
+{
+  "schemaVersion": 1,
+  "asOf": "2026-11-06",
+  "source": {
+    "name": "한국거래소 KRX 지수정보 · 구성종목",
+    "url": "https://index.krx.co.kr/"
+  },
+  "indices": [
+    {
+      "id": "kospi200",
+      "name": "코스피200",
+      "sourceUrl": "https://index.krx.co.kr/contents/MKD/03/0304/03040101/MKD03040101T3.jsp?upmidCd=0102&idxCd=1028&idxId=K2G01P",
+      "reportedCount": 201,
+      "countNote": "KRX 2026-11-06 구성종목 CSV 201종목과 개요의 구성종목수 201을 대조 확인. 공식 목록 전체를 적용.",
+      "constituents": [
+        {
+          "stockCode": "000080",
+          "name": "하이트진로"
+        },
+        {
+          "stockCode": "000100",
+          "name": "유한양행"
+        },
+        {
+          "stockCode": "000120",
+          "name": "CJ대한통운"
+        },
+        {
+          "stockCode": "000150",
+          "name": "두산"
+        },
+        {
+          "stockCode": "000210",
+          "name": "DL"
+        },
+        {
+          "stockCode": "000240",
+          "name": "한국앤컴퍼니"
+        },
+        {
+          "stockCode": "000270",
+          "name": "기아"
+        },
+        {
+          "stockCode": "000660",
+          "name": "SK하이닉스"
+        },
+        {
+          "stockCode": "000670",
+          "name": "영풍"
+        },
+        {
+          "stockCode": "000720",
+          "name": "현대건설"
+        },
+        {
+          "stockCode": "000810",
+          "name": "삼성화재"
+        },
+        {
+          "stockCode": "000880",
+          "name": "한화"
+        },
+        {
+          "stockCode": "000990",
+          "name": "DB하이텍"
+        },
+        {
+          "stockCode": "001040",
+          "name": "CJ"
+        },
+        {
+          "stockCode": "001430",
+          "name": "세아베스틸지주"
+        },
+        {
+          "stockCode": "001440",
+          "name": "대한전선"
+        },
+        {
+          "stockCode": "001450",
+          "name": "현대해상"
+        },
+        {
+          "stockCode": "001680",
+          "name": "대상"
+        },
+        {
+          "stockCode": "001800",
+          "name": "오리온홀딩스"
+        },
+        {
+          "stockCode": "002030",
+          "name": "아세아"
+        },
+        {
+          "stockCode": "002380",
+          "name": "KCC"
+        },
+        {
+          "stockCode": "002790",
+          "name": "아모레퍼시픽홀딩스"
+        },
+        {
+          "stockCode": "002840",
+          "name": "미원상사"
+        },
+        {
+          "stockCode": "003030",
+          "name": "세아제강지주"
+        },
+        {
+          "stockCode": "003090",
+          "name": "대웅"
+        },
+        {
+          "stockCode": "003230",
+          "name": "삼양식품"
+        },
+        {
+          "stockCode": "003240",
+          "name": "태광산업"
+        },
+        {
+          "stockCode": "003490",
+          "name": "대한항공"
+        },
+        {
+          "stockCode": "003550",
+          "name": "LG"
+        },
+        {
+          "stockCode": "003670",
+          "name": "포스코퓨처엠"
+        },
+        {
+          "stockCode": "004000",
+          "name": "롯데정밀화학"
+        },
+        {
+          "stockCode": "004020",
+          "name": "현대제철"
+        },
+        {
+          "stockCode": "004170",
+          "name": "신세계"
+        },
+        {
+          "stockCode": "004370",
+          "name": "농심"
+        },
+        {
+          "stockCode": "004990",
+          "name": "롯데지주"
+        },
+        {
+          "stockCode": "005300",
+          "name": "롯데칠성"
+        },
+        {
+          "stockCode": "005380",
+          "name": "현대차"
+        },
+        {
+          "stockCode": "005420",
+          "name": "코스모화학"
+        },
+        {
+          "stockCode": "005490",
+          "name": "POSCO홀딩스"
+        },
+        {
+          "stockCode": "005830",
+          "name": "DB손해보험"
+        },
+        {
+          "stockCode": "005850",
+          "name": "에스엘"
+        },
+        {
+          "stockCode": "005930",
+          "name": "삼성전자"
+        },
+        {
+          "stockCode": "005940",
+          "name": "NH투자증권"
+        },
+        {
+          "stockCode": "006040",
+          "name": "동원산업"
+        },
+        {
+          "stockCode": "006260",
+          "name": "LS"
+        },
+        {
+          "stockCode": "006280",
+          "name": "녹십자"
+        },
+        {
+          "stockCode": "006400",
+          "name": "삼성SDI"
+        },
+        {
+          "stockCode": "006650",
+          "name": "대한유화"
+        },
+        {
+          "stockCode": "006800",
+          "name": "미래에셋증권"
+        },
+        {
+          "stockCode": "007070",
+          "name": "GS리테일"
+        },
+        {
+          "stockCode": "007310",
+          "name": "오뚜기"
+        },
+        {
+          "stockCode": "007340",
+          "name": "DN오토모티브"
+        },
+        {
+          "stockCode": "007660",
+          "name": "이수페타시스"
+        },
+        {
+          "stockCode": "008730",
+          "name": "율촌화학"
+        },
+        {
+          "stockCode": "008770",
+          "name": "호텔신라"
+        },
+        {
+          "stockCode": "008930",
+          "name": "한미사이언스"
+        },
+        {
+          "stockCode": "009150",
+          "name": "삼성전기"
+        },
+        {
+          "stockCode": "009240",
+          "name": "한샘"
+        },
+        {
+          "stockCode": "009420",
+          "name": "한올바이오파마"
+        },
+        {
+          "stockCode": "009540",
+          "name": "HD한국조선해양"
+        },
+        {
+          "stockCode": "009830",
+          "name": "한화솔루션"
+        },
+        {
+          "stockCode": "009970",
+          "name": "영원무역홀딩스"
+        },
+        {
+          "stockCode": "010060",
+          "name": "OCI홀딩스"
+        },
+        {
+          "stockCode": "010120",
+          "name": "LS ELECTRIC"
+        },
+        {
+          "stockCode": "010130",
+          "name": "고려아연"
+        },
+        {
+          "stockCode": "010140",
+          "name": "삼성중공업"
+        },
+        {
+          "stockCode": "010950",
+          "name": "S-Oil"
+        },
+        {
+          "stockCode": "011070",
+          "name": "LG이노텍"
+        },
+        {
+          "stockCode": "011170",
+          "name": "롯데케미칼"
+        },
+        {
+          "stockCode": "011200",
+          "name": "HMM"
+        },
+        {
+          "stockCode": "011210",
+          "name": "현대위아"
+        },
+        {
+          "stockCode": "011780",
+          "name": "금호석유화학"
+        },
+        {
+          "stockCode": "011790",
+          "name": "SKC"
+        },
+        {
+          "stockCode": "012330",
+          "name": "현대모비스"
+        },
+        {
+          "stockCode": "012450",
+          "name": "한화에어로스페이스"
+        },
+        {
+          "stockCode": "0126Z0",
+          "name": "삼성에피스홀딩스"
+        },
+        {
+          "stockCode": "012750",
+          "name": "에스원"
+        },
+        {
+          "stockCode": "014680",
+          "name": "한솔케미칼"
+        },
+        {
+          "stockCode": "014820",
+          "name": "동원시스템즈"
+        },
+        {
+          "stockCode": "015760",
+          "name": "한국전력"
+        },
+        {
+          "stockCode": "016360",
+          "name": "삼성증권"
+        },
+        {
+          "stockCode": "017670",
+          "name": "SK텔레콤"
+        },
+        {
+          "stockCode": "017800",
+          "name": "현대엘리베이터"
+        },
+        {
+          "stockCode": "017960",
+          "name": "한국카본"
+        },
+        {
+          "stockCode": "018260",
+          "name": "삼성에스디에스"
+        },
+        {
+          "stockCode": "018880",
+          "name": "한온시스템"
+        },
+        {
+          "stockCode": "021240",
+          "name": "코웨이"
+        },
+        {
+          "stockCode": "0220W0",
+          "name": "한화머시너리앤서비스홀딩스"
+        },
+        {
+          "stockCode": "022100",
+          "name": "포스코DX"
+        },
+        {
+          "stockCode": "023530",
+          "name": "롯데쇼핑"
+        },
+        {
+          "stockCode": "024110",
+          "name": "기업은행"
+        },
+        {
+          "stockCode": "026960",
+          "name": "동서"
+        },
+        {
+          "stockCode": "028050",
+          "name": "삼성E&A"
+        },
+        {
+          "stockCode": "028260",
+          "name": "삼성물산"
+        },
+        {
+          "stockCode": "028670",
+          "name": "팬오션"
+        },
+        {
+          "stockCode": "029780",
+          "name": "삼성카드"
+        },
+        {
+          "stockCode": "030000",
+          "name": "제일기획"
+        },
+        {
+          "stockCode": "030200",
+          "name": "KT"
+        },
+        {
+          "stockCode": "032640",
+          "name": "LG유플러스"
+        },
+        {
+          "stockCode": "032830",
+          "name": "삼성생명"
+        },
+        {
+          "stockCode": "033780",
+          "name": "KT&G"
+        },
+        {
+          "stockCode": "034020",
+          "name": "두산에너빌리티"
+        },
+        {
+          "stockCode": "034220",
+          "name": "LG디스플레이"
+        },
+        {
+          "stockCode": "034230",
+          "name": "파라다이스"
+        },
+        {
+          "stockCode": "034730",
+          "name": "SK"
+        },
+        {
+          "stockCode": "035250",
+          "name": "강원랜드"
+        },
+        {
+          "stockCode": "035420",
+          "name": "NAVER"
+        },
+        {
+          "stockCode": "035720",
+          "name": "카카오"
+        },
+        {
+          "stockCode": "036460",
+          "name": "한국가스공사"
+        },
+        {
+          "stockCode": "036570",
+          "name": "NC"
+        },
+        {
+          "stockCode": "039490",
+          "name": "키움증권"
+        },
+        {
+          "stockCode": "042660",
+          "name": "한화오션"
+        },
+        {
+          "stockCode": "042700",
+          "name": "한미반도체"
+        },
+        {
+          "stockCode": "047040",
+          "name": "대우건설"
+        },
+        {
+          "stockCode": "047050",
+          "name": "포스코인터내셔널"
+        },
+        {
+          "stockCode": "047810",
+          "name": "한국항공우주"
+        },
+        {
+          "stockCode": "051600",
+          "name": "한전KPS"
+        },
+        {
+          "stockCode": "051900",
+          "name": "LG생활건강"
+        },
+        {
+          "stockCode": "051910",
+          "name": "LG화학"
+        },
+        {
+          "stockCode": "052690",
+          "name": "한전기술"
+        },
+        {
+          "stockCode": "055550",
+          "name": "신한지주"
+        },
+        {
+          "stockCode": "062040",
+          "name": "산일전기"
+        },
+        {
+          "stockCode": "064350",
+          "name": "현대로템"
+        },
+        {
+          "stockCode": "064400",
+          "name": "LG씨엔에스"
+        },
+        {
+          "stockCode": "066570",
+          "name": "LG전자"
+        },
+        {
+          "stockCode": "066970",
+          "name": "엘앤에프"
+        },
+        {
+          "stockCode": "068270",
+          "name": "셀트리온"
+        },
+        {
+          "stockCode": "069260",
+          "name": "TKG휴켐스"
+        },
+        {
+          "stockCode": "069620",
+          "name": "대웅제약"
+        },
+        {
+          "stockCode": "069960",
+          "name": "현대백화점"
+        },
+        {
+          "stockCode": "071050",
+          "name": "한국금융지주"
+        },
+        {
+          "stockCode": "071320",
+          "name": "지역난방공사"
+        },
+        {
+          "stockCode": "071970",
+          "name": "HD현대마린엔진"
+        },
+        {
+          "stockCode": "073240",
+          "name": "금호타이어"
+        },
+        {
+          "stockCode": "078930",
+          "name": "GS"
+        },
+        {
+          "stockCode": "079550",
+          "name": "LIG디펜스앤에어로스페이스"
+        },
+        {
+          "stockCode": "081660",
+          "name": "미스토홀딩스"
+        },
+        {
+          "stockCode": "082740",
+          "name": "한화엔진"
+        },
+        {
+          "stockCode": "086280",
+          "name": "현대글로비스"
+        },
+        {
+          "stockCode": "086790",
+          "name": "하나금융지주"
+        },
+        {
+          "stockCode": "088350",
+          "name": "한화생명"
+        },
+        {
+          "stockCode": "090430",
+          "name": "아모레퍼시픽"
+        },
+        {
+          "stockCode": "093370",
+          "name": "후성"
+        },
+        {
+          "stockCode": "096770",
+          "name": "SK이노베이션"
+        },
+        {
+          "stockCode": "097950",
+          "name": "CJ제일제당"
+        },
+        {
+          "stockCode": "103140",
+          "name": "풍산"
+        },
+        {
+          "stockCode": "105560",
+          "name": "KB금융"
+        },
+        {
+          "stockCode": "111770",
+          "name": "영원무역"
+        },
+        {
+          "stockCode": "112610",
+          "name": "씨에스윈드"
+        },
+        {
+          "stockCode": "120110",
+          "name": "코오롱인더"
+        },
+        {
+          "stockCode": "128940",
+          "name": "한미약품"
+        },
+        {
+          "stockCode": "137310",
+          "name": "에스디바이오센서"
+        },
+        {
+          "stockCode": "138040",
+          "name": "메리츠금융지주"
+        },
+        {
+          "stockCode": "138930",
+          "name": "BNK금융지주"
+        },
+        {
+          "stockCode": "139130",
+          "name": "iM금융지주"
+        },
+        {
+          "stockCode": "139480",
+          "name": "이마트"
+        },
+        {
+          "stockCode": "161390",
+          "name": "한국타이어앤테크놀로지"
+        },
+        {
+          "stockCode": "161890",
+          "name": "한국콜마"
+        },
+        {
+          "stockCode": "175330",
+          "name": "JB금융지주"
+        },
+        {
+          "stockCode": "180640",
+          "name": "한진칼"
+        },
+        {
+          "stockCode": "185750",
+          "name": "종근당"
+        },
+        {
+          "stockCode": "192080",
+          "name": "더블유게임즈"
+        },
+        {
+          "stockCode": "192820",
+          "name": "코스맥스"
+        },
+        {
+          "stockCode": "204320",
+          "name": "HL만도"
+        },
+        {
+          "stockCode": "207940",
+          "name": "삼성바이오로직스"
+        },
+        {
+          "stockCode": "241560",
+          "name": "두산밥캣"
+        },
+        {
+          "stockCode": "251270",
+          "name": "넷마블"
+        },
+        {
+          "stockCode": "259960",
+          "name": "크래프톤"
+        },
+        {
+          "stockCode": "267250",
+          "name": "HD현대"
+        },
+        {
+          "stockCode": "267260",
+          "name": "HD현대일렉트릭"
+        },
+        {
+          "stockCode": "267270",
+          "name": "HD건설기계"
+        },
+        {
+          "stockCode": "268280",
+          "name": "미원에스씨"
+        },
+        {
+          "stockCode": "271560",
+          "name": "오리온"
+        },
+        {
+          "stockCode": "272210",
+          "name": "한화시스템"
+        },
+        {
+          "stockCode": "278470",
+          "name": "에이피알"
+        },
+        {
+          "stockCode": "280360",
+          "name": "롯데웰푸드"
+        },
+        {
+          "stockCode": "282330",
+          "name": "BGF리테일"
+        },
+        {
+          "stockCode": "285130",
+          "name": "SK케미칼"
+        },
+        {
+          "stockCode": "298020",
+          "name": "효성티앤씨"
+        },
+        {
+          "stockCode": "298040",
+          "name": "효성중공업"
+        },
+        {
+          "stockCode": "298050",
+          "name": "HS효성첨단소재"
+        },
+        {
+          "stockCode": "300720",
+          "name": "한일시멘트"
+        },
+        {
+          "stockCode": "302440",
+          "name": "SK바이오사이언스"
+        },
+        {
+          "stockCode": "307950",
+          "name": "현대오토에버"
+        },
+        {
+          "stockCode": "316140",
+          "name": "우리금융지주"
+        },
+        {
+          "stockCode": "323410",
+          "name": "카카오뱅크"
+        },
+        {
+          "stockCode": "326030",
+          "name": "SK바이오팜"
+        },
+        {
+          "stockCode": "329180",
+          "name": "HD현대중공업"
+        },
+        {
+          "stockCode": "352820",
+          "name": "하이브"
+        },
+        {
+          "stockCode": "361610",
+          "name": "SK아이이테크놀로지"
+        },
+        {
+          "stockCode": "373220",
+          "name": "LG에너지솔루션"
+        },
+        {
+          "stockCode": "375500",
+          "name": "DL이앤씨"
+        },
+        {
+          "stockCode": "377300",
+          "name": "카카오페이"
+        },
+        {
+          "stockCode": "383220",
+          "name": "F&F"
+        },
+        {
+          "stockCode": "402340",
+          "name": "SK스퀘어"
+        },
+        {
+          "stockCode": "443060",
+          "name": "HD현대마린솔루션"
+        },
+        {
+          "stockCode": "450080",
+          "name": "에코프로머티"
+        },
+        {
+          "stockCode": "454910",
+          "name": "두산로보틱스"
+        },
+        {
+          "stockCode": "456040",
+          "name": "OCI"
+        },
+        {
+          "stockCode": "457190",
+          "name": "이수스페셜티케미컬"
+        },
+        {
+          "stockCode": "483650",
+          "name": "달바글로벌"
+        }
+      ]
+    },
+    {
+      "id": "kosdaq150",
+      "name": "코스닥150",
+      "sourceUrl": "https://index.krx.co.kr/contents/MKD/03/0304/03040101/MKD03040101T3.jsp?upmidCd=0103&idxCd=2203&idxId=Q5G01P",
+      "reportedCount": 150,
+      "countNote": "",
+      "constituents": [
+        {
+          "stockCode": "000250",
+          "name": "삼천당제약"
+        },
+        {
+          "stockCode": "0009K0",
+          "name": "에임드바이오"
+        },
+        {
+          "stockCode": "003380",
+          "name": "하림지주"
+        },
+        {
+          "stockCode": "005290",
+          "name": "동진쎄미켐"
+        },
+        {
+          "stockCode": "006730",
+          "name": "서부T&D"
+        },
+        {
+          "stockCode": "007390",
+          "name": "네이처셀"
+        },
+        {
+          "stockCode": "009520",
+          "name": "포스코엠텍"
+        },
+        {
+          "stockCode": "014620",
+          "name": "성광벤드"
+        },
+        {
+          "stockCode": "015750",
+          "name": "성우하이텍"
+        },
+        {
+          "stockCode": "018290",
+          "name": "브이티"
+        },
+        {
+          "stockCode": "025320",
+          "name": "시노펙스"
+        },
+        {
+          "stockCode": "025900",
+          "name": "동화기업"
+        },
+        {
+          "stockCode": "025980",
+          "name": "아난티"
+        },
+        {
+          "stockCode": "028300",
+          "name": "HLB"
+        },
+        {
+          "stockCode": "030520",
+          "name": "한컴"
+        },
+        {
+          "stockCode": "030530",
+          "name": "원익홀딩스"
+        },
+        {
+          "stockCode": "031980",
+          "name": "피에스케이홀딩스"
+        },
+        {
+          "stockCode": "032190",
+          "name": "다우데이타"
+        },
+        {
+          "stockCode": "032500",
+          "name": "케이엠더블유"
+        },
+        {
+          "stockCode": "032820",
+          "name": "우리기술"
+        },
+        {
+          "stockCode": "033100",
+          "name": "제룡전기"
+        },
+        {
+          "stockCode": "033500",
+          "name": "동성화인텍"
+        },
+        {
+          "stockCode": "035760",
+          "name": "CJ ENM"
+        },
+        {
+          "stockCode": "035900",
+          "name": "JYP Ent."
+        },
+        {
+          "stockCode": "036540",
+          "name": "SFA반도체"
+        },
+        {
+          "stockCode": "036620",
+          "name": "감성코퍼레이션"
+        },
+        {
+          "stockCode": "036810",
+          "name": "에프에스티"
+        },
+        {
+          "stockCode": "036830",
+          "name": "솔브레인홀딩스"
+        },
+        {
+          "stockCode": "036930",
+          "name": "주성엔지니어링"
+        },
+        {
+          "stockCode": "038500",
+          "name": "삼표시멘트"
+        },
+        {
+          "stockCode": "039030",
+          "name": "이오테크닉스"
+        },
+        {
+          "stockCode": "039200",
+          "name": "오스코텍"
+        },
+        {
+          "stockCode": "041190",
+          "name": "우리기술투자"
+        },
+        {
+          "stockCode": "041510",
+          "name": "에스엠"
+        },
+        {
+          "stockCode": "042000",
+          "name": "카페24"
+        },
+        {
+          "stockCode": "043260",
+          "name": "성호전자"
+        },
+        {
+          "stockCode": "048410",
+          "name": "현대바이오"
+        },
+        {
+          "stockCode": "050890",
+          "name": "쏠리드"
+        },
+        {
+          "stockCode": "052400",
+          "name": "코나아이"
+        },
+        {
+          "stockCode": "053800",
+          "name": "안랩"
+        },
+        {
+          "stockCode": "056080",
+          "name": "유진로봇"
+        },
+        {
+          "stockCode": "056190",
+          "name": "SFA"
+        },
+        {
+          "stockCode": "058470",
+          "name": "리노공업"
+        },
+        {
+          "stockCode": "058610",
+          "name": "에스피지"
+        },
+        {
+          "stockCode": "060250",
+          "name": "NHN KCP"
+        },
+        {
+          "stockCode": "060280",
+          "name": "큐렉소"
+        },
+        {
+          "stockCode": "060370",
+          "name": "LS마린솔루션"
+        },
+        {
+          "stockCode": "064760",
+          "name": "티씨케이"
+        },
+        {
+          "stockCode": "065350",
+          "name": "신성델타테크"
+        },
+        {
+          "stockCode": "067160",
+          "name": "SOOP"
+        },
+        {
+          "stockCode": "067310",
+          "name": "하나마이크론"
+        },
+        {
+          "stockCode": "068760",
+          "name": "셀트리온제약"
+        },
+        {
+          "stockCode": "069080",
+          "name": "웹젠"
+        },
+        {
+          "stockCode": "074600",
+          "name": "원익QnC"
+        },
+        {
+          "stockCode": "078340",
+          "name": "컴투스"
+        },
+        {
+          "stockCode": "078600",
+          "name": "대주전자재료"
+        },
+        {
+          "stockCode": "080220",
+          "name": "제주반도체"
+        },
+        {
+          "stockCode": "082270",
+          "name": "젬백스"
+        },
+        {
+          "stockCode": "082920",
+          "name": "비츠로셀"
+        },
+        {
+          "stockCode": "083650",
+          "name": "비에이치아이"
+        },
+        {
+          "stockCode": "084370",
+          "name": "유진테크"
+        },
+        {
+          "stockCode": "085660",
+          "name": "차바이오텍"
+        },
+        {
+          "stockCode": "086520",
+          "name": "에코프로"
+        },
+        {
+          "stockCode": "087010",
+          "name": "펩트론"
+        },
+        {
+          "stockCode": "089030",
+          "name": "테크윙"
+        },
+        {
+          "stockCode": "089970",
+          "name": "브이엠"
+        },
+        {
+          "stockCode": "090360",
+          "name": "로보스타"
+        },
+        {
+          "stockCode": "090710",
+          "name": "휴림로봇"
+        },
+        {
+          "stockCode": "095340",
+          "name": "ISC"
+        },
+        {
+          "stockCode": "095610",
+          "name": "테스"
+        },
+        {
+          "stockCode": "095660",
+          "name": "네오위즈"
+        },
+        {
+          "stockCode": "096530",
+          "name": "씨젠"
+        },
+        {
+          "stockCode": "098460",
+          "name": "고영"
+        },
+        {
+          "stockCode": "099320",
+          "name": "쎄트렉아이"
+        },
+        {
+          "stockCode": "100790",
+          "name": "미래에셋벤처투자"
+        },
+        {
+          "stockCode": "101490",
+          "name": "에스앤에스텍"
+        },
+        {
+          "stockCode": "101730",
+          "name": "위메이드맥스"
+        },
+        {
+          "stockCode": "108490",
+          "name": "로보티즈"
+        },
+        {
+          "stockCode": "112040",
+          "name": "위메이드"
+        },
+        {
+          "stockCode": "121600",
+          "name": "나노신소재"
+        },
+        {
+          "stockCode": "122870",
+          "name": "와이지엔터테인먼트"
+        },
+        {
+          "stockCode": "124500",
+          "name": "아이티센글로벌"
+        },
+        {
+          "stockCode": "125490",
+          "name": "한라캐스트"
+        },
+        {
+          "stockCode": "131290",
+          "name": "티에스이"
+        },
+        {
+          "stockCode": "131970",
+          "name": "두산테스나"
+        },
+        {
+          "stockCode": "137400",
+          "name": "피엔티"
+        },
+        {
+          "stockCode": "140860",
+          "name": "파크시스템스"
+        },
+        {
+          "stockCode": "141080",
+          "name": "리가켐바이오"
+        },
+        {
+          "stockCode": "145020",
+          "name": "휴젤"
+        },
+        {
+          "stockCode": "161580",
+          "name": "필옵틱스"
+        },
+        {
+          "stockCode": "166090",
+          "name": "하나머티리얼즈"
+        },
+        {
+          "stockCode": "171090",
+          "name": "선익시스템"
+        },
+        {
+          "stockCode": "178320",
+          "name": "서진시스템"
+        },
+        {
+          "stockCode": "183300",
+          "name": "코미코"
+        },
+        {
+          "stockCode": "189300",
+          "name": "인텔리안테크"
+        },
+        {
+          "stockCode": "194480",
+          "name": "데브시스터즈"
+        },
+        {
+          "stockCode": "195940",
+          "name": "HK이노엔"
+        },
+        {
+          "stockCode": "196170",
+          "name": "알테오젠"
+        },
+        {
+          "stockCode": "204270",
+          "name": "제이앤티씨"
+        },
+        {
+          "stockCode": "211050",
+          "name": "인카금융서비스"
+        },
+        {
+          "stockCode": "213420",
+          "name": "덕산네오룩스"
+        },
+        {
+          "stockCode": "214150",
+          "name": "클래시스"
+        },
+        {
+          "stockCode": "214370",
+          "name": "케어젠"
+        },
+        {
+          "stockCode": "214430",
+          "name": "아이쓰리시스템"
+        },
+        {
+          "stockCode": "214450",
+          "name": "파마리서치"
+        },
+        {
+          "stockCode": "215200",
+          "name": "메가스터디교육"
+        },
+        {
+          "stockCode": "218410",
+          "name": "RFHIC"
+        },
+        {
+          "stockCode": "222080",
+          "name": "SFA넥셀"
+        },
+        {
+          "stockCode": "222800",
+          "name": "심텍"
+        },
+        {
+          "stockCode": "225570",
+          "name": "넥슨게임즈"
+        },
+        {
+          "stockCode": "226950",
+          "name": "올릭스"
+        },
+        {
+          "stockCode": "232140",
+          "name": "와이씨"
+        },
+        {
+          "stockCode": "237690",
+          "name": "에스티팜"
+        },
+        {
+          "stockCode": "240810",
+          "name": "원익IPS"
+        },
+        {
+          "stockCode": "241710",
+          "name": "코스메카코리아"
+        },
+        {
+          "stockCode": "247540",
+          "name": "에코프로비엠"
+        },
+        {
+          "stockCode": "251970",
+          "name": "펌텍코리아"
+        },
+        {
+          "stockCode": "253450",
+          "name": "스튜디오드래곤"
+        },
+        {
+          "stockCode": "253590",
+          "name": "네오셈"
+        },
+        {
+          "stockCode": "257720",
+          "name": "실리콘투"
+        },
+        {
+          "stockCode": "263750",
+          "name": "펄어비스"
+        },
+        {
+          "stockCode": "272290",
+          "name": "이녹스첨단소재"
+        },
+        {
+          "stockCode": "277810",
+          "name": "레인보우로보틱스"
+        },
+        {
+          "stockCode": "278280",
+          "name": "천보"
+        },
+        {
+          "stockCode": "281740",
+          "name": "레이크머티리얼즈"
+        },
+        {
+          "stockCode": "290650",
+          "name": "엘앤씨바이오"
+        },
+        {
+          "stockCode": "293490",
+          "name": "카카오게임즈"
+        },
+        {
+          "stockCode": "295310",
+          "name": "에이치브이엠"
+        },
+        {
+          "stockCode": "298380",
+          "name": "에이비엘바이오"
+        },
+        {
+          "stockCode": "310210",
+          "name": "보로노이"
+        },
+        {
+          "stockCode": "319400",
+          "name": "현대무벡스"
+        },
+        {
+          "stockCode": "319660",
+          "name": "피에스케이"
+        },
+        {
+          "stockCode": "323280",
+          "name": "태성"
+        },
+        {
+          "stockCode": "328130",
+          "name": "루닛"
+        },
+        {
+          "stockCode": "347850",
+          "name": "디앤디파마텍"
+        },
+        {
+          "stockCode": "348210",
+          "name": "넥스틴"
+        },
+        {
+          "stockCode": "348370",
+          "name": "엔켐"
+        },
+        {
+          "stockCode": "352480",
+          "name": "씨앤씨인터내셔널"
+        },
+        {
+          "stockCode": "357780",
+          "name": "솔브레인"
+        },
+        {
+          "stockCode": "358570",
+          "name": "지아이이노베이션"
+        },
+        {
+          "stockCode": "376300",
+          "name": "디어유"
+        },
+        {
+          "stockCode": "388720",
+          "name": "유일로보틱스"
+        },
+        {
+          "stockCode": "399720",
+          "name": "가온칩스"
+        },
+        {
+          "stockCode": "403870",
+          "name": "HPSP"
+        },
+        {
+          "stockCode": "417200",
+          "name": "LS머트리얼즈"
+        },
+        {
+          "stockCode": "420770",
+          "name": "기가비스"
+        },
+        {
+          "stockCode": "437730",
+          "name": "삼현"
+        },
+        {
+          "stockCode": "445680",
+          "name": "큐리옥스바이오시스템즈"
+        },
+        {
+          "stockCode": "466100",
+          "name": "클로봇"
+        },
+        {
+          "stockCode": "475830",
+          "name": "오름테라퓨틱"
+        }
+      ]
+    }
+  ]
+}

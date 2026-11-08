@@ -45,7 +45,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Noto+Sans+KR:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/css/style.css?v=3.24">
+  <link rel="stylesheet" href="/css/style.css?v=3.25">
   <link rel="manifest" href="/manifest.json">
   <meta name="theme-color" content="#2563eb">
 
@@ -85,6 +85,7 @@
       <div class="site-nav-links">
         <a href="/" data-page-link="analysis" data-page="analysis" aria-current="page">재무분석</a>
         <a href="/about" data-page-link="about" data-page="about">시스템 소개</a>
+        <button type="button" id="pwaMenuButton" class="account-menu-button pwa-menu-button" aria-haspopup="dialog"><i class="bi bi-download" aria-hidden="true"></i> 앱 설치</button>
         <button type="button" id="accountMenuButton" class="account-menu-button">로그인</button>
         <a id="adminMenuLink" href="/admin" class="account-menu-button" hidden>관리자</a>
       </div>
@@ -674,6 +675,19 @@
     </div>
   </footer>
 
+  <div class="modal fade" id="pwaInstallModal" tabindex="-1" aria-labelledby="pwaInstallTitle" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered"><div class="modal-content pwa-guide">
+      <div class="modal-header"><h2 class="modal-title fs-5" id="pwaInstallTitle">Finalyze.AI 앱 설치</h2><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="닫기"></button></div>
+      <div class="modal-body">
+        <div class="pwa-guide-heading"><img src="/icons/icon-96x96.png" width="56" height="56" alt=""><p>홈 화면에서 바로 재무분석을 시작하세요.<br><span>무료 · 별도 앱스토어 다운로드 없이 설치</span></p></div>
+        <p id="pwaInstallStatus" role="status" aria-live="polite"></p>
+        <ol id="pwaInstallSteps"></ol>
+        <p class="pwa-guide-note">이미 설치했다면 홈 화면이나 앱 목록에서 Finalyze.AI를 열어 주세요. 설치 메뉴가 보이지 않으면 최신 Chrome·Edge 또는 Safari에서 다시 열어 주세요.</p>
+      </div>
+      <div class="modal-footer"><button type="button" class="btn btn-primary" data-bs-dismiss="modal">확인</button></div>
+    </div></div>
+  </div>
+
   <!-- PWA 설치 팝업 -->
   <div id="pwaInstallBanner" class="pwa-install-banner" style="display: none;">
     <div class="pwa-install-content">
@@ -733,7 +747,7 @@
       </div>
     </div></div>
   </div>
-  <script src="/js/main.js?v=3.18"></script>
+  <script src="/js/main.js?v=3.19"></script>
   <script src="/js/accounts.js?v=1.4"></script>
   <noscript>
     <div style="padding:2rem;text-align:center;font-family:sans-serif;">

@@ -1890,22 +1890,61 @@ function initPwaInstallBanner() {
   const banner = document.getElementById('pwaInstallBanner');
   const installBtn = document.getElementById('pwaInstallBtn');
   const dismissBtn = document.getElementById('pwaDismissBtn');
+  const menuBtn = document.getElementById('pwaMenuButton');
+  const modal = document.getElementById('pwaInstallModal');
+  const status = document.getElementById('pwaInstallStatus');
+  const steps = document.getElementById('pwaInstallSteps');
 
-  if (!banner || !installBtn || !dismissBtn) return;
+  if (!banner || !installBtn || !dismissBtn || !menuBtn || !modal) return;
 
-  // 이미 앱으로 실행 중이면 표시 안 함
-  if (window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone) {
-    return;
-  }
-
+  const standalone = window.matchMedia('(display-mode: standalone)');
+  let installed = standalone.matches || !!window.navigator.standalone;
   let deferredPrompt = null;
+  let busy = false;
+  function updateInstalledState() {
+    menuBtn.hidden = installed;
+    if (installed) {
+      banner.style.display = 'none';
+      deferredPrompt = null;
+      bootstrap.Modal.getInstance(modal)?.hide();
+    }
+  }
+  updateInstalledState();
+  standalone.addEventListener('change', event => {
+    installed = event.matches || !!window.navigator.standalone;
+    updateInstalledState();
+  });
+
+  function showGuide(message = '') {
+    const ua = navigator.userAgent;
+    const ios = /iPhone|iPad|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    const android = /Android/.test(ua);
+    const instructions = ios ? [
+      'Safari에서 Finalyze.AI를 열고 공유 버튼을 누르세요.',
+      '‘홈 화면에 추가’를 선택하세요. ‘웹 앱으로 열기’가 보이면 켜고 ‘추가’를 누르세요.'
+    ] : android ? [
+      'Chrome에서 Finalyze.AI를 열고 오른쪽 위 ⋮ 메뉴를 누르세요.',
+      '‘앱 설치’ 또는 ‘홈 화면에 추가’를 선택한 뒤 화면 안내를 따라 설치하세요.'
+    ] : [
+      'Chrome·Edge의 주소창 오른쪽 설치 아이콘 또는 브라우저 메뉴에서 ‘설치’를 선택하세요. Mac Safari에서는 ‘파일 → Dock에 추가’를 이용할 수 있습니다.',
+      '휴대폰에서는 이 사이트를 열고 ‘앱 설치’를 누르면 기기에 맞는 안내를 볼 수 있습니다.'
+    ];
+    status.textContent = message || '이 브라우저에서는 아래 방법으로 설치할 수 있습니다.';
+    steps.replaceChildren(...instructions.map(text => {
+      const li = document.createElement('li');
+      li.textContent = text;
+      return li;
+    }));
+    bootstrap.Modal.getOrCreateInstance(modal).show();
+  }
 
   window.addEventListener('beforeinstallprompt', (e) => {
     e.preventDefault();
+    if (installed) return;
     deferredPrompt = e;
 
     // 이번 세션에서 이미 거절했으면 표시 안 함
-    if (sessionStorage.getItem('pwaInstallDismissed')) return;
+    try { if (sessionStorage.getItem('pwaInstallDismissed')) return; } catch (_) { /* 저장소 제한 시에도 설치 가능 */ }
 
     // 3초 후 팝업 표시
     setTimeout(() => {
@@ -1915,25 +1954,44 @@ function initPwaInstallBanner() {
     }, 3000);
   });
 
-  installBtn.addEventListener('click', async () => {
-    if (!deferredPrompt) return;
-    deferredPrompt.prompt();
-    const { outcome } = await deferredPrompt.userChoice;
-    if (outcome === 'accepted') {
-      banner.style.display = 'none';
-    }
+  async function requestInstall() {
+    if (busy || installed) return;
+    if (!deferredPrompt) { showGuide(); return; }
+    const prompt = deferredPrompt;
     deferredPrompt = null;
-  });
+    busy = true;
+    for (const button of [menuBtn, installBtn]) {
+      button.disabled = true;
+      button.setAttribute('aria-busy', 'true');
+    }
+    try {
+      await prompt.prompt();
+      const { outcome } = await prompt.userChoice;
+      banner.style.display = 'none';
+      if (outcome !== 'accepted') showGuide('설치를 취소했습니다. 원할 때 ‘앱 설치’를 눌러 다시 진행할 수 있습니다.');
+    } catch (_) {
+      banner.style.display = 'none';
+      showGuide('설치 창을 열지 못했습니다. 아래 브라우저 메뉴에서 설치해 주세요.');
+    } finally {
+      busy = false;
+      for (const button of [menuBtn, installBtn]) {
+        button.disabled = false;
+        button.removeAttribute('aria-busy');
+      }
+    }
+  }
+  installBtn.addEventListener('click', requestInstall);
+  menuBtn.addEventListener('click', requestInstall);
 
   dismissBtn.addEventListener('click', () => {
     banner.style.display = 'none';
-    sessionStorage.setItem('pwaInstallDismissed', '1');
+    try { sessionStorage.setItem('pwaInstallDismissed', '1'); } catch (_) { /* 현재 화면에서는 숨김 유지 */ }
   });
 
   // 설치 완료 시 팝업 숨김
   window.addEventListener('appinstalled', () => {
-    banner.style.display = 'none';
-    deferredPrompt = null;
+    installed = true;
+    updateInstalledState();
   });
 }
 

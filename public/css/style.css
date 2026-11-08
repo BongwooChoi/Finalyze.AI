@@ -84,6 +84,19 @@ body {
 
 .site-brand span { color: var(--primary); }
 .site-nav-links { display: flex; gap: 0.4rem; }
+.pwa-menu-button { color: var(--primary-dark); background: #eff6ff; white-space: nowrap; }
+.pwa-guide-heading { display: flex; gap: 16px; align-items: center; margin-bottom: 20px; }
+.pwa-guide-heading img { border-radius: 12px; }
+.pwa-guide-heading p { margin: 0; font-weight: 600; line-height: 1.7; }
+.pwa-guide-heading span, .pwa-guide-note { color: var(--text-secondary); font-size: .85rem; font-weight: 400; }
+.pwa-guide ol { padding-left: 1.4rem; line-height: 1.8; }
+.pwa-guide li + li { margin-top: 10px; }
+.pwa-guide-note { margin-bottom: 0; line-height: 1.7; }
+.pwa-menu-button:focus-visible { outline: 3px solid var(--primary); outline-offset: 3px; }
+@media (max-width: 600px) {
+  .site-nav { flex-wrap: wrap; padding-top: 10px; padding-bottom: 10px; }
+  .site-nav-links { flex-wrap: wrap; justify-content: flex-end; }
+}
 .site-nav-links a {
   padding: 0.65rem 1rem;
   border-radius: var(--radius-sm);

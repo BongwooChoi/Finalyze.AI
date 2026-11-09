@@ -142,6 +142,16 @@ test('잠정실적 수치 경로는 비회원에게 원문 표를 제공하고 L
   const data=await r.json();assert.equal(data.chartData.metrics[0].current,195.25);assert.equal(calls,1);
 });
 
+test('원문 준비 대기는 오류와 구별하고 캐시하지 않는다',async()=>{
+  const dartClient=require('../dartClient'),original=dartClient.get;
+  dartClient.get=async()=>{throw Object.assign(new Error('private detail'),{code:'DART_DOCUMENT_NOT_READY',dartStatus:'014'});};
+  try {
+    const response=await fetch(`${baseUrl}/api/provisional-financials?rcept_no=20261109900452`),data=await response.json();
+    assert.equal(response.status,503);assert.equal(response.headers.get('cache-control'),'no-store');assert.equal(response.headers.get('retry-after'),'900');
+    assert.equal(data.status,'pending');assert.equal(data.code,'DART_DOCUMENT_NOT_READY');assert.doesNotMatch(data.message,/private/);
+  } finally {dartClient.get=original;}
+});
+
 test('로고는 선택 상태를 유지하는 SPA 링크가 아닌 첫 화면 링크다',async()=>{
   const html=await(await fetch(`${baseUrl}/about?corp=00126380`)).text();
   const logo=html.match(/<a\b[^>]*class="site-brand"[^>]*>/)[0];

@@ -69,6 +69,16 @@ test('원문 다운로드의 XML 요청 제한 응답도 감지한다', async ()
     { code: 'DART_RATE_LIMITED', dartStatus: '020' });
 });
 
+test('원문 014는 준비 대기로 구분하며 실패 응답을 캐시하지 않는다',async()=>{
+  const store=createMemoryStore({now:()=>NOW});let calls=0;
+  const zip=Buffer.from('PK fake successful ZIP');
+  const instance=client(store,async()=>({data:++calls===1 ? Buffer.from('<result><status>014</status><message>파일이 존재하지 않습니다.</message></result>') : zip,headers:{'content-type':'application/octet-stream'}}));
+  const url='https://opendart.fss.or.kr/api/document.xml';
+  await assert.rejects(instance.get(url,{responseType:'arraybuffer'}),{code:'DART_DOCUMENT_NOT_READY',dartStatus:'014'});
+  assert.deepEqual((await instance.get(url,{responseType:'arraybuffer'})).data,zip);
+  assert.equal(calls,2);
+});
+
 test('HTTP 429를 받으면 다른 API도 추가 전송하지 않는다', async () => {
   const store = createMemoryStore({ now: () => NOW });
   let calls = 0;

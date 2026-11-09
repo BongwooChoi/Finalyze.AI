@@ -67,6 +67,9 @@ function createDartClient({ apiKey, store, transport = (...args) => axios.get(..
       const xmlStatus = binary && !(bytes[0] === 80 && bytes[1] === 75)
         ? bytes.toString('utf8').slice(0, 2000).match(/<status>(\d+)<\/status>/)?.[1] : null;
       const status = xmlStatus || response.data?.status;
+      if (url.pathname === '/api/document.xml' && status === '014') {
+        throw clientError('DART_DOCUMENT_NOT_READY', '공시 원문 파일이 아직 제공되지 않습니다.', { dartStatus: status });
+      }
       if (['020', '012', '011'].includes(status)) {
         const current = now();
         const nextMidnight = Date.parse(`${kstDay(current)}T00:00:00+09:00`) + 86400000;

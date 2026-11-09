@@ -762,7 +762,24 @@ function aiPanel(context) {
     content:document.getElementById('provisionalContent'),access:document.getElementById('provisionalAccess'),notice:document.getElementById('provisionalNotice')};
 }
 
+function showDocumentPending(context,target) {
+  target.className='ai-notice document-pending';
+  target.innerHTML=`<span class="ai-notice-icon" aria-hidden="true"><i class="bi bi-hourglass-split"></i></span>
+    <div><span class="ai-notice-label">공시 자료 반영 대기</span><h4>공시 원문 준비 중</h4>
+    <p>공시 목록에는 등록됐지만, DART에서 원문 파일을 아직 제공하지 않고 있습니다.</p>
+    <small>공시 원문은 일반적으로 제출 15분 후 반영됩니다. 혼잡한 시기에는 익영업일까지 지연될 수 있습니다.</small>
+    <button type="button" class="ai-notice-retry" data-document-retry>원문 다시 확인</button>
+    <small class="document-pending-help">다시 확인해도 AI 분석은 자동으로 실행되지 않습니다.</small></div>`;
+  target.hidden=false;target.style.display=target===aiPanel(context).notice?'':'flex';
+  const guide=document.getElementById('analysisGuide');if(guide)guide.style.display='none';
+}
+
 function showAiNotice(context,data) {
+  if(context.kind==='provisional' && data.code==='DART_DOCUMENT_NOT_READY') {
+    const panel=aiPanel(context);context.status='document_waiting';
+    panel.access.hidden=true;panel.error.style.display='none';
+    showDocumentPending(context,panel.notice);return true;
+  }
   const notices={
     AI_MEMBER_DAILY_LIMIT:{status:'limited',title:'오늘 이용 가능한 AI 분석을 모두 사용했어요',icon:'bi-calendar-check'},
     AI_GLOBAL_DAILY_LIMIT:{status:'limited',title:'오늘의 AI 분석 제공량이 소진됐어요',icon:'bi-calendar-check'},
@@ -877,6 +894,22 @@ document.addEventListener('click',event => {
   if(button.dataset.aiAction === 'analyze') requestAiAnalysis(context);
   else window.FinalyzeAccount?.openAnalysisLogin().catch(() => showToast('로그인을 불러오지 못했습니다. 다시 시도해주세요.','error'));
 });
+document.addEventListener('click',async event => {
+  const button=event.target.closest('[data-document-retry]'),context=activeAiAnalysis;
+  if(!button || !context || context.kind!=='provisional' || context.documentLoading) return;
+  const container=button.closest('.document-pending');
+  if(container!==document.getElementById('provisionalDataNotice') && container!==aiPanel(context).notice) return;
+  button.disabled=true;button.setAttribute('aria-busy','true');
+  try {
+    await loadProvisionalFinancials(context);
+    if(context===activeAiAnalysis && context.documentReady && context.status==='document_waiting') {
+      const access=await window.FinalyzeAccount?.analysisAccess() || {authenticated:false};
+      if(context===activeAiAnalysis) showAiAccess(context,access.authenticated);
+    }
+  } catch (_) { /* Public data errors are displayed next to the chart. */ }
+  finally { button.disabled=false;button.removeAttribute('aria-busy'); }
+});
+
 document.addEventListener('account:changed',event => {
   if(!activeAiAnalysis) return;
   if(!event.detail.authenticated) {
@@ -1734,14 +1767,18 @@ async function handleProvisionalSelect(rceptNo, reportNm, btnElement) {
 }
 
 async function loadProvisionalFinancials(context) {
+  if(context!==activeAiAnalysis || context.documentLoading) return;
+  context.documentLoading=true;context.documentReady=false;
   const loading=document.getElementById('provisionalDataLoading');
   const notice=document.getElementById('provisionalDataNotice');
-  loading.style.display='block'; notice.style.display='none';
+  loading.style.display='block'; notice.style.display='none';notice.className='account-note';notice.replaceChildren();
   try {
     const response=await fetch(`/api/provisional-financials?rcept_no=${encodeURIComponent(context.receipt)}`);
     const data=await response.json();
     if(activeAiAnalysis!==context) return;
+    if(data.code==='DART_DOCUMENT_NOT_READY') { showDocumentPending(context,notice);return; }
     if(!response.ok || data.status!=='success') throw new Error(data.message || '잠정실적 수치를 불러오지 못했습니다.');
+    context.documentReady=true;
     renderProvisionalChart(data.chartData);
     context.chartAvailable=Boolean(data.chartData?.metrics?.length);
     if(context.chartAvailable) {
@@ -1751,7 +1788,7 @@ async function loadProvisionalFinancials(context) {
   } catch(error) {
     if(activeAiAnalysis!==context) return;
     notice.textContent=error.message || '잠정실적 수치를 불러오지 못했습니다.'; notice.style.display='block';
-  } finally { if(activeAiAnalysis===context) loading.style.display='none'; }
+  } finally { context.documentLoading=false;if(activeAiAnalysis===context) loading.style.display='none'; }
 }
 
 // 잠정실적 비교 차트 렌더링 (당기 vs 전기 vs 전년동기)

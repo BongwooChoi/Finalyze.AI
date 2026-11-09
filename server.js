@@ -1118,6 +1118,15 @@ ${documentText}
 `;
 }
 
+function sendDocumentPending(res,error) {
+  if(error.code!=='DART_DOCUMENT_NOT_READY') return false;
+  res.set('Cache-Control','no-store').set('Retry-After','900').status(503).json({
+    status:'pending',code:'DART_DOCUMENT_NOT_READY',retryAfter:900,
+    message:'공시 원문이 아직 제공되지 않습니다. 공시 직후에는 DART 반영에 시간이 걸릴 수 있습니다. 잠시 후 다시 확인해주세요.'
+  });
+  return true;
+}
+
 // 공시 원문의 숫자는 로그인과 AI 호출 없이 제공합니다.
 app.get('/api/provisional-financials',async (req,res) => {
   if(typeof req.query.rcept_no!=='string' || !/^\d{14}$/.test(req.query.rcept_no)) return res.status(400).json({status:'error',message:'공시 접수번호를 확인해주세요.'});
@@ -1129,6 +1138,7 @@ app.get('/api/provisional-financials',async (req,res) => {
     res.set('Cache-Control','public, max-age=300, s-maxage=3600').json({status:'success',chartData,
       ...(chartData ? {} : {message:'이 공시의 표 형식에서는 실적 수치를 자동으로 읽지 못했습니다. DART 원문에서 확인해주세요.'})});
   } catch(error) {
+    if(sendDocumentPending(res,error)) return;
     console.warn('잠정실적 수치 조회 실패:',{code:error.code || 'PROVISIONAL_DATA_UNAVAILABLE',receipt:req.query.rcept_no});
     res.set('Cache-Control','no-store').status(503).json({status:'error',message:'잠정실적 수치를 불러오지 못했습니다. 잠시 후 다시 시도하거나 DART 원문을 확인해주세요.'});
   }
@@ -1171,6 +1181,7 @@ app.get('/api/provisional-analysis', accounts.requireAnalysis, async (req, res) 
 
     res.json({ status: 'success', result, chartData: chartData || null });
   } catch (error) {
+    if(sendDocumentPending(res,error)) return;
     const failure=analysisFailure(error);
     if(failure.notice) console.info('AI 분석 이용 안내:',{code:failure.body.code});
     else console.error('잠정실적 분석 중 오류 발생:', error.message);

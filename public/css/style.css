@@ -776,6 +776,9 @@ body.modal-open .pwa-install-banner { visibility: hidden; }
 .ai-notice-wait .ai-notice-icon { color:#a56d13; }
 .ai-notice-retry { display:block;margin-top:16px;padding:8px 12px;border:1px solid #d5b77c;border-radius:8px;background:#fff;color:inherit;font-size:.78rem;font-weight:600; }
 .ai-notice-retry:focus-visible { outline:3px solid #d5b77c;outline-offset:3px; }
+.document-pending { margin-bottom:16px; }
+.document-pending .document-pending-help { margin-top:12px; }
+.document-pending .ai-notice-retry:disabled { opacity:.6;cursor:wait; }
 .provisional-section-title { margin: 0 0 1.2rem; font-size: 1rem; font-weight: 700; color: #0f172a; }
 .privacy-page { max-width: 800px; margin: 3rem auto; padding: 0 1.4rem; color: #334155; line-height: 1.9; }
 .privacy-page h1 { font-size: 1.8rem; margin-top: 1rem; }

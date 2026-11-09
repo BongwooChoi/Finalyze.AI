@@ -21,7 +21,7 @@ function fixture(fetchImpl) {
       receipt:'20261106000001',companyName:name,reportName:'영업(잠정)실적'};
     run(`activeAiAnalysis=${JSON.stringify(data)}`);
   }
-  return{document,requests,run,change,choose};
+  return{document,requests,run,change,choose,click:async event=>{for(const fn of listeners.get('click')||[])await fn(event);}};
 }
 function response(status=200,summary='확인된 분석') {return{status,ok:status===200,json:async()=>({status:status===200?'success':'error',
   result:{sections:[],rating:'mixed',summary},chartData:null})};}
@@ -135,4 +135,24 @@ test('an unsupported provisional table shows source guidance without an AI fallb
   await f.run('loadProvisionalFinancials(activeAiAnalysis)');
   assert.equal(f.document.getElementById('provisionalDataNotice').textContent,'원문 확인');
   assert.equal(f.requests.length,1);assert.match(f.requests[0].url,/provisional-financials/);
+});
+
+test('pending documents show guidance for guests and member AI without an automatic retry',async()=>{
+  const pending=()=>({ok:false,status:503,json:async()=>({status:'pending',code:'DART_DOCUMENT_NOT_READY'})});
+  const f=fixture(pending);f.choose('provisional');await f.run('loadProvisionalFinancials(activeAiAnalysis)');
+  const notice=f.document.getElementById('provisionalDataNotice');assert.match(notice.innerHTML,/공시 원문 준비 중/);assert.match(notice.innerHTML,/익영업일/);assert.match(notice.innerHTML,/data-document-retry/);assert.equal(f.requests.length,1);
+  f.change(true);await f.run('requestAiAnalysis(activeAiAnalysis)');
+  const ai=f.document.getElementById('provisionalNotice');assert.equal(ai.hidden,false);assert.equal(ai.style.display,'');assert.match(ai.innerHTML,/공시 원문 준비 중/);
+  assert.equal(f.document.getElementById('provisionalError').style.display,'none');assert.equal(f.run('activeAiAnalysis.status'),'document_waiting');assert.equal(f.requests.length,2);
+  f.change(false);assert.equal(ai.hidden,true);
+});
+
+test('checking a ready document fetches public figures only and requires a separate AI start',async()=>{
+  let first=true;const f=fixture(()=>first ? (first=false,{ok:false,status:503,json:async()=>({status:'pending',code:'DART_DOCUMENT_NOT_READY'})}) : {ok:true,json:async()=>({status:'success',chartData:null})});
+  f.change(true);f.choose('provisional');await f.run('requestAiAnalysis(activeAiAnalysis)');
+  const notice=f.document.getElementById('provisionalNotice');
+  const button={disabled:false,setAttribute(){},removeAttribute(){},closest(){return notice;}};
+  await f.click({target:{closest:selector=>selector==='[data-document-retry]'?button:null}});
+  assert.equal(f.requests.length,2);assert.match(f.requests[1].url,/provisional-financials/);assert.equal(f.run('activeAiAnalysis.status'),'ready');
+  assert.equal(notice.hidden,true);assert.match(f.document.getElementById('provisionalAccess').innerHTML,/AI 분석 시작하기/);assert.equal(button.disabled,false);
 });

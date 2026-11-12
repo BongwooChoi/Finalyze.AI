@@ -51,6 +51,16 @@ test('홈은 분석 화면과 루트 canonical을 초기 HTML에 제공한다', 
   const schema = JSON.parse(html.match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/)[1]);
   assert.equal(schema['@type'], 'WebApplication');
 });
+test('통합 통계 화면도 no-store/noindex이며 익명 조회·갱신을 차단한다',async()=>{
+ const response=await fetch(baseUrl+'/admin/traffic');const html=await response.text();
+ assert.equal(response.status,200);assert.equal(response.headers.get('cache-control'),'no-store');
+ assert.match(response.headers.get('x-robots-tag'),/noindex/);assert.match(html,/id="dashboard" hidden/);
+ for(const method of ['GET','POST']){
+   const api=await fetch(baseUrl+'/api/admin/traffic'+(method==='POST'?'/sync':''),{method});
+   assert.ok([401,503].includes(api.status));assert.equal(api.headers.get('cache-control'),'no-store');
+ }
+ const redirect=await fetch(baseUrl+'/traffic.html',{redirect:'manual'});assert.equal(redirect.status,301);assert.equal(redirect.headers.get('location'),'/admin/traffic');
+});
 
 test('/about은 JS 없이 소개 본문·전용 메타데이터를 제공한다', async () => {
   const response = await fetch(`${baseUrl}/about`);

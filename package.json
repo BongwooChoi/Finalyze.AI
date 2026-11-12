@@ -11,7 +11,7 @@
     "check:provisional-financials": "node --test tests/provisional-financials.test.js",
     "setup:accounts": "node scripts/setupAccounts.js",
     "check:security-integration": "node --test tests/account-postgres.test.js tests/analysis-limits.test.js",
-    "check:admin": "node --test tests/admin.test.js",
+    "check:admin": "node --test tests/admin.test.js tests/traffic-service.test.js",
     "check:accounts": "node --test tests/accounts.test.js tests/ai-access.test.js tests/frontend-security.test.js tests/analysis-limits.test.js tests/push-worker.test.js tests/mail-sender.test.js tests/account-ui.test.js",
     "start": "node server.js",
     "check:public-pages": "node --test tests/public-pages.test.js",

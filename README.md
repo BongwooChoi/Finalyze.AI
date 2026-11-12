@@ -1,5 +1,13 @@
 # OPEN DART API 프로젝트
 
+## 통합 방문 통계 (관리자)
+
+`/admin/traffic`에서 Vercel 운영 사이트 전체의 방문 통계와 프로젝트 포털의 링크 클릭 수를 확인합니다. 기존 Google 관리자 계정의 세션·CSRF·현재 allowlist 검사를 그대로 사용합니다. 관리자 메뉴에서 이동할 수 있으며 HTML/API는 no-store/noindex, 서비스 워커 캐시 제외 대상입니다.
+
+`trafficService.js`는 서버의 `TRAFFIC_REPORT_SECRET`를 사용해 고정된 포털 통계 API를 호출합니다. Vercel API 토큰과 통계 DB는 별도 `bongwoo-projects` 프로젝트에만 둡니다. 수집 스케줄·스키마·토큰 갱신은 해당 저장소 README를 참고하세요. 권한·프록시 검사는 `npm run check:admin`, 공개 경로 검사는 `npm run check:public-pages`입니다.
+
+방문 통계는 Vercel API의 UTC 날짜, 클릭은 KST 날짜를 사용합니다. 일별·서비스별 방문자 합계는 전체 고유 인원 수가 아니며 UI에서 중복 포함을 명시합니다. 수집 실패는 이전 값을 유지하고 오류/갱신 시각을 표시합니다.
+
 OPEN DART API를 사용하여 금융감독원 공시 데이터를 가져오는 프로젝트입니다.
 
 ## 설치 방법

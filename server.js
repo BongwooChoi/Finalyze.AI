@@ -19,7 +19,6 @@ const {createTelegramBroadcast,telegramConfig}=require('./telegramDisclosures');
 const {createAnalysisLimiter,OPENAI_DEADLINE_MS,analysisFailure}=require('./analysisLimits');
 const {createSettingsService}=require('./serviceSettings');
 const {createAdminRouter}=require('./adminRoutes');
-const {createTrafficService}=require('./trafficService');
 
 // 환경변수 로드
 dotenv.config();
@@ -41,8 +40,7 @@ app.get('/about', (req, res) => {
 app.get('/index.html', (req, res) => res.redirect(301, `/${req.originalUrl.slice(req.path.length)}`));
 app.get('/admin', (req,res)=>res.set({'Cache-Control':'no-store','X-Robots-Tag':'noindex, nofollow'}).sendFile(path.join(__dirname,'public','admin.html')));
 app.get('/admin.html', (req,res)=>res.redirect(301,'/admin'));
-app.get('/admin/traffic', (req,res)=>res.set({'Cache-Control':'no-store','X-Robots-Tag':'noindex, nofollow'}).sendFile(path.join(__dirname,'public','traffic.html')));
-app.get('/traffic.html', (req,res)=>res.redirect(301,'/admin/traffic'));
+app.get(['/admin/traffic','/traffic.html'], (req,res)=>res.set({'Cache-Control':'no-store','X-Robots-Tag':'noindex, nofollow'}).redirect(301,'https://bongwoo-projects.vercel.app/admin/traffic'));
 
 // 정적 파일 제공
 app.use(express.static(path.join(__dirname, 'public')));
@@ -64,7 +62,7 @@ const accounts = createAccountRouter({
   }
 });
 app.use('/api',accounts.router);
-app.use('/api/admin',createAdminRouter({accounts,settings:serviceSettings,sharedStore:getSharedStore,traffic:createTrafficService()}));
+app.use('/api/admin',createAdminRouter({accounts,settings:serviceSettings,sharedStore:getSharedStore}));
 app.get('/privacy',(req,res) => res.sendFile(path.join(__dirname,'public','privacy.html')));
 
 const notificationFeed = createDisclosureFeed({

@@ -19,9 +19,7 @@ async function fixture(t){
     findCompany:async corp=>({corp_code:corp,corp_name:'테스트',stock_code:'005930'}),verifyIdentity:async credential=>{
       if(!identities.has(credential))throw Error('invalid');return identities.get(credential);
     }});
-  const trafficCalls=[];
-  const traffic={report:async days=>{trafficCalls.push('read');return {days:Number(days),projects:[],daily:[],clicks:[]};},sync:async()=>{trafficCalls.push('sync');return {status:'ok',success:5};}};
-  const app=express();app.use(express.json());app.use('/api',accounts.router);app.use('/api/admin',createAdminRouter({accounts,settings,sharedStore:shared,traffic,now}));
+  const app=express();app.use(express.json());app.use('/api',accounts.router);app.use('/api/admin',createAdminRouter({accounts,settings,sharedStore:shared,now}));
   const server=await new Promise(resolve=>{const s=app.listen(0,'127.0.0.1',()=>resolve(s));});
   t.after(async()=>{await new Promise(resolve=>server.close(resolve));await store.close();});
   function client(){
@@ -39,7 +37,7 @@ async function fixture(t){
     }
     return{request,status,login,jar};
   }
-  return{store,shared,settings,config,client,now,trafficCalls,advance:ms=>time+=ms};
+  return{store,shared,settings,config,client,now,advance:ms=>time+=ms};
 }
 test('only the verified configured Google account can read or change admin data',async t=>{
   const f=await fixture(t),guest=f.client(),member=f.client(),owner=f.client();
@@ -55,18 +53,10 @@ test('only the verified configured Google account can read or change admin data'
   assert.equal(dashboard.stats.new_members,2);assert.equal(dashboard.stats.signed_in_members,2);
   assert.doesNotMatch(JSON.stringify(dashboard),/owner@example|member@example|csrfToken|email_enc|email_hash/);
 });
-test('unified traffic read and sync use the existing admin, session, CSRF and origin boundary',async t=>{
-  const f=await fixture(t),guest=f.client(),member=f.client(),owner=f.client();
-  assert.equal((await guest.request('/admin/traffic')).status,401);
-  await member.login('ordinary','member@example.com');
-  assert.equal((await member.request('/admin/traffic')).status,403);
-  assert.equal((await member.request('/admin/traffic/sync','POST',{})).status,403);
-  await owner.login('owner');
-  assert.equal((await owner.request('/admin/traffic','GET',undefined,{'X-CSRF-Token':''})).status,403);
-  assert.equal((await owner.request('/admin/traffic/sync','POST',{},{Origin:'https://evil.example'})).status,403);
-  assert.equal(f.trafficCalls.length,0);
-  const read=await owner.request('/admin/traffic?days=7');assert.equal(read.status,200);assert.equal(read.headers.get('cache-control'),'no-store');assert.equal((await read.json()).days,7);
-  assert.equal((await owner.request('/admin/traffic/sync','POST',{})).status,200);assert.deepEqual(f.trafficCalls,['read','sync']);
+test('the migrated traffic proxy is removed even for a signed-in administrator',async t=>{
+ const f=await fixture(t),owner=f.client();await owner.login('owner');
+ assert.equal((await owner.request('/admin/traffic')).status,404);
+ assert.equal((await owner.request('/admin/traffic/sync','POST',{})).status,404);
 });
 test('email claims must be verified and client flags or an empty allowlist never grant admin',async t=>{
   const f=await fixture(t),user=f.client();

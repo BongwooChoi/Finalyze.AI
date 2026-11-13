@@ -14,9 +14,12 @@ const SCHEMA = [
   `CREATE TABLE IF NOT EXISTS app_deliveries (id TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES app_users(id) ON DELETE CASCADE, receipt TEXT NOT NULL REFERENCES app_disclosures(receipt) ON DELETE CASCADE, channel TEXT NOT NULL, target_id TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'pending', attempts INTEGER NOT NULL DEFAULT 0, next_attempt BIGINT NOT NULL DEFAULT 0, lease_until BIGINT NOT NULL DEFAULT 0)`,
   `CREATE TABLE IF NOT EXISTS app_jobs (id TEXT PRIMARY KEY, last_success BIGINT NOT NULL DEFAULT 0, lease_token TEXT NOT NULL DEFAULT '', lease_until BIGINT NOT NULL DEFAULT 0)`,
   `CREATE TABLE IF NOT EXISTS app_telegram_channels (chat_id TEXT PRIMARY KEY, blocked_until BIGINT NOT NULL DEFAULT 0)`,
+  `CREATE TABLE IF NOT EXISTS app_signup_recipients (chat_id TEXT PRIMARY KEY, started_at BIGINT NOT NULL, blocked_until BIGINT NOT NULL DEFAULT 0)`,
+  `CREATE TABLE IF NOT EXISTS app_signup_deliveries (chat_id TEXT NOT NULL REFERENCES app_signup_recipients(chat_id) ON DELETE CASCADE, user_id TEXT NOT NULL REFERENCES app_users(id) ON DELETE CASCADE, created_at BIGINT NOT NULL, status TEXT NOT NULL DEFAULT 'pending', attempts INTEGER NOT NULL DEFAULT 0, next_attempt BIGINT NOT NULL DEFAULT 0, lease_until BIGINT NOT NULL DEFAULT 0, message_id TEXT, PRIMARY KEY(chat_id,user_id))`,
   `CREATE TABLE IF NOT EXISTS app_telegram_baselines (chat_id TEXT NOT NULL REFERENCES app_telegram_channels(chat_id) ON DELETE CASCADE, corp_code TEXT NOT NULL, started_at BIGINT NOT NULL, PRIMARY KEY(chat_id,corp_code))`,
   `CREATE TABLE IF NOT EXISTS app_telegram_deliveries (chat_id TEXT NOT NULL REFERENCES app_telegram_channels(chat_id) ON DELETE CASCADE, receipt TEXT NOT NULL, event_json TEXT NOT NULL, created_at BIGINT NOT NULL, status TEXT NOT NULL, attempts INTEGER NOT NULL DEFAULT 0, next_attempt BIGINT NOT NULL DEFAULT 0, lease_until BIGINT NOT NULL DEFAULT 0, message_id TEXT, PRIMARY KEY(chat_id,receipt))`,
   `CREATE INDEX IF NOT EXISTS app_sessions_expiry ON app_sessions(expires_at)`,
+  `CREATE INDEX IF NOT EXISTS app_users_created_at ON app_users(created_at)`,
   `CREATE INDEX IF NOT EXISTS app_sessions_user_expiry ON app_sessions(user_id,expires_at)`,
   `CREATE INDEX IF NOT EXISTS app_deliveries_pending ON app_deliveries(status,next_attempt)`
 ];
@@ -216,6 +219,31 @@ function createAccountStore(database, now = () => Date.now()) {
       await query('UPDATE app_telegram_deliveries SET status=$3,next_attempt=$4,lease_until=0,message_id=$5 WHERE chat_id=$1 AND receipt=$2',[chat,receipt,status,now()+delay,messageId]);
     },
     async pauseTelegram(chat,delay) { await query('UPDATE app_telegram_channels SET blocked_until=$2 WHERE chat_id=$1',[chat,now()+delay]); },
+    async captureSignups(chat) {
+      await transaction([
+        ['INSERT INTO app_signup_recipients(chat_id,started_at) VALUES($1,$2) ON CONFLICT(chat_id) DO NOTHING',[chat,now()]],
+        [`INSERT INTO app_signup_deliveries(chat_id,user_id,created_at)
+          SELECT $1,u.id,u.created_at FROM app_users u JOIN app_signup_recipients r ON r.chat_id=$1
+          WHERE u.created_at>r.started_at AND u.created_at>=$2
+          ON CONFLICT(chat_id,user_id) DO NOTHING`,[chat,now()-7*86400000]],
+        ['DELETE FROM app_signup_deliveries WHERE created_at<$1',[now()-30*86400000]]
+      ]);
+    },
+    async pendingSignups(chat) {
+      await query("UPDATE app_signup_deliveries SET status='uncertain' WHERE chat_id=$1 AND status='sending' AND lease_until<$2",[chat,now()]);
+      return query(`SELECT d.* FROM app_signup_deliveries d JOIN app_signup_recipients r ON r.chat_id=d.chat_id
+        WHERE d.chat_id=$1 AND d.status='pending' AND d.attempts<5 AND d.next_attempt<=$2 AND r.blocked_until<=$2
+        ORDER BY d.created_at,d.user_id LIMIT 8`,[chat,now()]);
+    },
+    async claimSignup(chat,id) { return first(await query(`UPDATE app_signup_deliveries SET status='sending',attempts=attempts+1,lease_until=$3
+      WHERE chat_id=$1 AND user_id=$2 AND status='pending' AND next_attempt<=$4 AND attempts<5
+      AND EXISTS(SELECT 1 FROM app_signup_recipients WHERE chat_id=$1 AND blocked_until<=$4) RETURNING *`,[chat,id,now()+30000,now()])); },
+    async finishSignup(chat,id,status,delay=0,messageId=null) {
+      await query('UPDATE app_signup_deliveries SET status=$3,next_attempt=$4,lease_until=0,message_id=$5 WHERE chat_id=$1 AND user_id=$2',[chat,id,status,now()+delay,messageId]);
+    },
+    async pauseSignups(chat,delay) { await query('UPDATE app_signup_recipients SET blocked_until=$2 WHERE chat_id=$1',[chat,now()+delay]); },
+    async signupStats(start,end) { return first(await query(`SELECT (SELECT COUNT(*) FROM app_users) AS members,
+      (SELECT COUNT(*) FROM app_users WHERE created_at>=$1 AND created_at<$2) AS new_members`,[start,end])); },
     async cleanup() { await transaction([
       ['DELETE FROM app_sessions WHERE expires_at<$1', [now()]],
       ['DELETE FROM app_disclosures WHERE first_seen<$1', [now()-30*86400000]],

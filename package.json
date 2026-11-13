@@ -8,6 +8,7 @@
     "sync:index-companies": "node scripts/syncIndexCompanies.js",
     "check:index-universe": "node --test tests/index-universe.test.js",
     "check:telegram-disclosures": "node --test tests/telegram-disclosures.test.js",
+    "check:signup-notifications": "node --test tests/signup-notifications.test.js",
     "check:provisional-financials": "node --test tests/provisional-financials.test.js",
     "setup:accounts": "node scripts/setupAccounts.js",
     "check:security-integration": "node --test tests/account-postgres.test.js tests/analysis-limits.test.js",

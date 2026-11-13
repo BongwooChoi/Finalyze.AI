@@ -68,7 +68,7 @@ function createSenders({ config,env = process.env,unsubscribeToken,fetchImpl = f
   };
 }
 
-function createNotificationJob({ store,collect,senders,broadcast,now = () => Date.now() }) {
+function createNotificationJob({ store,collect,senders,broadcast,signupNotifications,now = () => Date.now() }) {
   return async function run() {
     const startedAt=now();
     const storage = typeof store==='function' ? store() : store;
@@ -76,6 +76,10 @@ function createNotificationJob({ store,collect,senders,broadcast,now = () => Dat
     if(!lease) return { busy:true };
     const result = { scanned:0,sent:0,failed:0,skipped:0 };
     try {
+      if(signupNotifications?.enabled) {
+        try { result.signups=await signupNotifications.run(); }
+        catch { result.signups={unavailable:true};console.warn('회원 가입 알림 작업 지연:',{code:'SIGNUP_NOTIFICATION_UNAVAILABLE'}); }
+      }
       await storage.cleanup();
       const watched = await storage.watchedCompanies();
       const featured = broadcast?.enabled ? await broadcast.companies() : [];

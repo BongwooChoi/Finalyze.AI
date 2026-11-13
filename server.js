@@ -16,6 +16,7 @@ const { createDisclosureFeed,createSenders,createNotificationJob,cronAuthorized 
 const { sign } = require('./accountSecurity');
 const { readDisclosureXml,parseProvisionalFinancials } = require('./provisionalFinancials');
 const {createTelegramBroadcast,telegramConfig}=require('./telegramDisclosures');
+const {createSignupNotifications}=require('./signupNotifications');
 const {createAnalysisLimiter,OPENAI_DEADLINE_MS,analysisFailure}=require('./analysisLimits');
 const {createSettingsService}=require('./serviceSettings');
 const {createAdminRouter}=require('./adminRoutes');
@@ -80,7 +81,8 @@ const telegram=createTelegramBroadcast({config:telegramConfig(),store:getAccount
     params:{rcept_no:receipt},responseType:'arraybuffer',timeout:12000
   })).data
 });
-const notify = createNotificationJob({ store:getAccountStore,collect:notificationFeed,broadcast:telegram,
+const signupNotifications=createSignupNotifications({store:getAccountStore});
+const notify = createNotificationJob({ store:getAccountStore,collect:notificationFeed,broadcast:telegram,signupNotifications,
   senders:createSenders({ config:accounts.config,unsubscribeToken:accounts.unsubscribeToken }) });
 app.post('/api/jobs/disclosures',async (req,res) => {
   res.set('Cache-Control','no-store');

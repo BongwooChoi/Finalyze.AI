@@ -11,7 +11,7 @@ function telegramConfig(env=process.env) {
 function change(current,previous) {
   if(!Number.isFinite(current)||!Number.isFinite(previous)) return '';
   if(previous<0) return current>0 ? '흑자전환' : current===0 ? '손익분기' : current>previous ? '적자축소' : current<previous ? '적자확대' : '변동 없음';
-  if(previous===0) return current===0 ? '변동 없음' : '직전 수치 0';
+  if(previous===0) return current===0 ? '변동 없음' : '비교 기준 수치 0 · 증감률 계산 불가';
   if(current<0) return '적자전환';
   const value=(current-previous)/previous*100;
   return `${value>0?'+':''}${value.toFixed(1)}%`;
@@ -26,9 +26,13 @@ function formatTelegramDisclosure(event,chartData,origin='https://finalyze-ai.ve
   if(['원','천원','백만원','억원','조원'].includes(unit)) {
     for(const metric of (chartData.metrics || []).slice(0,3)) {
       if(!Number.isFinite(metric.current)) continue;
-      const comparisons=[['전기',metric.previous],['전년',metric.yearAgo]].map(([label,value])=>{const text=change(metric.current,value);return text?`${label} ${text}`:'';}).filter(Boolean);
       const amount=metric.current.toLocaleString('ko-KR',{maximumFractionDigits:2});
-      lines.push(`• ${html(metric.name)} <b>${html(amount)}${unit}</b>${comparisons.length?` (${comparisons.join(' · ')})`:''}`);
+      const period=key=>chartData.labels?.[key]?` (${html(chartData.labels[key])})`:'';
+      const yearAgo=change(metric.current,metric.yearAgo);
+      const previous=change(metric.current,metric.previous);
+      lines.push('',`• ${html(metric.name)} <b>${html(amount)}${unit}</b>`);
+      lines.push(`  <b>전년동기 대비${period('yearAgo')}: ${html(yearAgo || '비교 수치 확인 불가')}</b>`);
+      if(previous) lines.push(`  참고 · 전기(직전 기간) 대비${period('previous')}: ${html(previous)}`);
     }
     lines.push('※ 증감률은 표시 수치 기준 계산');
   }

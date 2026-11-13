@@ -82,14 +82,38 @@ test('formatting escapes HTML, preserves source units, and links without request
   const message=formatTelegramDisclosure({...event(1),corp_name:'<회사 & 이름>',report_nm:'영업(잠정)실적(공정공시)'},{unit:'억원',labels:{current:'26.3Q'},metrics:[
     {name:'매출액',current:100,previous:80,yearAgo:50},{name:'영업이익',current:10,previous:-10,yearAgo:0},
     {name:'당기순이익',current:null,previous:10,yearAgo:10}]});
-  assert.match(message.text,/&lt;회사 &amp; 이름&gt;/);assert.match(message.text,/100억원/);assert.match(message.text,/전기 \+25.0%/);
-  assert.match(message.text,/흑자전환/);assert.match(message.text,/직전 수치 0/);assert.doesNotMatch(message.text,/당기순이익/);
+  assert.match(message.text,/&lt;회사 &amp; 이름&gt;/);assert.match(message.text,/100억원/);assert.match(message.text,/전기\(직전 기간\) 대비: \+25.0%/);
+  assert.match(message.text,/흑자전환/);assert.match(message.text,/비교 기준 수치 0 · 증감률 계산 불가/);assert.doesNotMatch(message.text,/당기순이익/);
   assert.equal(message.allow_paid_broadcast,false);assert.equal(message.link_preview_options.is_disabled,true);
   assert.ok(message.text.length<4096);assert.match(message.reply_markup.inline_keyboard[0][1].url,/rcept=20261106000001/);
   assert.doesNotMatch(message.reply_markup.inline_keyboard[0][1].url,/auto|analysis/);
   assert.equal(change(-10,-20),'적자축소');assert.equal(change(-30,-20),'적자확대');assert.equal(change(-10,10),'적자전환');
   assert.equal(change(0,0),'변동 없음');assert.equal(change(null,10),'');
 });
+test('year-over-year leads in bold; opposite sequential changes are separate references with source periods',()=>{
+  const message=formatTelegramDisclosure(event(1),{unit:'억원',labels:{current:'26.3Q',yearAgo:'25.3Q',previous:'26.2Q'},
+    metrics:[{name:'매출액',current:100,yearAgo:50,previous:125}]});
+  const yoy='<b>전년동기 대비 (25.3Q): +100.0%</b>';
+  const prior='참고 · 전기(직전 기간) 대비 (26.2Q): -20.0%';
+  assert.ok(message.text.includes(yoy));assert.ok(message.text.includes(prior));
+  assert.ok(message.text.indexOf(yoy)<message.text.indexOf(prior));
+  assert.doesNotMatch(message.text,/<b>[^<]*참고/);
+  assert.match(message.text,/<\/b>\n  참고/);
+});
+
+test('missing or zero year-ago figures never turn sequential performance into the primary comparison',()=>{
+  const message=formatTelegramDisclosure(event(1),{unit:'억원',labels:{previous:'<직전 & 기간>'},metrics:[
+    {name:'매출액',current:100,yearAgo:null,previous:80},
+    {name:'영업이익',current:10,yearAgo:0,previous:-10},
+    {name:'당기순이익',current:-10,yearAgo:-20,previous:null}]});
+  assert.match(message.text,/<b>전년동기 대비: 비교 수치 확인 불가<\/b>/);
+  assert.match(message.text,/참고 · 전기\(직전 기간\) 대비 \(&lt;직전 &amp; 기간&gt;\): \+25.0%/);
+  assert.match(message.text,/<b>전년동기 대비: 비교 기준 수치 0 · 증감률 계산 불가<\/b>/);
+  assert.match(message.text,/<b>전년동기 대비: 적자축소<\/b>/);
+  assert.equal((message.text.match(/참고 · 전기/g)||[]).length,2);
+  assert.doesNotMatch(message.text,/직전분기|Infinity|NaN/);
+});
+
 test('provisional enrichment failure still sends the verified title and source link',async t=>{
   const f=await fixture(t);await f.capture([]);f.advance(1000);await f.capture([{...event(1),report_nm:'영업(잠정)실적(공정공시)'}]);
   assert.equal((await f.broadcast.deliver()).sent,1);assert.match(f.calls[0].payload.text,/잠정실적/);assert.doesNotMatch(f.calls[0].payload.text,/매출액/);

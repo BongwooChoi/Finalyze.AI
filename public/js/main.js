@@ -202,6 +202,8 @@ function renderPageFromUrl() {
 
 let recentDisclosuresLoading = false;
 let recentDisclosuresLastRequest = 0;
+let recentDisclosuresPollTimer = null;
+let recentDisclosuresPollCount = 0;
 let recentDisclosureOpening = false;
 
 function initRecentDisclosures() {
@@ -212,10 +214,13 @@ function initRecentDisclosures() {
   });
 }
 
-async function loadRecentDisclosures(force = false) {
+async function loadRecentDisclosures(force = false, followUp = false) {
   if (activePage !== 'analysis' || selectedCompany || document.hidden ||
       new URLSearchParams(location.search).has('corp') || recentDisclosuresLoading) return;
   if (!force && Date.now() - recentDisclosuresLastRequest < 5 * 60 * 1000) return;
+  clearTimeout(recentDisclosuresPollTimer);
+  if (!followUp) recentDisclosuresPollCount = 0;
+  let refreshing = false;
   const list = document.getElementById('recentDisclosuresList');
   const status = document.getElementById('recentDisclosuresStatus');
   const retry = document.getElementById('recentDisclosuresRetry');
@@ -270,23 +275,29 @@ async function loadRecentDisclosures(force = false) {
     const checked = new Intl.DateTimeFormat('ko-KR', {
       timeZone: 'Asia/Seoul', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false
     }).format(new Date(result.updatedAt));
-    status.textContent = result.stale ? `갱신이 지연되고 있습니다. 마지막 확인 ${checked} (한국 시간)` :
+    refreshing = result.refreshing === true && recentDisclosuresPollCount < 15;
+    status.textContent = refreshing ? `저장된 목록을 표시하고 최신 공시를 확인 중입니다. 마지막 확인 ${checked} (한국 시간)` :
+      result.stale ? `갱신이 지연되고 있습니다. 마지막 확인 ${checked} (한국 시간)` :
       result.partial ? `일부 공시를 확인하지 못해 확인된 목록을 표시합니다. 마지막 확인 ${checked} (한국 시간)` :
       result.data.length === 0 ? '최근 실적 공시가 없습니다. 기업 검색으로 이전 보고서를 살펴보세요.' :
       `마지막 확인 ${checked} (한국 시간)`;
-    retry.hidden = !result.stale && !result.partial;
-    recentDisclosuresLastRequest = Date.now();
+    retry.hidden = refreshing || (!result.stale && !result.partial);
+    recentDisclosuresLastRequest = refreshing ? 0 : Date.now();
   } catch (error) {
     retry.hidden = false;
     status.textContent = list.childElementCount ? '새 공시를 확인하지 못했습니다. 이전 목록을 표시합니다.' :
       '최신 공시를 불러오지 못했습니다. 다시 시도하거나 기업을 검색해주세요.';
   } finally {
     recentDisclosuresLoading = false;
-    status.classList.remove('is-loading');
+    status.classList.toggle('is-loading', refreshing);
     retry.disabled = false;
     retry.setAttribute('aria-busy', 'false');
     retry.querySelector('span').textContent = '다시 시도';
     list.setAttribute('aria-busy', 'false');
+    if (refreshing) {
+      recentDisclosuresPollCount++;
+      recentDisclosuresPollTimer = setTimeout(() => loadRecentDisclosures(true, true), 3000);
+    }
   }
 }
 

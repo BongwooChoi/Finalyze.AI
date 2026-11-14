@@ -17,6 +17,7 @@ const { sign } = require('./accountSecurity');
 const { readDisclosureXml,parseProvisionalFinancials } = require('./provisionalFinancials');
 const {createTelegramBroadcast,telegramConfig}=require('./telegramDisclosures');
 const {createSignupNotifications}=require('./signupNotifications');
+const {waitUntil}=require('@vercel/functions');
 const {createAnalysisLimiter,OPENAI_DEADLINE_MS,analysisFailure}=require('./analysisLimits');
 const {createSettingsService}=require('./serviceSettings');
 const {createAdminRouter}=require('./adminRoutes');
@@ -110,13 +111,16 @@ const recentDisclosures = createRecentDisclosureService({
   },
   onDocumentError: (rceptNo, error) => console.warn('최신 공시 원문 확인 실패:', {
     rceptNo, code: error.code || 'DOCUMENT_UNAVAILABLE', httpStatus: error.response?.status, message: error.message
+  }),
+  onRefreshError: error => console.warn('최신 공시 갱신 지연:', {
+    stage: error.stage, code: error.code || 'RECENT_REFRESH_FAILED', httpStatus: error.response?.status
   })
 });
 
 app.get('/api/recent-disclosures', async (req, res) => {
   try {
     if (!config.OPEN_DART_API_KEY) throw new Error('DART 인증키가 설정되지 않았습니다.');
-    const result = await recentDisclosures.getRecentDisclosures();
+    const result = await recentDisclosures.getRecentDisclosures({waitUntil});
     // CDN과 실행 중인 서버가 같은 목록을 공유합니다. 오래된 응답은 정상 갱신으로 캐시하지 않습니다.
     const cacheSeconds = Math.max(0, Math.ceil((Date.parse(result.updatedAt) + result.refreshSeconds * 1000 - Date.now()) / 1000));
     res.set('Cache-Control', result.stale ? 'no-store' : `public, max-age=0, s-maxage=${cacheSeconds}`);

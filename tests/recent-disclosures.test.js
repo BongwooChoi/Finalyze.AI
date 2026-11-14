@@ -242,3 +242,65 @@ test('최초 수집이 실패하면 다른 서버도 1분 동안 중복 수집�
   await assert.rejects(service([], options).getRecentDisclosures());
   assert.equal(calls, 2);
 });
+
+test('만료된 공유 목록은 즉시 반환하고 요청 수명에 연결한 한 작업만 갱신한다', {timeout:2000}, async () => {
+  let time=TODAY;
+  const sharedStore=createMemoryStore({now:()=>time}),original=STOCKS.slice(0,5).map((_,i)=>row(i));
+  const first=await service(original,{sharedStore,now:()=>time}).getRecentDisclosures();
+  time+=301000;
+  let release,calls=0;
+  const gate=new Promise(resolve=>{release=resolve;}),tasks=[];
+  const fetch=listFetcher([row(8,{rcept_no:'20261103009999'}),...original]);
+  const options={sharedStore,now:()=>time,fetchList:async params=>{calls++;await gate;return fetch(params);}};
+  const instance=service([],options),other=service([],options);
+  const background={waitUntil:promise=>tasks.push(promise)};
+  const old=await instance.getRecentDisclosures(background);
+  assert.equal(old.refreshing,true);assert.equal(old.stale,true);assert.equal(old.updatedAt,first.updatedAt);
+  assert.deepEqual(old.data,first.data);
+  await new Promise(setImmediate);
+  await Promise.all([instance.getRecentDisclosures(background),other.getRecentDisclosures(background)]);
+  assert.equal(calls,2);assert.equal(tasks.length,3);
+  release();await Promise.all(tasks);
+  const updated=await other.getRecentDisclosures(background);
+  assert.equal(updated.stale,false);assert.equal(updated.data[0].corp_name,'기업8');
+  assert.equal(updated.updatedAt,new Date(time).toISOString());assert.equal(calls,2);
+});
+
+test('백그라운드 실패는 기존 목록과 시각을 유지하고 재시도 대기 중에는 수집하지 않는다', async()=>{
+  let time=TODAY,calls=0;const sharedStore=createMemoryStore({now:()=>time}),tasks=[];
+  const first=await service([row(0)],{sharedStore,now:()=>time}).getRecentDisclosures();
+  time+=301000;
+  const instance=service([],{sharedStore,now:()=>time,fetchList:async()=>{calls++;throw Error('offline');}});
+  const background={waitUntil:p=>tasks.push(p)};
+  assert.equal((await instance.getRecentDisclosures(background)).refreshing,true);
+  await Promise.all(tasks);
+  const fallback=await instance.getRecentDisclosures(background);
+  assert.equal(fallback.stale,true);assert.ok(!fallback.refreshing);assert.equal(fallback.updatedAt,first.updatedAt);
+  assert.equal(calls,2);
+  time+=24*3600000;
+  await assert.rejects(instance.getRecentDisclosures(background),/offline/);
+});
+
+test('저장된 목록이 전혀 없으면 빈 목록 대신 첫 수집 결과를 기다린다', async()=>{
+  let registered=0;
+  const result=await service([row(0)],{sharedStore:createMemoryStore({now:()=>TODAY})})
+    .getRecentDisclosures({waitUntil:()=>registered++});
+  assert.equal(result.data.length,1);assert.equal(result.stale,false);assert.equal(registered,0);
+});
+
+test('정기공시 5개보다 뒤인 같은 날 잠정실적은 원문·추가 페이지 조회를 생략한다', async()=>{
+  let documents=0;const calls=[];
+  const regular=STOCKS.slice(0,5).map((_,i)=>row(i));
+  const provisional=Array.from({length:150},(_,i)=>row(5,{report_nm:'영업(잠정)실적(공정공시)',rcept_no:`20261103${String(i+500).padStart(6,'0')}`}));
+  const result=await service([...regular,...provisional],{fetchList:listFetcher([...regular,...provisional],calls),
+    fetchDocumentText:async()=>{documents++;return '매출액 | 100 |';}}).getRecentDisclosures();
+  assert.equal(result.data.length,5);assert.ok(result.data.every(r=>r.type==='3분기보고서'));
+  assert.equal(documents,0);assert.equal(calls.length,2);
+});
+
+test('같은 날짜 정기공시의 뒤 페이지는 계속 확인해 더 우선인 공시를 놓치지 않는다', async()=>{
+  const calls=[],regular=STOCKS.slice(0,5).map((_,i)=>row(i));
+  const rows=[...regular,...Array.from({length:95},(_,i)=>row(i+20,{stock_code:'999999'})),row(8,{rcept_no:'20261103099999'})];
+  const result=await service(rows,{fetchList:listFetcher(rows,calls)}).getRecentDisclosures();
+  assert.equal(result.data[0].corp_name,'기업8');assert.ok(calls.some(p=>p.pblntf_ty==='A'&&p.page_no===2));
+});

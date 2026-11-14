@@ -46,6 +46,7 @@ function compareReports(a, b) {
 
 function createRecentDisclosureService({ fetchList, fetchDocumentText, now = () => Date.now(),
   pause = ms => new Promise(resolve => setTimeout(resolve, ms)), onDocumentError = () => {},
+  onRefreshError = () => {},
   sharedStore, namespace = 'finalyze:recent:v4:5' }) {
   // 구성종목을 갱신하면 이전 대상의 목록·실패 캐시를 재사용하지 않습니다.
   namespace = `${namespace}:${INDEX_UNIVERSE.revision}`;
@@ -91,10 +92,13 @@ function createRecentDisclosureService({ fetchList, fetchDocumentText, now = () 
       total: Number(data.total_page), oldest: data.list.at(-1)?.rcept_dt }));
     while (true) {
       const selected = await selectReports([...previousRows, ...rows], failedDocuments);
-      const cutoff = selected.length >= DISPLAY_LIMIT ? selected[DISPLAY_LIMIT - 1].rcept_dt : null;
+      const lastSelected = selected.length >= DISPLAY_LIMIT ? selected[DISPLAY_LIMIT - 1] : null;
+      const cutoff = lastSelected?.rcept_dt;
       // 5개를 확보하고 나머지 페이지가 모두 더 오래되면 조회를 마칩니다.
       // 같은 날짜의 연결·정정 공시는 다음 페이지까지 확인합니다.
-      const pending = states.filter(state => state.page < state.total && (!cutoff || state.oldest >= cutoff));
+      const pending = states.filter(state => state.page < state.total && (!cutoff || state.oldest >= cutoff) &&
+        // 같은 날 정기공시 5개가 이미 앞서면, 더 뒤의 잠정실적은 순위를 바꿀 수 없습니다.
+        !(lastSelected && state.params.pblntf_detail_ty === 'I002' && state.oldest === cutoff && lastSelected.type !== '잠정실적'));
       if (!pending.length) break;
       const pages = await Promise.all(pending.map(state => fetchPage({ ...state.params, page_no: state.page + 1 })));
       pages.forEach((data, index) => {
@@ -131,8 +135,9 @@ function createRecentDisclosureService({ fetchList, fetchDocumentText, now = () 
       });
     const companies = [...groups.values()];
     const selected = [];
-    for (let i = 0; i < companies.length; i += 4) {
-      const batch = await Promise.all(companies.slice(i, i + 4).map(async reports => {
+    for (let i = 0; i < companies.length;) {
+      const batchSize = Math.min(4, Math.max(1, DISPLAY_LIMIT - selected.length));
+      const batch = await Promise.all(companies.slice(i, i + batchSize).map(async reports => {
         for (const row of reports) {
           if (failedDocuments.has(row.rcept_no)) continue;
           try {
@@ -149,8 +154,9 @@ function createRecentDisclosureService({ fetchList, fetchDocumentText, now = () 
       selected.push(...batch.filter(Boolean));
       selected.sort(compareReports);
       // 월간 공시를 건너뛴 기업의 이전 보고서보다 최근인 다른 기업도 계속 확인합니다.
-      const next = companies[i + 4];
-      if (selected.length >= DISPLAY_LIMIT && (!next || next[0].rcept_dt < selected[DISPLAY_LIMIT - 1].rcept_dt)) break;
+      i += batchSize;
+      const next = companies[i];
+      if (selected.length >= DISPLAY_LIMIT && (!next || compareReports(next[0], selected[DISPLAY_LIMIT - 1]) > 0)) break;
     }
     return selected.slice(0, DISPLAY_LIMIT).map(row => ({
       corp_code: row.corp_code,
@@ -188,24 +194,20 @@ function createRecentDisclosureService({ fetchList, fetchDocumentText, now = () 
     if (!sharedStore) return refresh(timestamp);
     const storage = typeof sharedStore === 'function' ? sharedStore() : sharedStore;
     const snapshotKey = `${namespace}:snapshot`;
-    function adopt(value) {
-      if (value && Array.isArray(value.data) && value.data.length <= DISPLAY_LIMIT) cached = value;
-      return cached && timestamp - Date.parse(cached.updatedAt) < cached.refreshSeconds * 1000;
-    }
-    if (adopt(await storage.get(snapshotKey))) return cached;
+    if (adopt(await storage.get(snapshotKey), timestamp)) return cached;
     if (await storage.get(`${namespace}:retry`)) throw new Error('공시 목록을 잠시 후 다시 확인해주세요.');
     const token = randomUUID();
     const lockKey = `${namespace}:lock`;
     if (!await storage.lock(lockKey, token, 120)) {
-      if (cached && timestamp - Date.parse(cached.updatedAt) < MAX_STALE_MS) return { ...cached, stale: true };
+      if (cached && timestamp - Date.parse(cached.updatedAt) < MAX_STALE_MS) return { ...cached, stale: true, refreshing: true };
       for (let attempt = 0; attempt < 40; attempt++) {
         await pause(500);
-        if (adopt(await storage.get(snapshotKey))) return cached;
+        if (adopt(await storage.get(snapshotKey), timestamp)) return cached;
       }
       throw new Error('공시 목록을 갱신하고 있습니다. 잠시 후 다시 확인해주세요.');
     }
     try {
-      if (adopt(await storage.get(snapshotKey))) return cached;
+      if (adopt(await storage.get(snapshotKey), timestamp)) return cached;
       const result = await refresh(timestamp);
       await storage.set(snapshotKey, result, MAX_STALE_MS / 1000);
       return result;
@@ -217,18 +219,42 @@ function createRecentDisclosureService({ fetchList, fetchDocumentText, now = () 
     }
   }
 
+  function adopt(value, timestamp) {
+    if (value && Array.isArray(value.data) && value.data.length <= DISPLAY_LIMIT &&
+        Number.isFinite(Date.parse(value.updatedAt)) && Number(value.refreshSeconds) > 0 &&
+        (!cached || Date.parse(value.updatedAt) >= Date.parse(cached.updatedAt))) cached = value;
+    return cached && timestamp - Date.parse(cached.updatedAt) < cached.refreshSeconds * 1000;
+  }
+
   return {
-    async getRecentDisclosures() {
+    async getRecentDisclosures({ waitUntil } = {}) {
       const timestamp = now();
-      const age = cached ? timestamp - Date.parse(cached.updatedAt) : Infinity;
+      let age = cached ? timestamp - Date.parse(cached.updatedAt) : Infinity;
       if (cached && age < cached.refreshSeconds * 1000) return cached;
+      // 새 인스턴스도 저장된 목록부터 읽습니다. 완료된 다른 인스턴스의 갱신도 이 경로로 반영합니다.
+      if (waitUntil && sharedStore) {
+        try {
+          const storage = typeof sharedStore === 'function' ? sharedStore() : sharedStore;
+          if (adopt(await storage.get(`${namespace}:snapshot`), timestamp)) return cached;
+          age = cached ? timestamp - Date.parse(cached.updatedAt) : Infinity;
+        } catch (error) {
+          if (cached && age < MAX_STALE_MS) return { ...cached, stale: true, refreshing: false };
+          throw error;
+        }
+      }
       if (timestamp < retryAfter && age < MAX_STALE_MS) return { ...cached, stale: true };
       if (!inFlight) {
         inFlight = refreshShared(timestamp).catch(error => {
           retryAfter = now() + 60 * 1000;
+          onRefreshError(error);
           if (cached && now() - Date.parse(cached.updatedAt) < MAX_STALE_MS) return { ...cached, stale: true };
           throw error;
         }).finally(() => { inFlight = null; });
+      }
+      if (waitUntil && cached && age < MAX_STALE_MS) {
+        // Vercel이 응답 후 작업을 중단하지 않도록 요청 수명에 연결합니다.
+        waitUntil(inFlight.catch(() => {}));
+        return { ...cached, stale: true, refreshing: true };
       }
       return inFlight;
     }

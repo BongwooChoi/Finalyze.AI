@@ -6,8 +6,8 @@
 
 ### 공유 이미지와 소개 자료
 
-- OG/Twitter 이미지: `public/og-terminal-20261115.jpg` (1200×630). `scripts/og-card.html`이 편집 가능한 원본이며, 브라우저에서 `#card`를 같은 크기로 렌더링합니다. 이미지 주소를 바꿔 공유 서비스의 이전 이미지 캐시와 구분합니다. `public/og-image.jpg`는 기존 주소 호환용으로 같은 이미지를 유지합니다.
-- 실제 화면: `public/images/finalyze-terminal-20261115.webp`. 삼성전자 2026년 반기보고서의 공개 차트·재무상태표와 회원 AI 분석 안내를 2026-11-15에 캡처했습니다. 화면 수치는 해당 공시 기준이며 실시간 수치가 아닙니다.
+- OG/Twitter 이미지: `public/og-terminal-ai-20261115.jpg` (1200×630). `scripts/og-card.html`이 편집 가능한 원본이며, 브라우저에서 `#card`를 같은 크기로 렌더링합니다. 이미지 주소를 바꿔 공유 서비스의 이전 이미지 캐시와 구분합니다. `public/og-image.jpg`는 기존 주소 호환용으로 같은 이미지를 유지합니다.
+- 실제 화면: `public/images/finalyze-terminal-ai-20261115.webp`. 삼성전자 2026년 반기보고서의 공개 차트·재무상태표와 실제 AI 분석 결과 중 종합평가·수익성·성장성을 2026-11-15에 캡처했습니다. 화면 수치는 해당 공시 기준이며 실시간 수치가 아닙니다.
 - 발표자료: `output/presentations/vibe-coding-20261107/index.html`, 원본 9장 버전, `vibe-coding-20261107-compact.html`에 같은 화면을 반영합니다. 단일 HTML 내부에 이미지·글꼴을 포함하고 compact 버전은 900KB·30만 자 제한을 확인합니다. 교체 전 자료는 `output/archives/before-terminal-materials-20261115/`에 보관했습니다.
 - 프로젝트 포털의 Finalyze.AI 소개·캡처는 별도 `bongwoo-projects` 저장소에서 관리합니다. 포털 자체의 공통 썸네일은 서비스 수에 의존하지 않습니다.
 

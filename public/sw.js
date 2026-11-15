@@ -1,9 +1,11 @@
-const CACHE_NAME = 'financial-app-cache-v52';
+const CACHE_NAME = 'financial-app-cache-v53';
 const urlsToCache = [
   '/',
   '/about',
   '/privacy',
   '/css/style.css',
+  '/css/terminal.css',
+  '/js/theme.js',
   '/js/main.js',
   '/js/site-pages.js',
   '/js/accounts.js',

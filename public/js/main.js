@@ -2107,12 +2107,25 @@ function showExportLoading(btn, loadingText) {
   };
 }
 
+// Transparent chart canvases need their theme's surface when embedded in a white PDF.
+function chartExportImage(canvas) {
+  if (document.documentElement.dataset.theme !== 'terminal') return canvas.toDataURL('image/png');
+  const output = document.createElement('canvas');
+  output.width = canvas.width;
+  output.height = canvas.height;
+  const context = output.getContext('2d');
+  context.fillStyle = '#131a22';
+  context.fillRect(0, 0, output.width, output.height);
+  context.drawImage(canvas, 0, 0);
+  return output.toDataURL('image/png');
+}
+
 // 캔버스 차트를 PNG dataURL로 변환
 function getChartImage() {
   const canvas = document.getElementById('incomeStatementChart');
   if (!canvas) return null;
   try {
-    return canvas.toDataURL('image/png');
+    return chartExportImage(canvas);
   } catch (e) {
     return null;
   }
@@ -2125,7 +2138,7 @@ async function getBalanceSheetVisImage() {
   try {
     const canvas = await html2canvas(container, {
       scale: 2,
-      backgroundColor: '#ffffff',
+      backgroundColor: document.documentElement.dataset.theme === 'terminal' ? '#131a22' : '#ffffff',
       logging: false
     });
     return canvas.toDataURL('image/png');
@@ -2434,7 +2447,7 @@ async function exportAnalysisAsImage() {
       if (title) {
         const h = document.createElement('h4');
         h.textContent = title;
-        h.style.cssText = 'margin-top:1.5rem;padding:0.5rem 0;border-bottom:2px solid #2563eb;color:#2563eb;font-weight:700;';
+        h.style.cssText = 'margin-top:1.5rem;padding:0.5rem 0;border-bottom:2px solid var(--primary);color:var(--primary);font-weight:700;';
         pane.insertBefore(h, pane.firstChild);
       }
     });
@@ -2447,7 +2460,7 @@ async function exportAnalysisAsImage() {
       if (!original) return;
       try {
         const img = document.createElement('img');
-        img.src = original.toDataURL('image/png');
+        img.src = chartExportImage(original);
         img.style.cssText = 'display:block;width:100%;height:auto;';
         const parent = cloneCanvas.parentNode;
         parent.replaceChild(img, cloneCanvas);
@@ -2564,7 +2577,7 @@ async function exportProvisionalAsPdf() {
       try {
         provisionalChart?.stop();
         provisionalChart?.update('none');
-        const chartImg = chartCanvas.toDataURL('image/png');
+        const chartImg = chartExportImage(chartCanvas);
         const chartHeight = 80;
         ensureSpace(chartHeight + 5);
         pdf.addImage(chartImg, 'PNG', margin, y, contentWidth, chartHeight);
@@ -2648,7 +2661,7 @@ async function exportProvisionalAsImage() {
         provisionalChart?.stop();
         provisionalChart?.update('none');
         const img = document.createElement('img');
-        img.src = originalCanvas.toDataURL('image/png');
+        img.src = chartExportImage(originalCanvas);
         img.style.cssText = 'display:block;width:100%;height:auto;';
         const parent = cloneCanvas.parentNode;
         parent.replaceChild(img, cloneCanvas);

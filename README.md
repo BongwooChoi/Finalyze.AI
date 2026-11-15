@@ -1,5 +1,9 @@
 # OPEN DART API 프로젝트
 
+## 화면 디자인
+
+기본은 차콜·앰버 터미널 테마이며 상단 `라이트` / `터미널` 버튼으로 기존 디자인과 전환합니다. 선택은 브라우저의 `finalyze-theme`에 저장합니다. `public/css/terminal.css`는 `html[data-theme="terminal"]` 아래에서만 기존 스타일을 덮어쓰며, `public/js/theme.js`는 첫 화면 적용·전환과 Chart.js의 축/범례 대비를 담당합니다. 재무 데이터·로그인·알림 동작은 테마와 무관합니다. 작은 화면의 손익 차트는 값 레이블 대신 툴팁을 사용하고, 내보내는 차트 이미지는 선택한 테마의 배경을 포함합니다.
+
 ## 통합 방문 통계 (관리자)
 
 통합 방문 통계는 독립 포털 https://bongwoo-projects.vercel.app/admin/traffic 에서 별도 비밀번호로 이용합니다. 이 서비스에는 화면·통계 프록시·통계 인증 키를 두지 않습니다. 기존 `/admin/traffic`과 `/traffic.html`은 새 주소로 이동하며 관리자 메뉴에도 링크를 제공합니다. 수집·DB·인증 관련 구현은 `bongwoo-projects` 저장소에서 관리합니다.

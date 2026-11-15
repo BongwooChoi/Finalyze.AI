@@ -4,6 +4,14 @@
 
 기본은 차콜·앰버 터미널 테마이며 상단 `라이트` / `터미널` 버튼으로 기존 디자인과 전환합니다. 선택은 브라우저의 `finalyze-theme`에 저장합니다. `public/css/terminal.css`는 `html[data-theme="terminal"]` 아래에서만 기존 스타일을 덮어쓰며, `public/js/theme.js`는 첫 화면 적용·전환과 Chart.js의 축/범례 대비를 담당합니다. 재무 데이터·로그인·알림 동작은 테마와 무관합니다. 작은 화면의 손익 차트는 값 레이블 대신 툴팁을 사용하고, 내보내는 차트 이미지는 선택한 테마의 배경을 포함합니다.
 
+### 공유 이미지와 소개 자료
+
+- OG/Twitter 이미지: `public/og-terminal-20261115.jpg` (1200×630). `scripts/og-card.html`이 편집 가능한 원본이며, 브라우저에서 `#card`를 같은 크기로 렌더링합니다. 이미지 주소를 바꿔 공유 서비스의 이전 이미지 캐시와 구분합니다. `public/og-image.jpg`는 기존 주소 호환용으로 같은 이미지를 유지합니다.
+- 실제 화면: `public/images/finalyze-terminal-20261115.webp`. 삼성전자 2026년 반기보고서의 공개 차트·재무상태표와 회원 AI 분석 안내를 2026-11-15에 캡처했습니다. 화면 수치는 해당 공시 기준이며 실시간 수치가 아닙니다.
+- 발표자료: `output/presentations/vibe-coding-20261107/index.html`, 원본 9장 버전, `vibe-coding-20261107-compact.html`에 같은 화면을 반영합니다. 단일 HTML 내부에 이미지·글꼴을 포함하고 compact 버전은 900KB·30만 자 제한을 확인합니다. 교체 전 자료는 `output/archives/before-terminal-materials-20261115/`에 보관했습니다.
+- 프로젝트 포털의 Finalyze.AI 소개·캡처는 별도 `bongwoo-projects` 저장소에서 관리합니다. 포털 자체의 공통 썸네일은 서비스 수에 의존하지 않습니다.
+
+
 ## 통합 방문 통계 (관리자)
 
 통합 방문 통계는 독립 포털 https://bongwoo-projects.vercel.app/admin/traffic 에서 별도 비밀번호로 이용합니다. 이 서비스에는 화면·통계 프록시·통계 인증 키를 두지 않습니다. 기존 `/admin/traffic`과 `/traffic.html`은 새 주소로 이동하며 관리자 메뉴에도 링크를 제공합니다. 수집·DB·인증 관련 구현은 `bongwoo-projects` 저장소에서 관리합니다.

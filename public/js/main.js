@@ -174,6 +174,15 @@ function renderPageFromUrl() {
   const aboutPage = document.getElementById('aboutPage');
   analysisPage.hidden = isAbout;
   aboutPage.hidden = !isAbout;
+  for (const [id, tag] of [['analysisTitle', isAbout ? 'h2' : 'h1'], ['aboutTitle', isAbout ? 'h1' : 'h2']]) {
+    const heading = document.getElementById(id);
+    if (heading.localName === tag) continue;
+    const replacement = document.createElement(tag);
+    replacement.id = id;
+    replacement.className = heading.className;
+    replacement.append(...heading.childNodes);
+    heading.replaceWith(replacement);
+  }
   const metadata = SITE_PAGES[page];
   document.title = metadata.title;
   document.querySelector('meta[name="description"]').content = metadata.description;

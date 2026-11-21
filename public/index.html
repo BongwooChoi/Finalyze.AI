@@ -48,7 +48,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Noto+Sans+KR:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/css/style.css?v=3.31">
+  <link rel="stylesheet" href="/css/style.css?v=3.32">
   <link rel="stylesheet" href="/css/terminal.css?v=1.1">
   <link rel="manifest" href="/manifest.json">
   <meta name="theme-color" content="#2563eb">
@@ -81,6 +81,9 @@
     "isAccessibleForFree": true
   }
   </script>
+  <script type="application/ld+json" id="publisher-schema">
+  {"@context":"https://schema.org","@type":"Organization","@id":"https://finalyze-ai.vercel.app/#publisher","name":"Finalyze.AI","url":"https://finalyze-ai.vercel.app/","logo":"https://finalyze-ai.vercel.app/icons/icon-512x512.png","sameAs":["https://t.me/finalyze_ai"],"email":"finalyze.ai.alerts@gmail.com"}
+  </script>
 </head>
 <body>
   <a class="skip-link" href="#analysisPage" id="skipLink">본문으로 이동</a>
@@ -110,17 +113,14 @@
     <div class="container">
       <div class="hero-content text-center">
         <div class="hero-intro">
-        <div class="terminal-only">
-          <p class="terminal-eyebrow">KOREAN EQUITIES / FINANCIAL RESEARCH</p>
-          <h1 class="terminal-title">기업의 숫자를,<br><span>투자의 언어로.</span></h1>
-          <p class="terminal-description">DART 공시에서 재무 차트, AI 해석까지.<br>기업을 이해하는 데 필요한 정보를 한곳에서 확인하세요.</p>
-        </div>
-        <div class="hero-badge">
-          <i class="bi bi-cpu"></i> AI-Powered Financial Analysis
-        </div>
-        <h1 class="hero-title">
-          <span class="title-gradient">Finalyze</span><span class="title-dot">.AI</span>
+        <p class="terminal-only terminal-eyebrow">KOREAN EQUITIES / FINANCIAL RESEARCH</p>
+        <div class="hero-badge"><i class="bi bi-cpu"></i> AI-Powered Financial Analysis</div>
+        <h1 id="analysisTitle" class="page-hero-heading">
+          <span class="visually-hidden">Finalyze.AI 한국 상장기업 재무제표 분석</span>
+          <span class="terminal-only terminal-title" aria-hidden="true">기업의 숫자를,<br><span>투자의 언어로.</span></span>
+          <span class="hero-title" aria-hidden="true"><span class="title-gradient">Finalyze</span><span class="title-dot">.AI</span></span>
         </h1>
+        <p class="terminal-only terminal-description">Finalyze.AI는 금융감독원 DART 공시로 한국 상장기업의 재무제표와 실적을 분석합니다.<br>차트는 누구나 보고, Google 로그인 후 AI 해석을 요청할 수 있습니다.</p>
         <p class="hero-subtitle">
           DART 공시 데이터 기반의 <strong>AI 재무분석</strong> 플랫폼<br>
           <span class="hero-subtitle-sub">기업의 재무제표를 한눈에 분석하고 인사이트를 얻으세요</span>
@@ -437,7 +437,7 @@
       <section class="about-hero" aria-labelledby="aboutTitle">
         <div>
           <p class="about-eyebrow">ABOUT FINALYZE.AI</p>
-          <h1 id="aboutTitle">공시 속 숫자를,<br><span>기업의 이야기로.</span></h1>
+          <h2 id="aboutTitle">공시 속 숫자를,<br><span>기업의 이야기로.</span></h2>
           <p class="about-lead">Finalyze.AI는 DART 공시 데이터를 차트로 정리하고,<br class="d-none d-lg-inline"> AI의 설명을 더해 기업의 재무를 읽는 데 도움을 주는 플랫폼입니다.</p>
           <a class="about-cta" href="/" data-page-link="analysis">기업 분석 시작하기 <i class="bi bi-arrow-up-right" aria-hidden="true"></i></a>
         </div>
@@ -567,7 +567,7 @@
         </ol>
       </section>
 
-      <section class="about-section" aria-labelledby="featuresTitle">
+      <section id="features" class="about-section" aria-labelledby="featuresTitle">
         <div class="about-section-heading">
           <p class="about-eyebrow">TWO WAYS TO READ A COMPANY</p>
           <h2 id="featuresTitle">정기보고서부터 잠정실적까지</h2>
@@ -661,7 +661,7 @@
           <li><a href="https://dart.fss.or.kr/" target="_blank" rel="noopener noreferrer">금융감독원 DART 전자공시시스템<span class="visually-hidden"> (새 창)</span></a> — 회사가 제출한 공시 원문과 정정 내역 확인</li>
         </ul>
         <p>회사명·종목코드 검색에는 서비스에 포함된 회사 목록을 사용합니다. 정정 공시나 자료 제공 시점에 따라 조회 결과가 달라질 수 있습니다. Finalyze.AI의 AI 설명은 금융감독원이 작성하거나 검증한 분석이 아닙니다.</p>
-        <p class="about-updated">문서 확인일: <time datetime="2026-11-06">2026년 11월 6일</time></p>
+        <p class="about-updated">문서 확인일: <time datetime="2026-11-22">2026년 11월 22일</time></p>
       </section>
 
       <section class="about-bottom-cta" aria-labelledby="startTitle">
@@ -680,9 +680,10 @@
         </div>
         <div class="footer-links">
           <a href="/about" data-page-link="about">시스템 소개</a>
-          <span><i class="bi bi-database me-1"></i>DART 공시 데이터</span>
-          <span><i class="bi bi-cpu me-1"></i>OpenAI GPT 분석</span>
-          <span><i class="bi bi-shield-check me-1"></i>실시간 조회</span>
+          <a href="/about#features">서비스 기능</a>
+          <a href="/about#faq">자주 묻는 질문</a>
+          <a href="/privacy#contact">이용 문의·개인정보처리 안내</a>
+          <a href="mailto:finalyze.ai.alerts@gmail.com">문의 · finalyze.ai.alerts@gmail.com</a>
         </div>
         <div class="footer-divider"></div>
         <p class="footer-copyright">&copy; 2026 Finalyze.AI &mdash; All rights reserved.</p>
@@ -740,7 +741,7 @@
   <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
-  <script src="/js/site-pages.js?v=1.1"></script>
+  <script src="/js/site-pages.js?v=1.2"></script>
   <div class="modal fade" id="accountModal" tabindex="-1" aria-labelledby="accountModalTitle" aria-hidden="true">
     <div class="modal-dialog modal-dialog-scrollable"><div class="modal-content account-panel">
       <div class="modal-header"><h2 class="modal-title fs-5" id="accountModalTitle">관심 기업 · 공시 알림</h2><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="닫기"></button></div>
@@ -774,7 +775,7 @@
       </div>
     </div></div>
   </div>
-  <script src="/js/main.js?v=3.26"></script>
+  <script src="/js/main.js?v=3.27"></script>
   <script src="/js/accounts.js?v=1.5"></script>
   <noscript>
     <div style="padding:2rem;text-align:center;font-family:sans-serif;">

@@ -35,6 +35,8 @@ function renderPage(pageName, query = {}) {
   html = html.replace(/<script type="application\/ld\+json">[\s\S]*?<\/script>/, `<script type="application/ld+json">${JSON.stringify(getPageStructuredData(pageName))}</script>`);
   if (isAbout) {
     html = html
+      .replace(/<h1 id="analysisTitle"([\s\S]*?)<\/h1>/, '<h2 id="analysisTitle"$1</h2>')
+      .replace(/<h2 id="aboutTitle"([\s\S]*?)<\/h2>/, '<h1 id="aboutTitle"$1</h1>')
       .replace('<main id="analysisPage" tabindex="-1">', '<main id="analysisPage" tabindex="-1" hidden>')
       .replace('<main id="aboutPage" class="about-page" tabindex="-1" hidden>', '<main id="aboutPage" class="about-page" tabindex="-1">')
       .replace('href="#analysisPage" id="skipLink"', 'href="#aboutPage" id="skipLink"')

@@ -2,7 +2,7 @@
 const SITE_PAGES = {
   analysis: {
     path: '/',
-    title: 'Finalyze.AI - AI 기반 재무제표 분석 플랫폼 | DART 공시 데이터',
+    title: 'Finalyze.AI | DART 공시·AI 재무제표 분석',
     description: 'Finalyze.AI는 DART 공시 데이터를 기반으로 한국 상장기업의 재무제표를 시각화하고 AI로 분석하는 무료 플랫폼입니다. 정기보고서 4종과 잠정실적 공시를 분석할 수 있습니다.',
     url: 'https://finalyze-ai.vercel.app/'
   },
@@ -21,6 +21,7 @@ function getPageStructuredData(pageName) {
     name: 'Finalyze.AI',
     url: SITE_PAGES.analysis.url,
     description: SITE_PAGES.analysis.description,
+    publisher: { '@id': SITE_PAGES.analysis.url + '#publisher' },
     applicationCategory: 'FinanceApplication',
     operatingSystem: 'Web',
     offers: { '@type': 'Offer', price: '0', priceCurrency: 'KRW' },
@@ -37,7 +38,7 @@ function getPageStructuredData(pageName) {
     name: SITE_PAGES.about.title,
     description: SITE_PAGES.about.description,
     inLanguage: 'ko',
-    dateModified: '2026-11-06',
+    dateModified: '2026-11-22',
     isPartOf: { '@type': 'WebSite', name: 'Finalyze.AI', url: SITE_PAGES.analysis.url },
     hasPart: [
       { '@type': 'WebPageElement', '@id': `${SITE_PAGES.about.url}#how-to-use`, name: 'Finalyze.AI 사용법' },

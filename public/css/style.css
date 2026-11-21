@@ -137,7 +137,7 @@ body {
   color: var(--primary-dark);
 }
 
-.about-hero h1 {
+#aboutTitle {
   font-size: clamp(2rem, 4vw, 3.25rem);
   font-weight: 800;
   line-height: 1.4;
@@ -145,7 +145,7 @@ body {
   margin: 0 0 1.4rem;
 }
 
-.about-hero h1 span { color: var(--primary); }
+#aboutTitle span { color: var(--primary); }
 .about-lead { color: #52647d; font-size: 0.95rem; line-height: 1.95; margin-bottom: 1.8rem; }
 .about-cta {
   display: inline-flex;
@@ -365,7 +365,7 @@ body {
   .site-nav { min-height: 64px; gap: 0.5rem; }
   .site-brand { font-size: 1.15rem; }
   .site-nav-links a { padding: 0.65rem; font-size: 0.8rem; }
-  .about-hero h1 { font-size: 2rem; }
+  #aboutTitle { font-size: 2rem; }
   .about-panel { padding: 1.2rem; }
   .about-steps { grid-template-columns: minmax(0, 1fr); }
   .about-steps li { border-right: 0; border-bottom: 1px solid var(--border-color); }
@@ -2040,3 +2040,6 @@ body.app-mode .features-section {
 
 .analysis-share { width: min(28rem, calc(100% - 2rem)); padding: 1.5rem; border: 1px solid var(--bs-border-color); border-radius: .75rem; background: var(--bs-body-bg); color: var(--bs-body-color); }
 .analysis-share::backdrop { background: rgb(0 0 0 / 55%); }
+
+.page-hero-heading { margin: 0; font: inherit; }
+.page-hero-heading .hero-title { display: block; }

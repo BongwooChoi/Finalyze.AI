@@ -64,7 +64,7 @@ const accounts = createAccountRouter({
   }
 });
 app.use('/api',accounts.router);
-app.use('/api/admin',createAdminRouter({accounts,settings:serviceSettings,sharedStore:getSharedStore}));
+app.use('/api/admin',createAdminRouter({accounts,settings:serviceSettings,store:getAccountStore,sharedStore:getSharedStore}));
 app.get('/privacy',(req,res) => res.sendFile(path.join(__dirname,'public','privacy.html')));
 
 const notificationFeed = createDisclosureFeed({

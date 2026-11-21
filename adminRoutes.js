@@ -1,9 +1,13 @@
 const express=require('express');
-function createAdminRouter({accounts,settings,sharedStore,now=()=>Date.now()}) {
+const {createAdminMembers}=require('./adminMembers');
+function createAdminRouter({accounts,settings,store,sharedStore,now=()=>Date.now()}) {
   const router=express.Router();
+  const members=createAdminMembers({store,sharedStore,now});
   const wrap=fn=>(req,res,next)=>Promise.resolve(fn(req,res)).catch(next);
   router.use((req,res,next)=>{res.set('Cache-Control','no-store');res.set('X-Robots-Tag','noindex, nofollow');res.vary('Cookie');next();});
   router.use(accounts.requireAdmin);
+  router.get('/members',wrap(async(req,res)=>res.json({status:'success',...await members.list(req.query)})));
+  router.get('/members/:id',wrap(async(req,res)=>res.json({status:'success',...await members.detail(req.params.id)})));
   router.get('/dashboard',wrap(async(req,res)=>{
     const data=await settings.dashboard();let aiUsage=null;
     try {const store=typeof sharedStore==='function'?sharedStore():sharedStore;aiUsage=await store.analysisUsage(data.day,now());} catch {}

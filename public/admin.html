@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="robots" content="noindex, nofollow"><title>관리자 | Finalyze.AI</title>
-  <link rel="icon" href="/favicon.png"><link rel="stylesheet" href="/css/admin.css?v=1.1">
+  <link rel="icon" href="/favicon.png"><link rel="stylesheet" href="/css/admin.css?v=1.2">
 </head>
 <body>
   <header class="admin-nav"><a class="brand" href="/">Finalyze<span>.AI</span></a><span class="admin-badge">관리자</span><nav class="admin-links" aria-label="관리자 이동"><a href="https://bongwoo-projects.vercel.app/admin/traffic">통합 방문 통계 ↗</a><a href="/">서비스 ↗</a></nav></header>
@@ -18,15 +18,29 @@
     </section>
     <div id="dashboard" hidden>
       <section class="metrics" aria-label="주요 현황">
-        <article class="metric"><span>전체 회원</span><strong id="memberCount">—</strong><small>현재 등록된 계정</small></article>
-        <article class="metric"><span>오늘 가입</span><strong id="newMemberCount">—</strong><small id="dayLabel">한국 시간 기준</small></article>
+        <button type="button" class="metric metric-link" data-member-filter="all"><span>전체 회원 <i aria-hidden="true">↗</i></span><strong id="memberCount">—</strong><small>현재 등록된 계정 · 회원 조회</small></button>
+        <button type="button" class="metric metric-link" data-member-filter="new"><span>오늘 가입 <i aria-hidden="true">↗</i></span><strong id="newMemberCount">—</strong><small id="dayLabel">한국 시간 기준</small></button>
         <article class="metric featured"><span>오늘 AI 분석</span><strong id="aiCount">—</strong><small id="aiUsageNote">허용된 분석 요청</small><div class="progress-track"><div id="aiProgress"></div></div></article>
-        <article class="metric"><span>로그인 유지 회원</span><strong id="signedInCount">—</strong><small id="sessionCount">만료 전 세션 기준 · 실시간 접속자와 다름</small></article>
+        <button type="button" class="metric metric-link" data-member-filter="signedIn"><span>로그인 유지 회원 <i aria-hidden="true">↗</i></span><strong id="signedInCount">—</strong><small id="sessionCount">만료 전 세션 기준 · 실시간 접속자와 다름</small></button>
       </section>
       <section class="operations" aria-label="알림과 관심 기업 현황">
-        <div><span>메일 알림 회원</span><strong id="emailCount">—</strong></div><div><span>푸시 알림 회원</span><strong id="pushCount">—</strong></div>
-        <div><span>등록된 푸시 기기</span><strong id="deviceCount">—</strong></div><div><span>관심 기업 등록</span><strong id="favoriteCount">—</strong></div>
-        <div><span>대기 중인 회원 알림</span><strong id="queueCount">—</strong></div><div class="last-scan"><span>마지막 공시 수집</span><strong id="lastScan">—</strong></div>
+        <button type="button" data-member-filter="email"><span>메일 알림 회원 ↗</span><strong id="emailCount">—</strong></button><button type="button" data-member-filter="push"><span>푸시 알림 회원 ↗</span><strong id="pushCount">—</strong></button>
+        <button type="button" data-member-filter="push"><span>등록된 푸시 기기 ↗</span><strong id="deviceCount">—</strong></button><button type="button" data-member-filter="favorites"><span>관심 기업 등록 ↗</span><strong id="favoriteCount">—</strong></button>
+        <button type="button" data-member-filter="queued"><span>대기 중인 회원 알림 ↗</span><strong id="queueCount">—</strong></button><div class="last-scan"><span>마지막 공시 수집</span><strong id="lastScan">—</strong></div>
+      </section>
+      <section id="membersSection" class="members-section" aria-labelledby="membersHeading">
+        <div class="section-heading"><div><h2 id="membersHeading" tabindex="-1">회원 상세 현황</h2><p class="muted">위 수치를 누르면 해당 회원을 조회합니다. 회원을 선택하면 관심 기업·알림·오늘 AI 사용량을 볼 수 있습니다.</p></div></div>
+        <form id="memberFilters" class="member-filters">
+          <label for="memberFilter">조회 대상<select id="memberFilter"><option value="all">전체 회원</option><option value="new">오늘 가입</option><option value="signedIn">로그인 유지</option><option value="email">메일 알림 켜짐</option><option value="push">푸시 기기 등록</option><option value="favorites">관심 기업 등록</option><option value="queued">알림 대기</option></select></label>
+          <label for="memberSearch">회원 식별자 검색<input id="memberSearch" type="search" maxlength="43" placeholder="식별자 앞부분 입력" autocomplete="off" spellcheck="false"></label>
+          <button type="submit" class="button secondary">조회</button>
+        </form>
+        <p id="memberListMessage" class="message" role="status" aria-live="polite"></p>
+        <p id="memberListNote" class="muted small">이름·이메일 대신 서비스 전용 회원 식별자로 구분합니다.</p>
+        <div id="memberTableWrap" class="member-table-wrap" aria-busy="false">
+          <table class="member-table"><caption class="sr-only">회원별 가입일, 로그인, 알림 및 관심 기업 현황</caption><thead><tr><th scope="col">회원</th><th scope="col">가입일 · KST</th><th scope="col">로그인 세션</th><th scope="col">메일</th><th scope="col">푸시 기기</th><th scope="col">관심 기업</th><th scope="col">대기 알림</th></tr></thead><tbody id="memberRows"></tbody></table>
+        </div>
+        <div class="member-pagination"><button id="memberPrevious" class="button secondary" type="button" disabled>이전</button><span id="memberPage" class="muted small"></span><button id="memberNext" class="button secondary" type="button" disabled>다음</button></div>
       </section>
       <form id="settingsForm">
         <div class="section-heading"><div><h2>이용 한도 설정</h2><p class="muted">변경 내용은 저장 후 다음 요청부터 적용됩니다.</p></div><span id="settingsVersion" class="version"></span></div>
@@ -54,9 +68,14 @@
         </fieldset>
       </form>
       <section class="history-section"><div class="section-heading"><div><h2>설정 변경 기록</h2><p class="muted">최근 10건 · 변경 전후 값을 기록합니다.</p></div></div><div id="historyList" class="history-list"></div></section>
-      <p class="privacy-note">회원의 이메일·이름·기기 주소를 표시하지 않습니다. 위 통계는 등록·세션·알림 상태를 집계한 값입니다.</p>
+      <p class="privacy-note">회원의 이메일·이름·기기 주소를 표시하지 않습니다. 상세 조회는 기존에 저장된 가입·세션·관심 기업·알림 상태만 사용합니다.</p>
     </div>
   </main>
-  <script src="/js/admin.js?v=1.0"></script>
+  <dialog id="memberDialog" aria-labelledby="memberDetailTitle">
+    <div class="detail-heading"><div><p class="eyebrow">MEMBER DETAILS</p><h2 id="memberDetailTitle">회원 상세</h2></div><button id="closeMember" class="button secondary" type="button" autofocus>닫기</button></div>
+    <p id="memberDetailMessage" class="message" role="status" aria-live="polite"></p>
+    <div id="memberDetailBody"></div>
+  </dialog>
+  <script src="/js/admin.js?v=1.1"></script>
 </body>
 </html>

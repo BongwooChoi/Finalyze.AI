@@ -21,7 +21,8 @@ const SCHEMA = [
   `CREATE INDEX IF NOT EXISTS app_sessions_expiry ON app_sessions(expires_at)`,
   `CREATE INDEX IF NOT EXISTS app_users_created_at ON app_users(created_at)`,
   `CREATE INDEX IF NOT EXISTS app_sessions_user_expiry ON app_sessions(user_id,expires_at)`,
-  `CREATE INDEX IF NOT EXISTS app_deliveries_pending ON app_deliveries(status,next_attempt)`
+  `CREATE INDEX IF NOT EXISTS app_deliveries_pending ON app_deliveries(status,next_attempt)`,
+  `CREATE INDEX IF NOT EXISTS app_deliveries_user_status ON app_deliveries(user_id,status)`
 ];
 
 function sqliteDatabase(filename = ':memory:') {

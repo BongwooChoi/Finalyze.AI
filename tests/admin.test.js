@@ -19,7 +19,7 @@ async function fixture(t){
     findCompany:async corp=>({corp_code:corp,corp_name:'테스트',stock_code:'005930'}),verifyIdentity:async credential=>{
       if(!identities.has(credential))throw Error('invalid');return identities.get(credential);
     }});
-  const app=express();app.use(express.json());app.use('/api',accounts.router);app.use('/api/admin',createAdminRouter({accounts,settings,sharedStore:shared,now}));
+  const app=express();app.use(express.json());app.use('/api',accounts.router);app.use('/api/admin',createAdminRouter({accounts,settings,store,sharedStore:shared,now}));
   const server=await new Promise(resolve=>{const s=app.listen(0,'127.0.0.1',()=>resolve(s));});
   t.after(async()=>{await new Promise(resolve=>server.close(resolve));await store.close();});
   function client(){
@@ -138,4 +138,87 @@ test('dashboard keeps member stats available if usage cache is down, and KST sig
   const data=await(await owner.request('/admin/dashboard')).json();
   assert.equal(data.stats.members,1);assert.equal(data.stats.new_members,0);assert.equal(data.aiUsage,null);
   assert.doesNotMatch(JSON.stringify(data),/private cache details/);
+});
+
+test('member list and detail enforce admin, CSRF and live allowlist, with no-store responses',async t=>{
+  const f=await fixture(t),guest=f.client(),normal=f.client(),owner=f.client();
+  await normal.login('normal','normal@example.com');await owner.login('owner');
+  const id=(await f.store.query('SELECT id FROM app_users ORDER BY id'))[0].id;
+  for(const path of ['/admin/members','/admin/members/'+id]){
+    assert.equal((await guest.request(path)).status,401);
+    assert.equal((await normal.request(path)).status,403);
+    assert.equal((await owner.request(path,'GET',undefined,{'X-CSRF-Token':''})).status,403);
+    assert.equal((await owner.request(path,'GET',undefined,{Origin:'https://evil.example'})).status,403);
+    const response=await owner.request(path);assert.equal(response.status,200);
+    assert.equal(response.headers.get('cache-control'),'no-store');assert.match(response.headers.get('x-robots-tag'),/noindex/);
+  }
+  f.config.adminEmailHashes=[];
+  assert.equal((await owner.request('/admin/members/'+id)).status,403);
+});
+
+test('member filters agree with aggregate counts without multiplying sessions, devices or favorites',async t=>{
+  const f=await fixture(t),owner=f.client();await owner.login('owner');
+  const {sign}=require('../accountSecurity');
+  const ids=['older','today','boundary','inactive'].map(x=>sign(x,'fixture-members'));
+  for(const id of ids)await f.store.ensureUser(id);
+  const start=Date.parse('2026-11-06T00:00:00+09:00');
+  await f.store.query('UPDATE app_users SET created_at=$1 WHERE id=$2',[start-1,ids[0]]);
+  await f.store.query('UPDATE app_users SET created_at=$1 WHERE id=$2',[start,ids[2]]);
+  await f.store.setEmail(ids[1],'private-email-ciphertext');
+  for(let i=0;i<2;i++){
+    await f.store.addSession('secret-token-'+i,ids[1],f.now()+10000+i);
+    await f.store.addPush(ids[1],'private-endpoint-'+i,'private-subscription-ciphertext');
+    await f.store.addFavorite(ids[1],{corp_code:'0000000'+i,corp_name:'기업 '+i,stock_code:'00000'+i});
+  }
+  await f.store.addSession('expired-token',ids[0],f.now());
+  const stats=(await(await owner.request('/admin/dashboard')).json()).stats;
+  for(const [filter,key] of Object.entries({all:'members',new:'new_members',signedIn:'signed_in_members',email:'email_members',push:'push_members'})){
+    const data=await(await owner.request('/admin/members?filter='+filter)).json();assert.equal(data.total,stats[key],filter);
+  }
+  const listed=await(await owner.request('/admin/members?filter=push')).json();
+  assert.equal(listed.total,1);assert.equal(listed.members[0].devices,2);assert.equal(listed.members[0].sessions,2);assert.equal(listed.members[0].favorites,2);
+  assert.equal((await(await owner.request('/admin/members?filter=favorites')).json()).total,1);
+  assert.equal((await(await owner.request('/admin/members?filter=queued')).json()).total,0);
+  assert.doesNotMatch(JSON.stringify(listed),/private-|email_enc|subscription_enc|token_hash|email_hash/);
+});
+
+test('member list validates input, bounds pages and supports exact case-sensitive identifier prefixes',async t=>{
+  const f=await fixture(t),owner=f.client();await owner.login('owner');
+  for(let i=0;i<29;i++)await f.store.ensureUser(String(i).padStart(43,'A'));
+  const first=await(await owner.request('/admin/members')).json();
+  const second=await(await owner.request('/admin/members?page=2')).json();
+  assert.equal(first.total,30);assert.equal(first.members.length,25);assert.equal(second.members.length,5);
+  assert.equal(new Set([...first.members,...second.members].map(m=>m.id)).size,30);
+  assert.equal((await(await owner.request('/admin/members?page=999999')).json()).page,2);
+  assert.equal((await(await owner.request('/admin/members?search=AAAA')).json()).total,29);
+  assert.equal((await(await owner.request('/admin/members?search=aaaa')).json()).total,0);
+  for(const query of ['filter=__proto__','filter=bad','filter[]=all','page=0','page=-1','page=1.5','page=1000000','page=2&page=1','search=%25','search=%27%20OR%201=1','search[]=id','search='+'a'.repeat(44)])
+    assert.equal((await owner.request('/admin/members?'+query)).status,400,query);
+});
+
+test('member details return only operational data, member-scoped usage and recent delivery outcomes',async t=>{
+  const f=await fixture(t),owner=f.client();await owner.login('owner');
+  const [user]=await f.store.query('SELECT id FROM app_users');
+  const id=user.id,other='z'.repeat(43);await f.store.ensureUser(other);
+  await f.store.setEmail(id,'not-decryptable-private-email');
+  await f.store.addPush(id,'private-push-id','private-endpoint');
+  await f.store.addFavorite(id,{corp_code:'00126380',corp_name:'<img src=x onerror=alert(1)>',stock_code:'005930'});
+  await f.store.query('INSERT INTO app_disclosures(receipt,corp_code,corp_name,report_name,receipt_date,first_seen) VALUES($1,$2,$3,$4,$5,$6)',
+    ['20261106000001','00126380','삼성전자','분기보고서','20261106',f.now()]);
+  for(let i=0;i<34;i++)await f.store.query('INSERT INTO app_deliveries(id,user_id,receipt,channel,target_id,status,attempts) VALUES($1,$2,$3,$4,$5,$6,$7)',
+    ['private-delivery-'+i,i===33?other:id,'20261106000001','email','private-target',i===0?'pending':i===1?'failed':'sent',i===0?1:5]);
+  await f.shared.set(`finalyze:ai:v1:user:${id}:day:2026-11-06`,3,86400);
+  const detail=await(await owner.request('/admin/members/'+id)).json();
+  assert.equal(detail.aiUsage.used,3);assert.equal(detail.member.queued,1);assert.equal(detail.deliveries.length,30);
+  assert.equal(detail.member.emailEnabled,true);assert.equal(detail.devices.length,1);assert.equal(detail.sessions.length,1);
+  assert.equal(detail.favorites[0].name,'<img src=x onerror=alert(1)>');
+  assert.doesNotMatch(JSON.stringify(detail),/private-|email_enc|subscription_enc|token_hash|email_hash|csrfToken/);
+  assert.equal((await(await owner.request('/admin/members?filter=queued')).json()).total,1);
+  f.shared.get=async()=>{throw Error('private cache details');};
+  assert.equal((await(await owner.request('/admin/members/'+id)).json()).aiUsage,null);
+  assert.equal((await owner.request('/admin/members/not-an-id')).status,400);
+  await f.store.deleteUser(id);
+  // Keep authorization in a separate account after deleting the inspected member.
+  const secondOwner=f.client();await secondOwner.login('second-owner');
+  assert.equal((await secondOwner.request('/admin/members/'+id)).status,404);
 });

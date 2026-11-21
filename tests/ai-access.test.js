@@ -34,6 +34,17 @@ test('guest previews for both report types never request an AI endpoint',async()
     assert.equal(gate.hidden,false);assert.match(gate.innerHTML,/Google로 로그인하고 AI 분석 보기/);
   }
 });
+
+test('shared financial and provisional results wait for the member to request AI',async()=>{
+  for(const kind of ['financial','provisional']) {
+    const f=fixture();f.change(true);f.choose(kind);
+    await f.run('requestAiAnalysis(activeAiAnalysis,true)');
+    assert.equal(f.requests.length,0);
+    assert.equal(f.run('activeAiAnalysis.status'),'ready');
+    await f.run('requestAiAnalysis(activeAiAnalysis)');
+    assert.equal(f.requests.length,1);
+  }
+});
 test('login preserves the report and waits for an explicit AI start',async()=>{
   const f=fixture();f.choose();await f.run('requestAiAnalysis(activeAiAnalysis)');
   f.change(true);

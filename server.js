@@ -32,7 +32,7 @@ const serviceSettings=createSettingsService({store:getAccountStore});
 const runAnalysis = createAnalysisLimiter({getSettings:serviceSettings.values});
 
 // 공개 페이지는 JavaScript 실행 전에도 본문과 고유 메타데이터를 제공합니다.
-app.get('/', (req, res) => res.type('html').send(renderPage('analysis')));
+app.get('/', (req, res) => res.type('html').send(renderPage('analysis', req.query)));
 app.get('/about', (req, res) => {
   if (req.path.endsWith('/')) {
     return res.redirect(301, `/about${req.originalUrl.slice(req.path.length)}`);

@@ -48,7 +48,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Noto+Sans+KR:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/css/style.css?v=3.30">
+  <link rel="stylesheet" href="/css/style.css?v=3.31">
   <link rel="stylesheet" href="/css/terminal.css?v=1.1">
   <link rel="manifest" href="/manifest.json">
   <meta name="theme-color" content="#2563eb">
@@ -254,6 +254,7 @@
       <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
         <h3 id="provisionalCardTitle" class="mb-0">잠정실적 분석</h3>
         <div class="export-actions">
+          <button type="button" class="btn btn-sm btn-outline-secondary" data-share-report="provisionalCardTitle" aria-haspopup="dialog"><i class="bi bi-share me-1" aria-hidden="true"></i>공유하기</button>
           <button class="btn btn-sm btn-export" id="provisionalPdfBtn" title="PDF로 내보내기">
             <i class="bi bi-file-earmark-pdf me-1"></i>PDF 내보내기
           </button>
@@ -297,6 +298,7 @@
       <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
         <h3 id="analysisCardTitle" class="mb-0">통합 재무분석</h3>
         <div class="export-actions">
+          <button type="button" class="btn btn-sm btn-outline-secondary" data-share-report="analysisCardTitle" aria-haspopup="dialog"><i class="bi bi-share me-1" aria-hidden="true"></i>공유하기</button>
           <button class="btn btn-sm btn-export" id="exportPdfBtn" title="PDF로 내보내기">
             <i class="bi bi-file-earmark-pdf me-1"></i>PDF 내보내기
           </button>
@@ -644,7 +646,7 @@
         <details><summary>공시 목록의 기간과 5개년 추이는 어떻게 다른가요?</summary><p>기업을 선택하면 공시 목록은 현재 연도를 포함한 최근 3개년의 정기보고서·잠정실적을 보여줍니다. 연간 추이 탭은 최근 5개년 사업보고서 데이터를 별도로 조회합니다. 아직 사업보고서가 발표되지 않았거나 DART에 데이터가 없는 연도는 실적을 확인할 수 없을 수 있습니다.</p></details>
         <details><summary>특정 기업이나 재무 항목이 표시되지 않는 이유는 무엇인가요?</summary><p>회사 검색 결과와 DART 재무데이터 제공 범위는 다를 수 있습니다. 해당 기간에 보고서가 없거나 주요계정 API가 항목을 제공하지 않으면 일부 분석이 제한됩니다. 재고자산처럼 주요계정에 없는 세부 항목이 필요한 당좌비율도 제공하지 않습니다.</p></details>
         <details><summary>잠정실적과 나중에 발표된 재무제표가 다를 수 있나요?</summary><p>네. 잠정실적은 이후 확정된 재무제표와 차이가 날 수 있고, 정정 공시가 발표될 수도 있습니다. 공시 목록의 원문 링크로 발표 시점과 정정 여부를 확인해 주세요. AI 설명에도 오류가 있을 수 있어 원문과 함께 읽는 것이 좋습니다.</p></details>
-        <details><summary>분석 결과를 저장하거나 공유할 수 있나요?</summary><p>정기보고서와 잠정실적 분석 화면의 PDF 내보내기 또는 이미지 저장 버튼을 이용할 수 있습니다. 기업·공시를 선택한 뒤 브라우저 주소를 복사하면 해당 선택 상태를 공유할 수 있습니다. 공유 주소를 다시 열 때는 데이터를 새로 조회하므로 같은 시점의 결과가 그대로 보관되는 것은 아닙니다.</p></details>
+        <details><summary>분석 결과를 저장하거나 공유할 수 있나요?</summary><p>정기보고서와 잠정실적 분석 화면의 PDF 내보내기 또는 이미지 저장 버튼을 이용할 수 있습니다. 공유하기를 눌러 공시 분석 화면을 카카오톡 등 설치된 앱이나 X로 보내거나 링크를 복사할 수 있습니다. 받는 사람은 공개 차트를 바로 보고 로그인 후 AI 분석을 요청할 수 있습니다. 공유 주소를 다시 열 때는 데이터를 새로 조회하므로 같은 시점의 결과가 그대로 보관되는 것은 아닙니다.</p></details>
         <details><summary>모바일에서도 사용할 수 있나요?</summary><p>스마트폰 브라우저에서 Finalyze.AI에 접속하면 사용할 수 있습니다. ‘모바일에서 사용하기’ 영역의 QR코드를 스캔하거나 접속 링크를 누르세요. 지원되는 브라우저에서는 홈 화면에 추가해 앱처럼 이용할 수도 있습니다.</p></details>
       </section>
 
@@ -687,6 +689,18 @@
       </div>
     </div>
   </footer>
+
+  <dialog id="analysisShare" class="analysis-share" aria-labelledby="shareHeading">
+    <form method="dialog" class="d-flex align-items-center justify-content-between mb-3"><h2 id="shareHeading" class="h5 mb-0">분석 공유하기</h2><button class="btn-close" aria-label="닫기"></button></form>
+    <p id="analysisShareTitle" class="fw-semibold"></p>
+    <input id="analysisShareLink" class="form-control mb-3" aria-label="분석 화면 주소" readonly>
+    <div class="d-flex flex-wrap gap-2">
+      <button id="analysisShareNative" type="button" class="btn btn-primary" hidden>앱으로 공유</button>
+      <button id="analysisShareCopy" type="button" class="btn btn-outline-secondary">링크 복사</button>
+      <a id="analysisShareX" class="btn btn-outline-secondary" target="_blank" rel="noopener noreferrer">X에 공유</a>
+    </div>
+    <p id="analysisShareStatus" class="small mt-3 mb-0" role="status"></p>
+  </dialog>
 
   <div class="modal fade" id="pwaInstallModal" tabindex="-1" aria-labelledby="pwaInstallTitle" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered"><div class="modal-content pwa-guide">
@@ -760,7 +774,7 @@
       </div>
     </div></div>
   </div>
-  <script src="/js/main.js?v=3.25"></script>
+  <script src="/js/main.js?v=3.26"></script>
   <script src="/js/accounts.js?v=1.5"></script>
   <noscript>
     <div style="padding:2rem;text-align:center;font-family:sans-serif;">

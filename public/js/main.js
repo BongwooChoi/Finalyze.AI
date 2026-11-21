@@ -73,6 +73,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initPwaInstallBanner();
 
   initRecentDisclosures();
+  initAnalysisSharing();
   
   // 검색 버튼 클릭 이벤트
   searchBtn.addEventListener('click', () => searchCompany());
@@ -346,7 +347,8 @@ function showToast(message, type = 'info') {
 
 // URL 파라미터로부터 회사·공시 선택 상태 복원
 async function restoreStateFromUrl() {
-  const params = new URLSearchParams(window.location.search);
+  const paramsToRestore = window.location.search;
+  const params = new URLSearchParams(paramsToRestore);
   const corpCode = params.get('corp');
   if (!corpCode) return;
   if (!/^\d{8}$/.test(corpCode)) {
@@ -364,12 +366,65 @@ async function restoreStateFromUrl() {
     return;
   }
 
+  if (window.location.search !== paramsToRestore) return;
   companySearchInput.value = company.corp_name;
   await selectCompany(company, { skipHistory: true });
 
-  // 공시 항목만 복원합니다. 분석 요청은 사용자가 '분석하기'를 눌렀을 때만 실행합니다.
+  if (company !== selectedCompany || window.location.search !== paramsToRestore) return;
   const rcept = params.get('rcept');
+  if (params.get('view') === 'analysis') {
+    const item = [...document.querySelectorAll('.disclosure-item')].find(row => row.dataset.rcept_no === rcept);
+    if (item && /^\d{14}$/.test(rcept)) {
+      await handleDisclosureSelect(rcept, item.dataset.report_nm, item.querySelector('.btn-analyze'), {shared:true});
+    } else {
+      showToast('공유된 공시를 찾지 못했습니다. 공시 목록을 확인해주세요.', 'error');
+    }
+    return;
+  }
   if (rcept) focusDisclosure(rcept);
+}
+
+function initAnalysisSharing() {
+  const dialog = document.getElementById('analysisShare');
+  const link = document.getElementById('analysisShareLink');
+  const native = document.getElementById('analysisShareNative');
+  const status = document.getElementById('analysisShareStatus');
+  const title = document.getElementById('analysisShareTitle');
+  document.querySelectorAll('[data-share-report]').forEach(button => {
+    button.addEventListener('click', () => {
+      const receipt = new URLSearchParams(window.location.search).get('rcept');
+      if (!selectedCompany || !/^\d{14}$/.test(receipt)) {
+        showToast('공시를 먼저 선택해주세요.', 'error');
+        return;
+      }
+      const params = new URLSearchParams({corp:selectedCompany.corp_code, rcept:receipt, view:'analysis'});
+      link.value = new URL('/?' + params, window.location.origin).href;
+      title.textContent = document.getElementById(button.dataset.shareReport).textContent;
+      const tweet = new URL('https://twitter.com/intent/tweet');
+      tweet.search = new URLSearchParams({text:title.textContent, url:link.value});
+      document.getElementById('analysisShareX').href = tweet.href;
+      native.hidden = typeof navigator.share !== 'function';
+      status.textContent = native.hidden ? '카카오톡 대화방에 보내려면 링크를 복사해 붙여넣으세요.' : '앱 공유 메뉴에서 카카오톡 등 설치된 앱을 선택하세요.';
+      dialog.showModal();
+    });
+  });
+  native.addEventListener('click', async () => {
+    try {
+      await navigator.share({title:title.textContent, url:link.value});
+    } catch (error) {
+      if (error.name !== 'AbortError') status.textContent = '앱 공유를 열 수 없습니다. 링크를 복사해 보내주세요.';
+    }
+  });
+  document.getElementById('analysisShareCopy').addEventListener('click', async () => {
+    try {
+      await navigator.clipboard.writeText(link.value);
+      status.textContent = '분석 링크를 복사했습니다.';
+    } catch {
+      link.focus();
+      link.select();
+      status.textContent = '선택된 주소를 직접 복사해 보내주세요.';
+    }
+  });
 }
 
 function focusDisclosure(rceptNo) {
@@ -519,13 +574,14 @@ async function selectCompany(company, { skipHistory = false } = {}) {
 
   // disclosure list 표시
   await fetchAndDisplayDisclosureList(company.corp_code);
+  if (selectedCompany !== company) return;
 
   // 화면 스크롤
   document.getElementById('disclosureListContainer').scrollIntoView({ behavior: 'smooth' });
 }
 
 // 통합 재무분석 조회 함수
-async function fetchFinancialAnalysis() {
+async function fetchFinancialAnalysis(shared = false) {
   if (!selectedCompany) {
     showToast('회사를 먼저 선택해주세요.', 'error');
     return;
@@ -594,7 +650,7 @@ async function fetchFinancialAnalysis() {
     
     if (data.status === 'success') {
       // 데이터 표시 함수 호출
-      displayFinancialAnalysis(data.data);
+      displayFinancialAnalysis(data.data, shared);
     } else {
       // 오류 처리 (loadingIndicator 숨기는 로직 제거)
       loadingIndicator.style.display = 'none'; // 오류 시에는 여기서 바로 숨김
@@ -615,7 +671,7 @@ async function fetchFinancialAnalysis() {
 }
 
 // 통합 재무분석 표시 함수
-function displayFinancialAnalysis(analysis) {
+function displayFinancialAnalysis(analysis, shared) {
   console.log('--- displayFinancialAnalysis called ---', analysis);
   try {
     // !!! 여기서 메인 로딩 인디케이터 숨기기 !!!
@@ -631,7 +687,7 @@ function displayFinancialAnalysis(analysis) {
     displayBalanceSheetVis(analysis);
     // displayCompositionCharts(analysis);
     console.log('Calling AI analysis function...');
-    fetchAIFinancialAnalysis(analysis); 
+    fetchAIFinancialAnalysis(analysis, shared);
 
     // 2. 다른 탭 내용 생성
     displayBalanceSheetTable(analysis.balanceSheet || {});
@@ -841,7 +897,7 @@ function showAiAccess(context, member) {
   }
 }
 
-async function requestAiAnalysis(context) {
+async function requestAiAnalysis(context, previewOnly = false) {
   if(context !== activeAiAnalysis || ['checking','loading'].includes(context.status)) return;
   const version = ++aiRequestVersion;
   aiRequestController?.abort();
@@ -856,7 +912,7 @@ async function requestAiAnalysis(context) {
   try {
     const access = await window.FinalyzeAccount?.analysisAccess() || {authenticated:false};
     if(!current()) return;
-    if(!access.authenticated) { showAiAccess(context,false); return; }
+    if(previewOnly || !access.authenticated) { showAiAccess(context,Boolean(access.authenticated)); return; }
     context.status = 'loading';
     panel.access.hidden = true; panel.loading.style.display = 'block';
     if(context.kind === 'provisional') showAnalysisGuide(context.reportName,'provisionalCard');
@@ -930,7 +986,7 @@ document.addEventListener('account:changed',event => {
 });
 
 // Snapshot the selected report so login and delayed responses keep the correct company and period.
-function fetchAIFinancialAnalysis(analysis) {
+function fetchAIFinancialAnalysis(analysis, shared) {
   const context = {kind:'financial',status:'idle',financialData:{
       companyName: selectedCompany.corp_name,
       year: currentYear,
@@ -941,7 +997,7 @@ function fetchAIFinancialAnalysis(analysis) {
       isFinancialCompany: isFinancialCompany
   }};
   activeAiAnalysis = context;
-  return requestAiAnalysis(context);
+  return requestAiAnalysis(context, shared);
 }
 
 // 손익계산서 차트 표시 함수
@@ -1571,6 +1627,7 @@ async function fetchAndDisplayDisclosureList(corpCode) {
   try {
     const response = await fetch(`/api/disclosure-list?corp_code=${corpCode}`);
     const data = await response.json();
+    if (selectedCompany?.corp_code !== corpCode) return;
     if (data.status !== '000' || !data.list || data.list.length === 0) {
       container.innerHTML = '<div class="alert alert-warning">최근 3년간 공시가 없습니다.</div>';
       return;
@@ -1645,11 +1702,10 @@ async function fetchAndDisplayDisclosureList(corpCode) {
 }
 
 // 보고서 선택 시 분석 함수
-function handleDisclosureSelect(rceptNo, reportNm, btnElement) {
+function handleDisclosureSelect(rceptNo, reportNm, btnElement, {shared = false} = {}) {
   // 잠정실적 공시는 원문 기반 AI 분석으로 처리
   if (isProvisionalDisclosure(reportNm)) {
-    handleProvisionalSelect(rceptNo, reportNm, btnElement);
-    return;
+    return handleProvisionalSelect(rceptNo, reportNm, btnElement, shared);
   }
   let year = '';
   let reprtCode = '';
@@ -1683,7 +1739,7 @@ function handleDisclosureSelect(rceptNo, reportNm, btnElement) {
   }
 
   // URL에 선택한 공시 반영
-  updateUrlState(rceptNo);
+  if (!shared) updateUrlState(rceptNo);
 
   // 선택된 항목 하이라이트
   document.querySelectorAll('.disclosure-item').forEach(el => {
@@ -1710,7 +1766,7 @@ function handleDisclosureSelect(rceptNo, reportNm, btnElement) {
   // 결과 안내 배너 표시
   showAnalysisGuide(reportNm);
 
-  fetchFinancialAnalysis().finally(() => {
+  return fetchFinancialAnalysis(shared).finally(() => {
     if (btnElement) {
       btnElement.disabled = false;
       btnElement.innerHTML = '<i class="bi bi-check-circle me-1"></i>분석 완료';
@@ -1724,11 +1780,11 @@ function handleDisclosureSelect(rceptNo, reportNm, btnElement) {
 }
 
 // 잠정실적 공시 선택 시 분석 함수
-async function handleProvisionalSelect(rceptNo, reportNm, btnElement) {
+async function handleProvisionalSelect(rceptNo, reportNm, btnElement, shared = false) {
   resetAiAnalysis();
   analysisCard.style.display = 'none';
   // URL에 선택한 공시 반영
-  updateUrlState(rceptNo);
+  if (!shared) updateUrlState(rceptNo);
 
   // 선택된 항목 하이라이트
   document.querySelectorAll('.disclosure-item').forEach(el => {
@@ -1773,7 +1829,7 @@ async function handleProvisionalSelect(rceptNo, reportNm, btnElement) {
   document.getElementById('provisionalImageBtn').disabled = true;
   activeAiAnalysis = context;
   document.getElementById('provisionalSourceLink').href = `https://dart.fss.or.kr/dsaf001/main.do?rcpNo=${encodeURIComponent(rceptNo)}`;
-  await Promise.all([loadProvisionalFinancials(context),requestAiAnalysis(context)]);
+  await Promise.all([loadProvisionalFinancials(context),requestAiAnalysis(context, shared)]);
   if(activeAiAnalysis === context) card.scrollIntoView({behavior:'smooth'});
 }
 

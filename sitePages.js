@@ -9,7 +9,7 @@ function escapeAttribute(value) {
   return value.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
-function renderPage(pageName) {
+function renderPage(pageName, query = {}) {
   const page = pages[pageName];
   const isAbout = pageName === 'about';
   let html = template.replaceAll('{{DISCLOSURE_UNIVERSE_AS_OF}}', getIndexUniverseSummary().asOf)
@@ -23,6 +23,10 @@ function renderPage(pageName) {
     'twitter:title': page.title,
     'twitter:description': page.description
   };
+  if (!isAbout && query.view === 'analysis' && typeof query.corp === 'string' &&
+      typeof query.rcept === 'string' && /^\d{8}$/.test(query.corp) && /^\d{14}$/.test(query.rcept)) {
+    meta['og:url'] = page.url + '?' + new URLSearchParams({corp:query.corp, rcept:query.rcept, view:'analysis'});
+  }
   for (const [name, value] of Object.entries(meta)) {
     const pattern = new RegExp(`(<meta (?:name|property)="${name}" content=")[^"]*("\\s*>)`);
     html = html.replace(pattern, (_, start, end) => start + escapeAttribute(value) + end);

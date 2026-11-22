@@ -413,7 +413,7 @@ function initAnalysisSharing() {
       tweet.search = new URLSearchParams({text:title.textContent, url:link.value});
       document.getElementById('analysisShareX').href = tweet.href;
       native.hidden = typeof navigator.share !== 'function';
-      status.textContent = native.hidden ? '카카오톡 대화방에 보내려면 링크를 복사해 붙여넣으세요.' : '앱 공유 메뉴에서 카카오톡 등 설치된 앱을 선택하세요.';
+      status.textContent = native.hidden ? '카카오톡 대화방에 보내려면 링크를 복사해 붙여넣으세요.' : '기기의 공유 메뉴가 열리면 카카오톡, 메시지 등 원하는 곳을 선택하세요.';
       dialog.showModal();
     });
   });
@@ -421,7 +421,7 @@ function initAnalysisSharing() {
     try {
       await navigator.share({title:title.textContent, url:link.value});
     } catch (error) {
-      if (error.name !== 'AbortError') status.textContent = '앱 공유를 열 수 없습니다. 링크를 복사해 보내주세요.';
+      if (error.name !== 'AbortError') status.textContent = '공유 메뉴를 열 수 없습니다. 링크를 복사해 보내주세요.';
     }
   });
   document.getElementById('analysisShareCopy').addEventListener('click', async () => {

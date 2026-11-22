@@ -29,6 +29,7 @@ const app = express();
 if(process.env.VERCEL) app.set('trust proxy',1);
 const PORT = process.env.PORT || 3000;
 const serviceSettings=createSettingsService({store:getAccountStore});
+const {reuseAnalysis,issueFinancialProof,verifiedFinancialId}=require('./analysisResults');
 const runAnalysis = createAnalysisLimiter({getSettings:serviceSettings.values});
 
 // 공개 페이지는 JavaScript 실행 전에도 본문과 고유 메타데이터를 제공합니다.
@@ -708,6 +709,14 @@ app.get('/api/financial-analysis', async (req, res) => {
       ratio: Object.keys(analysis.ratio).length
     });
     
+    if (process.env.SESSION_SECRET && companyName) {
+      const receipts = [...new Set(financialStatements.map(row => row.rcept_no).filter(Boolean))].sort();
+      const source = JSON.stringify([corp_code,bsns_year,reprt_code,receipts]);
+      analysis.reportProof = issueFinancialProof(source, {
+        ...analysis, year:bsns_year, previousYear:String(Number(bsns_year)-1)
+      }, process.env.SESSION_SECRET);
+    }
+
     res.json({
       status: 'success',
       data: analysis
@@ -721,6 +730,15 @@ app.get('/api/financial-analysis', async (req, res) => {
     });
   }
 });
+
+// Cached reads require the same member access and service availability as new analyses.
+async function analyzeReport(key, generate) {
+  const settings = await serviceSettings.values();
+  if (!settings.aiEnabled || settings.memberDaily === 0 || settings.globalDaily === 0) {
+    throw Object.assign(new Error('현재 AI 분석 제공을 잠시 중지했습니다.'), {code:'AI_PAUSED'});
+  }
+  return reuseAnalysis(getAccountStore(), key, generate);
+}
 
 // AI 기반 재무분석 API
 app.post('/api/ai-financial-analysis', accounts.requireAnalysis, async (req, res) => {
@@ -742,13 +760,19 @@ app.post('/api/ai-financial-analysis', accounts.requireAnalysis, async (req, res
     const prompt = createFinancialAnalysisPrompt(companyName, year, previousYear, balanceSheet, incomeStatement, ratio, isFinancialComp);
     
     // OpenAI API 호출 (structured outputs)
-    const result = await runAnalysis(req.analysisUserId,async()=>parseAnalysisJson(await callOpenAIAPI(prompt, FINANCIAL_ANALYSIS_SCHEMA)));
-    result.title = `${companyName} ${year}년 재무 분석`;
-
-    res.json({
-      status: 'success',
-      result
+    const generate = () => runAnalysis(req.analysisUserId, async () => {
+      const result = parseAnalysisJson(await callOpenAIAPI(prompt, FINANCIAL_ANALYSIS_SCHEMA));
+      result.title = `${companyName} ${year}년 재무 분석`;
+      return result;
     });
+    const id = verifiedFinancialId(req.body.reportProof, req.body, process.env.SESSION_SECRET);
+    if (req.body.reportProof && !id) {
+      return res.status(400).json({status:'error',message:'공시 데이터가 변경됐습니다. 화면을 새로고침해주세요.'});
+    }
+    const {payload, cached} = id
+      ? await analyzeReport(`financial:v1:${id}`, generate)
+      : {payload:await generate(), cached:false};
+    res.json({status:'success', result:payload, cached});
   } catch (error) {
     const failure=analysisFailure(error);
     if(failure.notice) console.info('AI 분석 이용 안내:',{code:failure.body.code});
@@ -1154,39 +1178,31 @@ app.get('/api/provisional-financials',async (req,res) => {
 // 잠정실적 공시 AI 분석 API
 app.get('/api/provisional-analysis', accounts.requireAnalysis, async (req, res) => {
   try {
-    const { rcept_no, corp_name, report_nm } = req.query;
-    if (!rcept_no) {
-      return res.status(400).json({ status: 'error', message: 'rcept_no는 필수입니다.' });
+    const {rcept_no, corp_name} = req.query;
+    if (typeof rcept_no !== 'string' || !/^\d{14}$/.test(rcept_no)) {
+      return res.status(400).json({status:'error',message:'공시 접수번호를 확인해주세요.'});
     }
-
-    // 공시서류 원본파일 다운로드
-    const url = `https://opendart.fss.or.kr/api/document.xml?crtfc_key=${config.OPEN_DART_API_KEY}&rcept_no=${rcept_no}`;
-    const response = await dartClient.get(url, { responseType: 'arraybuffer' });
-
-    // 오류 시 zip 대신 XML 오류 메시지가 반환됨
-    const contentType = response.headers['content-type'] || '';
-    if (contentType.includes('xml') || contentType.includes('json')) {
-      const errText = Buffer.from(response.data).toString('utf8');
-      const msgMatch = errText.match(/<message>([^<]+)<\/message>/);
-      throw new Error(msgMatch ? msgMatch[1] : '공시 원본을 내려받지 못했습니다.');
-    }
-
-    let documentText = extractDocumentText(Buffer.from(response.data));
-    const MAX_DOC_LENGTH = 20000;
-    if (documentText.length > MAX_DOC_LENGTH) {
-      documentText = documentText.slice(0, MAX_DOC_LENGTH);
-    }
-
-    console.log(`잠정실적 분석 요청: ${corp_name || ''} ${report_nm || ''} (rcept_no: ${rcept_no}, 본문 ${documentText.length}자)`);
-
-    const prompt = createProvisionalAnalysisPrompt(corp_name || '해당 회사', report_nm || '잠정실적 공시', documentText);
-    // 숫자 시각화는 원문 파서가 담당하고, 모델은 해석만 작성합니다.
-    let chartData = null;
-    try { chartData = parseProvisionalFinancials(readDisclosureXml(Buffer.from(response.data))); } catch {}
-    const result = await runAnalysis(req.analysisUserId,async()=>parseAnalysisJson(await callOpenAIAPI(prompt, PROVISIONAL_ANALYSIS_SCHEMA)));
-    result.title = `${corp_name || '해당 회사'} 잠정실적 분석`;
-
-    res.json({ status: 'success', result, chartData: chartData || null });
+    const {payload, cached} = await analyzeReport(`provisional:v1:${rcept_no}`, async () => {
+      const response = await dartClient.get('https://opendart.fss.or.kr/api/document.xml', {
+        params:{rcept_no}, responseType:'arraybuffer', timeout:12000
+      });
+      const buffer = Buffer.from(response.data);
+      const type = response.headers['content-type'] || '';
+      if (type.includes('xml') || type.includes('json')) {
+        const message = buffer.toString('utf8').match(/<message>([^<]+)<\/message>/);
+        throw new Error(message?.[1] || '공시 원본을 내려받지 못했습니다.');
+      }
+      const documentText = extractDocumentText(buffer).slice(0,20000);
+      if (!documentText.trim()) throw new Error('공시 본문이 비어 있습니다.');
+      const prompt = createProvisionalAnalysisPrompt('공시 제출 기업','잠정실적 공시',documentText);
+      let chartData = null;
+      try { chartData = parseProvisionalFinancials(readDisclosureXml(buffer)); } catch {}
+      const result = await runAnalysis(req.analysisUserId, async () =>
+        parseAnalysisJson(await callOpenAIAPI(prompt, PROVISIONAL_ANALYSIS_SCHEMA)));
+      return {result, chartData};
+    });
+    const title = `${typeof corp_name === 'string' ? corp_name : '해당 회사'} 잠정실적 분석`;
+    res.json({status:'success',result:{...payload.result,title},chartData:payload.chartData,cached});
   } catch (error) {
     if(sendDocumentPending(res,error)) return;
     const failure=analysisFailure(error);

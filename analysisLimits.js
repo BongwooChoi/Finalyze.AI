@@ -3,7 +3,7 @@ const {getSharedStore}=require('./sharedStore');
 const {defaultSettings,validateSettings}=require('./serviceSettings');
 const LEASE_MS=180000; // Longer than the complete upstream deadline, including retries.
 const OPENAI_DEADLINE_MS=120000;
-const AI_NOTICE_CODES=new Set(['AI_MEMBER_DAILY_LIMIT','AI_GLOBAL_DAILY_LIMIT','AI_MEMBER_BUSY','AI_SERVICE_BUSY','AI_REQUEST_INTERVAL','AI_PAUSED']);
+const AI_NOTICE_CODES=new Set(['AI_MEMBER_DAILY_LIMIT','AI_GLOBAL_DAILY_LIMIT','AI_MEMBER_BUSY','AI_SERVICE_BUSY','AI_REPORT_BUSY','AI_REQUEST_INTERVAL','AI_PAUSED']);
 function analysisFailure(error) {
   const notice=AI_NOTICE_CODES.has(error.code);
   const code=notice ? error.code : error.code==='AI_LIMIT_UNAVAILABLE' ? 'AI_LIMIT_UNAVAILABLE' : 'AI_UNAVAILABLE';

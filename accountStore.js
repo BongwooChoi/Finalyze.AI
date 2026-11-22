@@ -3,6 +3,7 @@ const fs = require('node:fs');
 const { randomUUID } = require('node:crypto');
 
 const SCHEMA = [
+  `CREATE TABLE IF NOT EXISTS app_analysis_results (report_key TEXT PRIMARY KEY, result_json TEXT, owner TEXT NOT NULL, lease_until BIGINT NOT NULL)`,
   `CREATE TABLE IF NOT EXISTS app_users (id TEXT PRIMARY KEY, created_at BIGINT NOT NULL, email_enc TEXT, email_enabled INTEGER NOT NULL DEFAULT 0, email_since BIGINT NOT NULL DEFAULT 0)`,
   `CREATE TABLE IF NOT EXISTS app_admin_grants (user_id TEXT PRIMARY KEY REFERENCES app_users(id) ON DELETE CASCADE, email_hash TEXT NOT NULL)`,
   `CREATE TABLE IF NOT EXISTS app_service_settings (id TEXT PRIMARY KEY, version BIGINT NOT NULL, value_json TEXT NOT NULL, updated_at BIGINT NOT NULL, updated_by TEXT NOT NULL)`,

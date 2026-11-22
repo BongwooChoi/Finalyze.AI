@@ -2043,3 +2043,27 @@ body.app-mode .features-section {
 
 .page-hero-heading { margin: 0; font: inherit; }
 .page-hero-heading .hero-title { display: block; }
+
+.btn-share-report {
+  --bs-btn-color: #fff;
+  --bs-btn-bg: #2354a3;
+  --bs-btn-border-color: #2354a3;
+  --bs-btn-hover-color: #fff;
+  --bs-btn-hover-bg: #173f81;
+  --bs-btn-hover-border-color: #173f81;
+  --bs-btn-active-color: #fff;
+  --bs-btn-active-bg: #173f81;
+  --bs-btn-focus-shadow-rgb: 53, 113, 209;
+  font-weight: 650;
+}
+html[data-theme="terminal"] .btn-share-report {
+  --bs-btn-color: #18130b;
+  --bs-btn-bg: #edb45e;
+  --bs-btn-border-color: #edb45e;
+  --bs-btn-hover-color: #18130b;
+  --bs-btn-hover-bg: #ffd18d;
+  --bs-btn-hover-border-color: #ffd18d;
+  --bs-btn-active-color: #18130b;
+  --bs-btn-active-bg: #ffd18d;
+  --bs-btn-focus-shadow-rgb: 237, 180, 94;
+}

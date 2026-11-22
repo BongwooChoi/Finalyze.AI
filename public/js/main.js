@@ -860,6 +860,7 @@ function showAiNotice(context,data) {
     AI_MEMBER_DAILY_LIMIT:{status:'limited',title:'오늘 이용 가능한 AI 분석을 모두 사용했어요',icon:'bi-calendar-check'},
     AI_GLOBAL_DAILY_LIMIT:{status:'limited',title:'오늘의 AI 분석 제공량이 소진됐어요',icon:'bi-calendar-check'},
     AI_MEMBER_BUSY:{status:'waiting',title:'진행 중인 분석을 기다려주세요',icon:'bi-hourglass-split'},
+    AI_REPORT_BUSY:{status:'waiting',title:'이 공시의 분석을 작성하고 있어요',icon:'bi-hourglass-split'},
     AI_SERVICE_BUSY:{status:'waiting',title:'AI 분석 요청이 몰리고 있어요',icon:'bi-hourglass-split'},
     AI_REQUEST_INTERVAL:{status:'waiting',title:'잠시 간격을 두고 요청해주세요',icon:'bi-clock'},
     AI_PAUSED:{status:'paused',title:'AI 분석을 잠시 쉬고 있어요',icon:'bi-pause-circle'}
@@ -939,6 +940,12 @@ async function requestAiAnalysis(context, previewOnly = false) {
       throw new Error(data.message || 'AI 분석을 불러오지 못했습니다. 잠시 후 다시 시도해주세요.');
     }
     panel.content.innerHTML = renderAiAnalysisHtml(data.result,context.kind);
+    if (data.cached) {
+      const note = document.createElement('p');
+      note.className = 'small text-body-secondary mb-2';
+      note.textContent = '저장된 AI 분석 · 이용 횟수 차감 없음';
+      panel.content.prepend(note);
+    }
     panel.content.style.display = 'block'; context.status = 'complete';
     if(context.kind === 'provisional') {
       document.getElementById('provisionalPdfBtn').disabled = false;
@@ -997,7 +1004,8 @@ document.addEventListener('account:changed',event => {
 // Snapshot the selected report so login and delayed responses keep the correct company and period.
 function fetchAIFinancialAnalysis(analysis, shared) {
   const context = {kind:'financial',status:'idle',financialData:{
-      companyName: selectedCompany.corp_name,
+      companyName: analysis.companyName || selectedCompany.corp_name,
+      reportProof: analysis.reportProof,
       year: currentYear,
       previousYear: previousYear,
       balanceSheet: analysis.balanceSheet,
